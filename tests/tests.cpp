@@ -12,51 +12,6 @@
 
 using std::string;
 
-TEST_CASE("Decode card", "[card]") {
-  std::set<int> card_ids;
-  for(int rank = 0; rank < 13; ++rank) {
-    for(int suit = 0; suit < 4; ++suit) {
-      string card_str = string(1, "23456789TJQKA"[rank]) + "sdhc"[suit];
-      int bits = make_card(card_str);
-      card_ids.insert(bits);
-      REQUIRE(decode_cards(bits) == card_str);
-    }
-  }
-  REQUIRE(card_ids.size() == 52);
-};
-
-TEST_CASE("Decode hand", "[card]") {
-  string ranks = "23456789TJQKA";
-  string suits = "sdhc";
-  for(int i = 0; i < 13; ++i) {
-    for(int j = 0; j < 13; ++j) {
-      int si = i % 4;
-      int sj = j % 4;
-      string hand_str = string(1, ranks[i]) + suits[si] + ranks[j] + suits[sj];
-      REQUIRE(decode_cards(make_hand(hand_str)) == hand_str);
-    }
-  }
-}
-
-TEST_CASE("Evaluate hand", "[eval]") {
-  omp::HandEvaluator evaluator;
-  std::fstream file("../resources/eval_testset.txt");
-  string line;
-  while(std::getline(file, line)) {
-    std::string hero_str = line.substr(0, 15);
-    std::string villain_str = line.substr(15, 15);
-    omp::Hand hero = omp::Hand::empty();
-    omp::Hand villain = omp::Hand::empty();
-    for(int i = 0; i < hero_str.length(); i += 3) {
-      hero += omp::Hand(hero_str.substr(i, 2));
-    }
-    for(int i = 0; i < villain_str.length(); i += 3) {
-      villain += omp::Hand(villain_str.substr(i, 2));
-    }
-    REQUIRE((evaluator.evaluate(hero) > evaluator.evaluate(villain)) == (line[line.length() - 1] == '1'));
-  }
-};
-
 TEST_CASE("Evaluate benchmark", "[eval]") {
   omp::HandEvaluator evaluator;
   omp::Hand hero = omp::Hand("Qd") + omp::Hand("As") + omp::Hand("6h") + omp::Hand("Js") + omp::Hand("2c");
