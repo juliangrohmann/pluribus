@@ -10,6 +10,7 @@
 #include <omp/HandEvaluator.h>
 #include <pluribus/poker.hpp>
 
+using namespace pluribus;
 using std::string;
 
 TEST_CASE("Evaluate benchmark", "[eval]") {
