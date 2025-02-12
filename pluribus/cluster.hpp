@@ -4,6 +4,7 @@
 #include <array>
 #include <omp/EquityCalculator.h>
 #include <omp/Hand.h>
+#include <hand_isomorphism/hand_index.h>
 
 namespace pluribus {
 

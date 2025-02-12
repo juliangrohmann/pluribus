@@ -13,6 +13,7 @@
 #include <hand_isomorphism/hand_index.h>
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
+#include <pluribus/util.hpp>
 
 using namespace pluribus;
 using std::string;
@@ -25,15 +26,7 @@ omp::Hand init_hand(const std::string& str) {
 
 std::vector<std::vector<int>> board_idx_sample(int round, int amount) {
   hand_indexer_t indexer;
-  uint8_t n_cards[round + 1];
-  uint8_t all_rounds[] = {2, 3, 1, 1};
-  int card_sum = 0;
-  for(int i = 0; i < round + 1; ++i) {
-    n_cards[i] = all_rounds[i];
-    card_sum += all_rounds[i];
-  }
-
-  assert(hand_indexer_init(round + 1, n_cards, &indexer));
+  int card_sum = init_indexer(indexer, round);
   int n_idx = hand_indexer_size(&indexer, round);
 
   uint8_t cards[7] = {};

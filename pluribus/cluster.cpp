@@ -12,6 +12,7 @@
 #include <hand_isomorphism/hand_index.h>
 #include <omp/EquityCalculator.h>
 #include <omp/CardRange.h>
+#include <pluribus/util.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 
@@ -80,6 +81,7 @@ void solve_features(const hand_indexer_t& indexer, int round, int card_sum, size
   std::vector<float> feature_map((end - start) * 8);
   std::cout << "launching threads..." << std::endl;
   std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+  
   #pragma omp parallel for schedule(static)
   for(size_t idx = start; idx < end; ++idx) {
     int tid = omp_get_thread_num();
@@ -114,16 +116,7 @@ void solve_features(const hand_indexer_t& indexer, int round, int card_sum, size
 void build_ochs_features(int round) {
   omp::EquityCalculator eq;
   hand_indexer_t indexer;
-  uint8_t n_cards[round + 1];
-  uint8_t all_rounds[] = {2, 3, 1, 1};
-  int card_sum = 0;
-  for(int i = 0; i < round + 1; ++i) {
-    n_cards[i] = all_rounds[i];
-    card_sum += all_rounds[i];
-  }
-
-  bool init_success = hand_indexer_init(round + 1, n_cards, &indexer);
-  assert(init_success && "Failed to initialize indexer.");
+  int card_sum = init_indexer(indexer, round);
   size_t n_idx = hand_indexer_size(&indexer, round);
   if(round == 3) {
     int n_batches = 10;

@@ -1,0 +1,36 @@
+#include <cassert>
+#include <string>
+#include <omp/Hand.h>
+#include <hand_isomorphism/hand_index.h>
+
+namespace pluribus {
+
+int card_to_idx(const std::string& card) {
+  assert(card.length() == 2 && "Card string must have length == 2.");
+  return omp::RANKS.find(card[0]) * 4 + omp::SUITS.find(card[1]);
+}
+
+std::string idx_to_card(int idx) {
+  return std::string(1, omp::RANKS[idx / 4]) + omp::SUITS[idx % 4];
+}
+
+void str_to_cards(std::string card_str, uint8_t cards[]) {
+  for(int i = 0; i < card_str.length(); i += 2) {
+    cards[i / 2] = card_to_idx(card_str.substr(i, 2));
+  }
+}
+
+int init_indexer(hand_indexer_t& indexer, int round) {
+  uint8_t n_cards[round + 1];
+  uint8_t all_rounds[] = {2, 3, 1, 1};
+  int card_sum = 0;
+  for(int i = 0; i < round + 1; ++i) {
+    n_cards[i] = all_rounds[i];
+    card_sum += all_rounds[i];
+  }
+  bool init_success = hand_indexer_init(round + 1, n_cards, &indexer);
+  assert(init_success && "Failed to initialize indexer.");
+  return card_sum;
+}
+
+}
