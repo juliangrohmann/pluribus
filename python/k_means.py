@@ -10,9 +10,8 @@ def cluster(data, n_clusters):
   return km.labels_.to_pandas().values
 
 def cluster_batched(i, n_clusters):
-  data = np.concatenate([np.load(f"features_{i}_b{b}.npy").astype(np.half) for b in range(10)])
+  data = np.concatenate([np.load(f"features_{i}_b{b}.npy") for b in range(10)])
   print(data.shape)
-  print(data)
   cluster(data, n_clusters)
 
 
