@@ -63,13 +63,16 @@ struct Hand
     }
 
     // Initialize hand from a hand string.
-    Hand(std::string handStr)
+    Hand(const std::string& handStr)
     {
         #if OMP_SSE2
         omp_assert((uintptr_t)&mData % sizeof(__m128i) == 0);
         #endif
-        omp_assert(handStr.length() == 2);
-        *this = CARDS[4 * RANKS.find(handStr[0]) + SUITS.find(handStr[1])];
+        omp_assert(handStr.length() % 2 == 0);
+        *this = Hand(4 * RANKS.find(handStr[0]) + SUITS.find(handStr[1]));
+        for(int i = 2; i < handStr.length(); i += 2) {
+            *this += Hand(4 * RANKS.find(handStr[i]) + SUITS.find(handStr[i + 1]));
+        }
     }
 
     // Combine with another hand.
@@ -118,6 +121,11 @@ struct Hand
     bool operator==(const Hand& hand2) const
     {
         return mask() == hand2.mask() && key() == hand2.key();
+    }
+
+    bool contains(const Hand& hand2) const
+    {
+        return (mask() & hand2.mask());
     }
 
     // Initialize a new empty hand.

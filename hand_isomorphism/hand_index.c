@@ -512,7 +512,7 @@ bool hand_unindex(const hand_indexer_t * indexer, uint_fast32_t round, hand_inde
   if (round >= indexer->rounds || index >= indexer->round_size[round]) {
     return false;
   }
-
+  
   uint_fast32_t low = 0, high = indexer->configurations[round], configuration_idx = 0;
   while(low < high) {
     uint_fast32_t mid = (low+high)/2;

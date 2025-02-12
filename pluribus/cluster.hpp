@@ -18,6 +18,9 @@ const std::array<std::string, 8> ochs_categories = {
   "88,99,TT,JJ,QQ,KK,AA"
 };
 
-std::array<float, 8> features(omp::EquityCalculator& calc, const std::string& hand, const std::string& board);
+void assign_features(const std::string& hand, const std::string& board, float* data);
+double equity(const omp::Hand& hero, const omp::CardRange villain, const omp::Hand& board);
+void build_ochs_features(int round);
+void build_ochs_features(int round, int test);
 
 }

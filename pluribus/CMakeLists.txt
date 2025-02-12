@@ -3,3 +3,4 @@ add_library(
   poker.cpp
   cluster.cpp
 )
+target_link_libraries(PluribusLib PRIVATE OpenMP::OpenMP_CXX cnpy z HandIsoLib OMPEvalLib ${Boost_LIBRARIES})
