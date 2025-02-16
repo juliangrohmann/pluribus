@@ -2,6 +2,11 @@ add_library(
   PluribusLib
   poker.cpp
   cluster.cpp
+  agent.cpp
+  simulate.cpp
+  actions.cpp
+  infoset.cpp
+  mccfr.cpp
   util.cpp
   debug.cpp
 )

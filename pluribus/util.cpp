@@ -5,7 +5,7 @@
 
 namespace pluribus {
 
-int card_to_idx(const std::string& card) {
+uint8_t card_to_idx(const std::string& card) {
   assert(card.length() == 2 && "Card string must have length == 2.");
   return omp::RANKS.find(card[0]) * 4 + omp::SUITS.find(card[1]);
 }
@@ -18,6 +18,14 @@ void str_to_cards(std::string card_str, uint8_t cards[]) {
   for(int i = 0; i < card_str.length(); i += 2) {
     cards[i / 2] = card_to_idx(card_str.substr(i, 2));
   }
+}
+
+std::string cards_to_str(uint8_t cards[], int n) {
+  std::string str = "";
+  for(int i = 0; i < n; ++i) {
+    str += idx_to_card(cards[i]);
+  }
+  return str;
 }
 
 int init_indexer(hand_indexer_t& indexer, int round) {

@@ -8,11 +8,15 @@
 
 namespace pluribus {
 
-void print_cards(uint8_t cards[], int n) {
-  for(int i = 0; i < n; ++i) {
-    std::cout << idx_to_card(cards[i]);
+std::string round_to_str(int round) {
+  switch(round) {
+    case 0: return "Preflop";
+    case 1: return "Flop";
+    case 2: return "Turn";
+    case 3: return "River";
+    case 4: return "Showdown";
+    default: return "Unknown round: " + std::to_string(round);
   }
-  std::cout << '\n';
 }
 
 std::string cluster_file(int round, int n_clusters) {
@@ -26,7 +30,7 @@ void print_cluster(int cluster, int round, const hand_indexer_t& indexer, const 
   for(int i = 0; i < n_idx; ++i) {
     if(clusters[i] != cluster) continue;
     hand_unindex(&indexer, round, i, cards);
-    print_cards(cards, card_sum);
+    std::cout << cards_to_str(cards, card_sum) << "\n";
   }
 }
 

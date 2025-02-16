@@ -13,6 +13,10 @@
 #include <hand_isomorphism/hand_index.h>
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
+#include <pluribus/agent.hpp>
+#include <pluribus/simulate.hpp>
+#include <pluribus/actions.hpp>
+#include <pluribus/infoset.hpp>
 #include <pluribus/util.hpp>
 
 using namespace pluribus;
@@ -143,4 +147,40 @@ TEST_CASE("Simple equity solver", "[equity]") {
       REQUIRE(abs(calc_eq - simple_eq) < 1e-5);
     }
   }
+}
+
+TEST_CASE("Simulate hands", "[poker]") {
+  std::vector<Agent*> agents;
+  for(int i = 0; i < 9; ++i) {
+    agents.push_back(new RandomAgent());
+  }
+  auto results = simulate(agents, 100 * 100, 0, 10'000);
+  for(int t = 0; t < results.size(); ++t) {
+    long net = 0;
+    for(const auto& result : results) {
+      net += result[t];
+    }
+    REQUIRE(net == 0);
+  }
+}
+
+TEST_CASE("Split pot", "[poker]") {
+  Deck deck;
+  std::vector<std::array<uint8_t, 2>> hands{
+    {card_to_idx("Ks"), card_to_idx("Tc")},
+    {card_to_idx("As"), card_to_idx("4c")},
+    {card_to_idx("Ac"), card_to_idx("2h")}
+  };
+  std::array<uint8_t, 5> board;
+  str_to_cards("AdKh9s9h5c", board.data());
+  ActionHistory actions = {
+    Action::PREFLOP_2_BET, Action::FOLD, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action::BET_33, Action::POSTFLOP_2_BET, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action::CHECK_CALL
+  };
+  auto result = simulate_round(board, hands, actions, 10000, 0);
+  REQUIRE(result[0] == -50);
+  REQUIRE(result[1] == 25);
+  REQUIRE(result[2] == 25);
 }
