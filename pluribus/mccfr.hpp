@@ -21,7 +21,7 @@ struct StrategyState {
   }
 };
 
-const int it_per_sec = 1000;
+const int it_per_sec = 3000;
 const int it_per_min = it_per_sec * 60;
 
 class BlueprintTrainer {
