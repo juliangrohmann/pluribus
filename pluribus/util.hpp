@@ -5,6 +5,7 @@
 
 namespace pluribus {
 
+std::string date_time_str();
 uint8_t card_to_idx(const std::string& card);
 std::string idx_to_card(int idx);
 void str_to_cards(std::string card_str, uint8_t cards[]);

@@ -21,12 +21,15 @@ struct StrategyState {
   }
 };
 
+const int it_per_sec = 1000;
+const int it_per_min = it_per_sec * 60;
+
 class BlueprintTrainer {
 public:
-  BlueprintTrainer(int n_players, int n_chips, int ante, int strategy_interval = 10'000, int prune_thresh = 12'000'000, 
-                   int prune_cutoff = -300'000'000, int regret_floor = -310'000'000, int lcfr_thresh = 24'000'000, 
-                   int discount_interval = 600'000, int log_interval = 10'000);
-  void mccfr_p(int T);
+  BlueprintTrainer(int n_players, int n_chips, int ante, int strategy_interval = 10'000, int preflop_threshold = 800 * it_per_min, 
+                   int snapshot_interval = 200 * it_per_min, int prune_thresh = 200 * it_per_min, int prune_cutoff = -300'000'000, int regret_floor = -310'000'000,
+                   int lcfr_thresh = 400 * it_per_min, int discount_interval = 10 * it_per_min, int log_interval = it_per_min);
+  void mccfr_p(long T);
   void save_strategy(std::string fn) const;
   void load_strategy(std::string fn);
   long count_infosets();
@@ -48,6 +51,8 @@ private:
   int _n_chips;
   int _ante;
   int _strategy_interval;
+  int _preflop_threshold;
+  int _snapshot_interval;
   int _prune_thresh;
   int _prune_cutoff;
   int _regret_floor;

@@ -1,9 +1,26 @@
+#include <iostream>
+#include <iomanip>
 #include <cassert>
 #include <string>
+#include <ctime>
+#include <sstream>
 #include <omp/Hand.h>
 #include <hand_isomorphism/hand_index.h>
 
 namespace pluribus {
+
+std::string date_time_str() {
+    std::time_t t = std::time(nullptr);
+    std::tm tm;
+#ifdef _WIN32
+    localtime_s(&tm, &t);
+#else
+    localtime_r(&t, &tm);
+#endif
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%Y-%m-%d_%H-%M-%S");
+    return oss.str();
+}
 
 uint8_t card_to_idx(const std::string& card) {
   assert(card.length() == 2 && "Card string must have length == 2.");

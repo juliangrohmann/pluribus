@@ -1,6 +1,7 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <string>
 #include <algorithm>
 #include <stdexcept>
 #include <tqdm/tqdm.hpp>
@@ -17,29 +18,36 @@ bool StrategyState::operator==(const StrategyState& other) const {
   return regret == other.regret && frequency == other.frequency && phi == other.phi;
 }
 
-BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, int strategy_interval, int prune_thresh, int prune_cutoff, int regret_floor,
-                                  int lcfr_thresh, int discount_interval, int log_interval) : 
+std::string minutes_str(int val) {
+  return " (" + std::to_string(val / it_per_min) + " m)";
+}
+
+BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, int strategy_interval, int preflop_threshold, int snapshot_interval, 
+                                   int prune_thresh, int prune_cutoff, int regret_floor, int lcfr_thresh, int discount_interval, int log_interval) : 
     _strategy{}, _eval{}, _n_players{n_players}, _n_chips{n_chips}, _ante{ante}, _strategy_interval{strategy_interval}, 
-    _prune_thresh{prune_thresh}, _prune_cutoff{prune_cutoff}, _regret_floor{regret_floor}, _lcfr_thresh{lcfr_thresh}, 
-    _discount_interval{discount_interval}, _log_interval{log_interval} {
+    _preflop_threshold{preflop_threshold}, _snapshot_interval{snapshot_interval}, _prune_thresh{prune_thresh}, _prune_cutoff{prune_cutoff},
+    _regret_floor{regret_floor}, _lcfr_thresh{lcfr_thresh}, _discount_interval{discount_interval}, _log_interval{log_interval} {
   std::cout << "N players: " << _n_players << "\n";
   std::cout << "N chips: " << _n_chips << "\n";
   std::cout << "Ante: " << _ante << "\n";
+  std::cout << "Iterations/s: " << it_per_sec << "\n";
+  std::cout << "Iterations/min: " << it_per_min << "\n";
   std::cout << "Strategy interval: " << _strategy_interval << "\n";
-  std::cout << "Prune threshold: " << _prune_thresh << "\n";
+  std::cout << "Preflop threshold: " << _preflop_threshold << minutes_str(_preflop_threshold) << "\n";
+  std::cout << "Snapshot interval: " << _snapshot_interval << minutes_str(_snapshot_interval) << "\n";
+  std::cout << "Prune threshold: " << _prune_thresh << minutes_str(_prune_thresh) << "\n";
   std::cout << "Prune cutoff: " << _prune_cutoff << "\n";
   std::cout << "Regret floor: " << _regret_floor << "\n";
-  std::cout << "LCFR threshold: " << _lcfr_thresh << "\n";
-  std::cout << "Discount interval: " << _discount_interval << "\n";
-  std::cout << "Log interval: " << _log_interval << "\n";
+  std::cout << "LCFR threshold: " << _lcfr_thresh << minutes_str(_lcfr_thresh) << "\n";
+  std::cout << "Discount interval: " << _discount_interval << minutes_str(_discount_interval) << "\n";
+  std::cout << "Log interval: " << _log_interval << minutes_str(_log_interval) << "\n";
 }
 
-void BlueprintTrainer::mccfr_p(int T) {
+void BlueprintTrainer::mccfr_p(long T) {
   Deck deck;
   Board board;
   std::vector<Hand> hands{static_cast<size_t>(_n_players)};
-  for(int t : tq::trange(1, T)) {
-  // for(long t = 1; t < T + 1; ++t) {
+  for(long t = 1; t < T + 1; ++t) {
     if(verbose) std::cout << "============== t = " << t << " ==============\n";
     if(t % _log_interval == 0) log_metrics(t);
     for(int i = 0; i < _n_players; ++i) {
@@ -48,14 +56,13 @@ void BlueprintTrainer::mccfr_p(int T) {
       board.deal(deck);
       for(Hand& hand : hands) hand.deal(deck);
 
-      if(t % _strategy_interval == 0) {
+      if(t < _preflop_threshold && t % _strategy_interval == 0) {
         if(verbose) std::cout << "============== Updating strategy ==============\n";
         // deck.shuffle();
         // board.deal(deck);
         // for(Hand& hand : hands) hand.deal(deck);
         update_strategy(PokerState{_n_players, _n_chips, _ante}, i, board, hands);
       }
-
       if(t > _prune_thresh) {
         std::uniform_real_distribution<float> dist(0.0f, 1.0f);
         float q = dist(GlobalRNG::instance());
@@ -83,6 +90,11 @@ void BlueprintTrainer::mccfr_p(int T) {
           action_entry.second.phi *= d;
         }
       }
+    }
+    if(t > _preflop_threshold && t % _snapshot_interval == 0) {
+      if(verbose) std::cout << "============== Saving snapshot ==============\n";
+      std::string fn = date_time_str() + "_t" + std::to_string(t) + ".bin";
+      save_strategy(fn);
     }
   }
 }
@@ -242,21 +254,7 @@ Action BlueprintTrainer::sample(const InformationSet& info_set) const {
 }
 
 void BlueprintTrainer::log_metrics(int t) {
-  // long info_sets = 0;
-  // long total_r_imm = 0;
-  // for(const auto& strat_entry : _strategy) {
-  //   ++info_sets;
-  //   int max_r_imm = 0;
-  //   for(const auto& action_entry : strat_entry.second) {
-  //     if(action_entry.second.counter == 0) continue;
-  //     max_r_imm = std::max(action_entry.second.regret / action_entry.second.counter, max_r_imm);
-  //   }
-  //   total_r_imm += max_r_imm;
-  // }
-  // if(info_sets == 0) return;
-  // long avg_r_imm = total_r_imm / info_sets;
-  // std::cout << std::setprecision(2) << "t=" << t << "    " << "infosets=" << info_sets << "    " 
-  //           << "total imm regret=" << total_r_imm << "    " << "avg imm regret=" << avg_r_imm << "\n";
+  std::cout << std::setprecision(2) << "t=" << t << "\n";
 }
 
 void BlueprintTrainer::save_strategy(std::string fn) const {
