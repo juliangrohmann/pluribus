@@ -101,6 +101,10 @@ int8_t find_winner(const PokerState& state) {
   return winner;
 }
 
+int big_blind_idx(const PokerState& state) {
+  return state.get_players().size() == 2 ? 0 : 1;
+}
+
 PokerState PokerState::bet(int amount) const {
   if(verbose) std::cout << std::fixed << std::setprecision(2) << "Player " << static_cast<int>(_active) << " (" 
                         << (_players[_active].get_chips() / 100.0) << "): " << (_bet_level == 0 ? "Bet " : "Raise to ")
@@ -140,7 +144,7 @@ PokerState PokerState::check() const {
                         << (_players[_active].get_chips() / 100.0) << "): Check\n";
   assert(!_players[_active].has_folded() && "Attempted to check but player already folded.");
   assert(_players[_active].get_betsize() == _max_bet && "Attempted check but a unmatched bet exists.");
-  assert(_max_bet == 0 || (_round == 0 && _active == 1) && "Attempted to check but a bet exists");
+  assert(_max_bet == 0 || (_round == 0 && _active == big_blind_idx(*this)) && "Attempted to check but a bet exists");
   assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to check but there are no opponents left.");
   PokerState state = *this;
   state.next_player();
@@ -183,10 +187,9 @@ void PokerState::next_round() {
 }
 
 bool is_round_complete(const PokerState& state) {
-  int big_blind = state.get_players().size() == 2 ? 0 : 1;
   return state.get_players()[state.get_active()].get_betsize() == state.get_max_bet() && 
          (state.get_max_bet() > 0 || state.get_active() == 0) &&
-         (state.get_max_bet() > 100 || state.get_active() != big_blind || state.get_round() != 0); // preflop, big blind
+         (state.get_max_bet() > 100 || state.get_active() != big_blind_idx(state) || state.get_round() != 0); // preflop, big blind
 }
 
 void PokerState::next_player() {
@@ -223,11 +226,10 @@ int total_bet_size(const PokerState& state, Action action) {
 }
 
 std::vector<Action> all_actions(const PokerState& state) {
-  int big_blind = state.get_players().size() == 2 ? 0 : 1;
   if(state.get_round() == 0) {
     switch(state.get_bet_level()) {
       case 1:
-        if(state.get_active() == big_blind) {
+        if(state.get_active() == big_blind_idx(state)) {
           return {Action::CHECK_CALL, Action::PREFLOP_2_BET, Action::ALL_IN};
         }
         else {
@@ -257,7 +259,7 @@ std::vector<Action> valid_actions(const PokerState& state) {
     if(actions[i] == Action::CHECK_CALL || actions[i] == Action::FOLD) continue;
     int total_bet = total_bet_size(state, actions[i]);
     int required = total_bet - player.get_betsize();
-    if(required > player.get_chips() || total_bet < state.get_max_bet()) {
+    if(required > player.get_chips() || total_bet <= state.get_max_bet()) {
       actions.erase(actions.begin() + i);
     }
   }
