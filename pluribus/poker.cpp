@@ -3,11 +3,14 @@
 #include <cassert>
 #include <vector>
 #include <array>
+#include <string>
 #include <initializer_list>
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
 #include <boost/functional/hash.hpp>
+#include <pluribus/rng.hpp>
 #include <pluribus/debug.hpp>
+#include <pluribus/util.hpp>
 #include <pluribus/poker.hpp>
 
 namespace pluribus {
@@ -20,7 +23,7 @@ void Deck::reset() {
 }
 
 void Deck::shuffle() {
-  std::shuffle(_cards.begin(), _cards.end(), _rng);
+  std::shuffle(_cards.begin(), _cards.end(), GlobalRNG::instance());
   _current = 0;
 }
 
@@ -49,7 +52,7 @@ PokerState::PokerState(int n_players, int chips, int ante) : _pot{150}, _max_bet
   for(int i = 0; i < n_players; ++i) {
     _players.push_back(Player{chips});
   }
-
+  
   if(_players.size() > 2) {
     _players[0].invest(50);
     
@@ -86,6 +89,18 @@ PokerState PokerState::apply(Action action) const {
   return state;
 }
 
+int8_t find_winner(const PokerState& state) {
+  int8_t winner = -1;
+  const std::vector<Player>& players = state.get_players();
+  for(int8_t i = 0; i < players.size(); ++i) {
+    if(!players[i].has_folded()) {
+      if(winner == -1) winner = i;
+      else return -1;
+    }
+  }
+  return winner;
+}
+
 PokerState PokerState::bet(int amount) const {
   if(verbose) std::cout << std::fixed << std::setprecision(2) << "Player " << static_cast<int>(_active) << " (" 
                         << (_players[_active].get_chips() / 100.0) << "): " << (_bet_level == 0 ? "Bet " : "Raise to ")
@@ -94,6 +109,7 @@ PokerState PokerState::bet(int amount) const {
   assert(_players[_active].get_chips() >= amount && "Not enough chips to bet.");
   assert(amount + _players[_active].get_betsize() > _max_bet && 
          "Attempted to bet but the players new betsize does not exceed the existing maximum bet.");
+  assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to bet but there are no opponents left.");
   PokerState state = *this;
   state._players[_active].invest(amount);
   state._pot += amount;
@@ -111,6 +127,7 @@ PokerState PokerState::call() const {
   assert(_max_bet > 0 && "Attempted call but no bet exists.");
   assert(_max_bet > _players[_active].get_betsize() && "Attempted call but player has already placed the maximum bet.");
   assert(_players[_active].get_chips() >= amount && "Not enough chips to call.");
+  assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to call but there are no opponents left.");
   PokerState state = *this;
   state._players[_active].invest(amount);
   state._pot += amount;
@@ -124,6 +141,7 @@ PokerState PokerState::check() const {
   assert(!_players[_active].has_folded() && "Attempted to check but player already folded.");
   assert(_players[_active].get_betsize() == _max_bet && "Attempted check but a unmatched bet exists.");
   assert(_max_bet == 0 || (_round == 0 && _active == 1) && "Attempted to check but a bet exists");
+  assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to check but there are no opponents left.");
   PokerState state = *this;
   state.next_player();
   return state;
@@ -135,9 +153,16 @@ PokerState PokerState::fold() const {
   assert(!_players[_active].has_folded() && "Attempted to fold but player already folded.");
   assert(_max_bet > 0 && "Attempted fold but no bet exists.");
   assert(_players[_active].get_betsize() < _max_bet && "Attempted to fold but player can check");
+  assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to fold but there are no opponents left.");
   PokerState state = *this;
   state._players[_active].fold();
-  state.next_player();
+  state._winner = find_winner(state);
+  if(state._winner == -1) {
+    state.next_player();
+  }
+  else if(verbose) {
+    std::cout << "Only player " << static_cast<int>(state._winner) << " is remaining.\n";
+  }
   return state;
 }
 
@@ -158,10 +183,10 @@ void PokerState::next_round() {
 }
 
 bool is_round_complete(const PokerState& state) {
-  // std::cout << "Max bet = " << state.get_max_bet() << ", Betsize = " << state.get_players()[state.get_active()].get_betsize() << "\n";
+  int big_blind = state.get_players().size() == 2 ? 0 : 1;
   return state.get_players()[state.get_active()].get_betsize() == state.get_max_bet() && 
          (state.get_max_bet() > 0 || state.get_active() == 0) &&
-         (state.get_max_bet() > 100 || state.get_active() != 1 || round != 0); // preflop, big blind
+         (state.get_max_bet() > 100 || state.get_active() != big_blind || state.get_round() != 0); // preflop, big blind
 }
 
 void PokerState::next_player() {
@@ -172,14 +197,6 @@ void PokerState::next_player() {
     if(is_round_complete(*this)) {
       next_round();
       return;
-    }
-    if(_active == init_player_idx && !all_in) {
-      assert(!_players[init_player_idx].has_folded() && "All players folded and there are no winners.");
-      _winner = init_player_idx;
-      return;
-    }
-    else {
-      all_in |= _players[_active].get_chips() == 0 && !_players[_active].has_folded();
     }
   } while((_players[_active].has_folded() || _players[_active].get_chips() == 0));
 }
@@ -244,17 +261,16 @@ std::vector<Action> valid_actions(const PokerState& state) {
   return actions;
 }
 
-std::vector<uint8_t> winners(const PokerState& state, const std::vector<std::array<uint8_t, 2>>& hands, 
-               const std::array<uint8_t, 5>& board_cards, const omp::HandEvaluator& eval) {
+std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board board_cards, const omp::HandEvaluator& eval) {
   int best = -1;
   std::vector<uint8_t> winners{};
   omp::Hand board = omp::Hand::empty();
-  for(const uint8_t& idx : board_cards) {
+  for(const uint8_t& idx : board_cards.cards()) {
     board += omp::Hand(idx);
   }
   for(uint8_t i = 0; i < hands.size(); ++i) {
     if(state.get_players()[i].has_folded()) continue;
-    uint16_t value = eval.evaluate(board + hands[i][0] + hands[i][1]);
+    uint16_t value = eval.evaluate(board + hands[i].cards()[0] + hands[i].cards()[1]);
     if(value == best) {
       winners.push_back(i);
     }

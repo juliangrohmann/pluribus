@@ -13,12 +13,7 @@ public:
 
 class RandomAgent : public Agent {
 public:
-  RandomAgent() : _rng{std::random_device{}()} {}
-  // RandomAgent() : _rng{222} {}
   Action act(const PokerState& state) override;
-
-private:
-  std::mt19937 _rng;
 };
 
 }

@@ -7,6 +7,6 @@
 namespace pluribus {
 
 std::vector<std::vector<long>> simulate(std::vector<Agent*> agents, int n_chips, int ante, unsigned long n_iter);
-std::vector<long> simulate_round(std::array<uint8_t, 5> board, std::vector<std::array<uint8_t, 2>> hands, ActionHistory actions, int n_chips, int ante);
+std::vector<long> simulate_round(Board board, std::vector<Hand> hands, ActionHistory actions, int n_chips, int ante);
 
 }

@@ -10,6 +10,7 @@
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
 #include <boost/dynamic_bitset.hpp>
+#include <pluribus/util.hpp>
 #include <pluribus/actions.hpp>
 
 namespace pluribus {
@@ -24,7 +25,33 @@ public:
 private:
     std::array<uint8_t, 52> _cards;
     uint8_t _current = 0;
-    std::mt19937 _rng{ std::random_device{}() };
+};
+
+template<int N>
+class CardSet {
+public:
+  CardSet() = default;
+  CardSet(std::initializer_list<uint8_t> cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
+  CardSet(std::string card_str) { str_to_cards(card_str, cards().data()); }
+  void deal(Deck& deck) { for(int i = 0; i < N; ++i) _cards[i] = deck.draw(); }
+  std::array<uint8_t, N>& cards() { return _cards; }
+  const std::array<uint8_t, N>& cards() const { return _cards; }
+private:
+  std::array<uint8_t, N> _cards;
+};
+
+class Board : public CardSet<5> {
+public:
+  Board() = default;
+  Board(std::initializer_list<uint8_t> cards) : CardSet<5>{cards} {}
+  Board(std::string card_str) : CardSet<5>{card_str} {};
+};
+
+class Hand : public CardSet<2> {
+public:
+  Hand() = default;
+  Hand(std::initializer_list<uint8_t> cards) : CardSet<2>{cards} {}
+  Hand(std::string card_str) : CardSet<2>{card_str} {};
 };
 
 class Player {
@@ -56,12 +83,14 @@ public:
   PokerState& operator=(const PokerState&) = default;
   PokerState& operator=(PokerState&&) = default;
   inline const std::vector<Player>& get_players() const { return _players; }
+  inline const ActionHistory& get_action_history() const { return _actions; }
   inline int get_pot() const { return _pot; }
   inline int get_max_bet() const { return _max_bet; }
   inline uint8_t get_active() const { return _active; }
   inline uint8_t get_round() const { return _round; }
   inline uint8_t get_bet_level() const { return _bet_level; }
   inline int8_t get_winner() const { return _winner; }
+  inline bool is_terminal() const { return get_winner() != -1 || get_round() >= 4; };
   PokerState apply(Action action) const;
   
 private:
@@ -88,8 +117,7 @@ int total_bet_size(const PokerState& state, Action action);
 std::vector<Action> all_actions(const PokerState& state);
 std::vector<Action> valid_actions(const PokerState& state);
 
-std::vector<uint8_t> winners(const PokerState& state, const std::vector<std::array<uint8_t, 2>>& hands, 
-               const std::array<uint8_t, 5>& board_cards, const omp::HandEvaluator& eval);
+std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board board_cards, const omp::HandEvaluator& eval);
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands);
 void deal_board(Deck& deck, std::array<uint8_t, 5>& board);
 }

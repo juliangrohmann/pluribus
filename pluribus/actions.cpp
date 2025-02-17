@@ -1,3 +1,4 @@
+#include <iostream>
 #include <pluribus/actions.hpp>
 
 namespace pluribus {
@@ -7,6 +8,10 @@ ActionHistory::ActionHistory(std::initializer_list<Action> list) {
     push_back(action);
   }
 };
+
+bool ActionHistory::operator==(const ActionHistory& other) const {
+  return _data == other._data;
+}
 
 void ActionHistory::push_back(Action action) {
   if(_end_idx >= _data.size()) {
@@ -32,6 +37,14 @@ Action ActionHistory::get(int idx) const {
 
 size_t ActionHistory::size() const {
   return _end_idx / action_bits;
+}
+
+std::string ActionHistory::to_string() const {
+  std::string str = "";
+  for(int i = 0; i < size(); ++i) {
+    str += action_to_str.at(get(i)) + (i == size() - 1 ? "" : " -> ");
+  }
+  return str;
 }
 
 }

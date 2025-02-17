@@ -1,16 +1,28 @@
 #pragma once
 
+#include <hand_isomorphism/hand_index.h>
 #include <pluribus/actions.hpp>
 
 namespace pluribus {
 
 class InformationSet {
 public:
-const ActionHistory& getHistory() const { return _history; }
-  uint16_t getCluster() const { return cluster; }
+  InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round);
+  InformationSet() = default;
+  bool operator==(const InformationSet& other) const;
+  const ActionHistory& getHistory() const { return _history; }
+  uint16_t getCluster() const { return _cluster; }
+  std::string to_string() const;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_history, _cluster);
+  }
 private:
+  static const std::array<hand_indexer_t, 4> _indexers;
+  static const std::array<std::vector<uint16_t>, 4> _cluster_map;
   ActionHistory _history;
-  uint16_t cluster;
+  uint16_t _cluster;
 };
 
 }

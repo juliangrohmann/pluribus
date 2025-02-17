@@ -135,4 +135,31 @@ void build_ochs_features(int round) {
   hand_indexer_free(&indexer);
 }
 
+std::string cluster_filename(int round, int n_clusters, int split) {
+  std::string base = "clusters_r" + std::to_string(round) + "_c" + std::to_string(n_clusters);
+  return base + (round == 3 ? "_p" + std::to_string(split) + ".npy": ".npy");
+}
+
+std::array<std::vector<uint16_t>, 4> init_cluster_map(int n_clusters) {
+  std::array<std::vector<uint16_t>, 4> cluster_map;
+  for(int i = 0; i < 4; ++i) {
+    std::cout << "Loading round " << i << " clusters...\n";
+    if(i == 0)  {
+      cluster_map[i].resize(169);
+      std::iota(cluster_map[i].begin(), cluster_map[i].end(), 0);
+    }
+    else if(i == 3) {
+      cluster_map[i] = cnpy::npy_load(cluster_filename(i, n_clusters, 1)).as_vec<uint16_t>();
+      auto s2 = cnpy::npy_load(cluster_filename(i, n_clusters, 2)).as_vec<uint16_t>();
+      size_t s1_size = cluster_map[i].size();
+      cluster_map[i].resize(cluster_map[i].size() + s2.size());
+      std::copy(s2.begin(), s2.end(), cluster_map[i].data() + s1_size);
+    }
+    else {
+      cluster_map[i] = cnpy::npy_load(cluster_filename(i, n_clusters, 1)).as_vec<uint16_t>();
+    }
+  }
+  return cluster_map;
+}
+
 }

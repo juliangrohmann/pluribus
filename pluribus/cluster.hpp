@@ -2,6 +2,7 @@
 
 #include <string>
 #include <array>
+#include <vector>
 #include <omp/EquityCalculator.h>
 #include <omp/Hand.h>
 #include <hand_isomorphism/hand_index.h>
@@ -23,5 +24,7 @@ void assign_features(const std::string& hand, const std::string& board, float* d
 double equity(const omp::Hand& hero, const omp::CardRange villain, const omp::Hand& board);
 void build_ochs_features(int round);
 void build_ochs_features(int round, int test);
+std::string cluster_filename(int round, int n_clusters, int split);
+std::array<std::vector<uint16_t>, 4> init_cluster_map(int n_clusters);
 
 }

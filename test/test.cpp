@@ -6,7 +6,8 @@
 #include <fstream>
 #include <algorithm>
 #include <cmath>
-
+#include <cereal/archives/binary.hpp>
+#include <cereal/types/unordered_map.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
@@ -17,6 +18,7 @@
 #include <pluribus/simulate.hpp>
 #include <pluribus/actions.hpp>
 #include <pluribus/infoset.hpp>
+#include <pluribus/mccfr.hpp>
 #include <pluribus/util.hpp>
 
 using namespace pluribus;
@@ -166,13 +168,8 @@ TEST_CASE("Simulate hands", "[poker]") {
 
 TEST_CASE("Split pot", "[poker]") {
   Deck deck;
-  std::vector<std::array<uint8_t, 2>> hands{
-    {card_to_idx("Ks"), card_to_idx("Tc")},
-    {card_to_idx("As"), card_to_idx("4c")},
-    {card_to_idx("Ac"), card_to_idx("2h")}
-  };
-  std::array<uint8_t, 5> board;
-  str_to_cards("AdKh9s9h5c", board.data());
+  std::vector<Hand> hands{{"KsTc"}, {"As4c"}, {"Ac2h"}};
+  Board board{"AdKh9s9h5c"};
   ActionHistory actions = {
     Action::PREFLOP_2_BET, Action::FOLD, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::BET_33, Action::POSTFLOP_2_BET, Action::CHECK_CALL,
@@ -183,4 +180,102 @@ TEST_CASE("Split pot", "[poker]") {
   REQUIRE(result[0] == -50);
   REQUIRE(result[1] == 25);
   REQUIRE(result[2] == 25);
+}
+
+TEST_CASE("Serialize ActionHistory", "[serialize]") {
+  ActionHistory actions = {
+    Action::PREFLOP_2_BET, Action::FOLD, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action::BET_33, Action::POSTFLOP_2_BET, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action::CHECK_CALL
+  };
+  
+  {
+    std::ofstream os("test_actions.bin", std::ios::binary);
+    cereal::BinaryOutputArchive oarchive(os);
+    oarchive(actions);
+  }
+  
+  ActionHistory loaded_actions;
+  {
+    std::ifstream is("test_actions.bin", std::ios::binary);
+    cereal::BinaryInputArchive iarchive(is);
+    iarchive(loaded_actions);
+  }
+
+  REQUIRE(loaded_actions.size() == actions.size());
+  for(int i = 0; i < loaded_actions.size(); ++i) {
+    REQUIRE(loaded_actions.get(i) == actions.get(i));
+  }
+}
+
+TEST_CASE("Serialize StrategyState", "[serialize]") {
+  StrategyState state;
+  state.regret = 69;
+  state.frequency = 0.42;
+  state.phi = 7;
+
+  {
+    std::ofstream os("test_strategy_state.bin", std::ios::binary);
+    cereal::BinaryOutputArchive oarchive(os);
+    oarchive(state);
+  }
+  
+  StrategyState loaded_state;
+  {
+    std::ifstream is("test_strategy_state.bin", std::ios::binary);
+    cereal::BinaryInputArchive iarchive(is);
+    iarchive(loaded_state);
+  }
+
+  REQUIRE(loaded_state.regret == state.regret);
+  REQUIRE(loaded_state.frequency == state.frequency);
+  REQUIRE(loaded_state.phi == state.phi);
+}
+
+TEST_CASE("Serialize InformationSet", "[serialize]") {
+  Hand hand{"KsTc"};
+  Board board{"AdKh9s9h5c"};
+  ActionHistory actions = {
+    Action::PREFLOP_2_BET, Action::FOLD, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action::BET_33, Action::POSTFLOP_2_BET, Action::CHECK_CALL,
+    Action::CHECK_CALL
+  };
+  InformationSet info_set{actions, board, hand, 2};
+
+  {
+    std::ofstream os("test_info_set.bin", std::ios::binary);
+    cereal::BinaryOutputArchive oarchive(os);
+    oarchive(info_set);
+  }
+  
+  InformationSet loaded_info_set;
+  {
+    std::ifstream is("test_info_set.bin", std::ios::binary);
+    cereal::BinaryInputArchive iarchive(is);
+    iarchive(loaded_info_set);
+  }
+
+  REQUIRE(loaded_info_set == info_set);
+}
+
+TEST_CASE("Serialize strategy", "[serialize]") {
+  BlueprintTrainer trainer{2, 10'000, 0};
+  std::cout << trainer.count_infosets() << "\n";
+  trainer.mccfr_p(1000);
+
+  {
+    std::ofstream os("test_strategy.bin", std::ios::binary);
+    cereal::BinaryOutputArchive oarchive(os);
+    oarchive(trainer.get_strategy());
+  }
+  
+  std::unordered_map<InformationSet, std::unordered_map<Action, StrategyState>> loaded_strategy;
+  {
+    std::ifstream is("test_strategy.bin", std::ios::binary);
+    cereal::BinaryInputArchive iarchive(is);
+    iarchive(loaded_strategy);
+  }
+
+  REQUIRE(loaded_strategy == trainer.get_strategy());
 }

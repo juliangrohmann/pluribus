@@ -1,10 +1,15 @@
+#include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <cnpy.h>
 #include <hand_isomorphism/hand_index.h>
 #include <pluribus/util.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/debug.hpp>
+#include <pluribus/mccfr.hpp>
 
 namespace pluribus {
 
@@ -53,6 +58,34 @@ void print_similar_boards(std::string board, int n_clusters) {
   int cluster = clusters[idx];
   std::cout << board << " cluster: " << cluster << std::endl;
   print_cluster(cluster, round, indexer, clusters);
+}
+
+std::string strategy_str(const std::unordered_map<InformationSet, std::unordered_map<Action, StrategyState>>& strategy, 
+                         const ActionHistory& history, Action action, const Board& board, int round) {
+  std::ostringstream oss;
+  for(uint8_t i = 0; i < 52; ++i) {
+    for(uint8_t j = i + 1; j < 52; ++j) {
+      Hand hand{j, i};
+      InformationSet info_set{history, board, hand, round};
+      auto action_map_it = strategy.find(info_set);
+      if(action_map_it == strategy.end()) {
+        std::cout << cards_to_str(hand.cards().data(), 2) << ": Info set missing.\n";
+        continue;
+      }
+      auto strat_it = action_map_it->second.find(action);
+      if(strat_it == action_map_it->second.end()) {
+        std::cout << cards_to_str(hand.cards().data(), 2) << ": Action missing.\n";
+        continue;
+      }
+      float freq = strat_it->second.frequency * 100;
+      if(freq < 0.1) {
+        std::cout << cards_to_str(hand.cards().data(), 2) << ": Frequency=" << freq << "\n";
+        continue;
+      }
+      oss << std::fixed << std::setprecision(1) << "[" << freq << "]" << cards_to_str(hand.cards().data(), 2) << "[/" << freq << "],";
+    }
+  }
+  return oss.str();
 }
 
 }
