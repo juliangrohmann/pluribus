@@ -93,8 +93,9 @@ void BlueprintTrainer::mccfr_p(long T) {
     }
     if(t > _preflop_threshold && t % _snapshot_interval == 0) {
       if(verbose) std::cout << "============== Saving snapshot ==============\n";
-      std::string fn = date_time_str() + "_t" + std::to_string(t) + ".bin";
-      save_strategy(fn);
+      std::ostringstream oss;
+      oss << date_time_str() << "_t" << std::fixed << std::setprecision(1) << t / 1'000'000 << "M.bin";
+      save_strategy(oss.str());
     }
   }
 }
