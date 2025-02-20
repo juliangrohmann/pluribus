@@ -56,11 +56,8 @@ void BlueprintTrainer::mccfr_p(long T) {
       board.deal(deck);
       for(Hand& hand : hands) hand.deal(deck);
 
-      if(t < _preflop_threshold && t % _strategy_interval == 0) {
+      if(t <= _preflop_threshold && t % _strategy_interval == 0) {
         if(verbose) std::cout << "============== Updating strategy ==============\n";
-        // deck.shuffle();
-        // board.deal(deck);
-        // for(Hand& hand : hands) hand.deal(deck);
         update_strategy(PokerState{_n_players, _n_chips, _ante}, i, board, hands);
       }
       if(t > _prune_thresh) {
@@ -91,10 +88,16 @@ void BlueprintTrainer::mccfr_p(long T) {
         }
       }
     }
-    if(t > _preflop_threshold && t % _snapshot_interval == 0) {
+    if(t == _preflop_threshold) {
+      if(verbose) std::cout << "============== Saving & freezing preflop strategy ==============\n";
+      std::ostringstream oss;
+      oss << date_time_str() << "_preflop.bin";
+      save_strategy(oss.str());
+    }
+    else if(t > _preflop_threshold && t % _snapshot_interval == 0) {
       if(verbose) std::cout << "============== Saving snapshot ==============\n";
       std::ostringstream oss;
-      oss << date_time_str() << "_t" << std::fixed << std::setprecision(1) << t / 1'000'000 << "M.bin";
+      oss << date_time_str() << "_t" << std::fixed << std::setprecision(1) << static_cast<double>(t) / 1'000'000 << "M.bin";
       save_strategy(oss.str());
     }
   }
