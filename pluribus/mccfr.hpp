@@ -39,7 +39,7 @@ public:
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_strategy, _strategy_interval, _preflop_threshold, _snapshot_interval, _prune_thresh, _lcfr_thresh, _discount_interval, _log_interval,
+    ar(_strategy, _t, _strategy_interval, _preflop_threshold, _snapshot_interval, _prune_thresh, _lcfr_thresh, _discount_interval, _log_interval,
        _prune_cutoff, _regret_floor, _n_players, _n_chips, _ante);
   }
 
@@ -60,6 +60,7 @@ private:
 
   StrategyMap _strategy;
   omp::HandEvaluator _eval;
+  long _t;
   long _strategy_interval;
   long _preflop_threshold;
   long _snapshot_interval;

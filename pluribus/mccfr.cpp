@@ -25,7 +25,7 @@ std::string minutes_str(int val) {
 
 BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long strategy_interval, long preflop_threshold, long snapshot_interval, 
                                    long prune_thresh, int prune_cutoff, int regret_floor, long lcfr_thresh, long discount_interval, long log_interval) : 
-    _strategy{}, _eval{}, _n_players{n_players}, _n_chips{n_chips}, _ante{ante}, _strategy_interval{strategy_interval}, 
+    _t{1}, _strategy{}, _eval{}, _n_players{n_players}, _n_chips{n_chips}, _ante{ante}, _strategy_interval{strategy_interval}, 
     _preflop_threshold{preflop_threshold}, _snapshot_interval{snapshot_interval}, _prune_thresh{prune_thresh}, _prune_cutoff{prune_cutoff},
     _regret_floor{regret_floor}, _lcfr_thresh{lcfr_thresh}, _discount_interval{discount_interval}, _log_interval{log_interval} {
   std::cout << "N players: " << _n_players << "\n";
@@ -45,8 +45,11 @@ BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long st
 }
 
 void BlueprintTrainer::mccfr_p(long T) {
+  long limit = _t + T;
+  std::cout << "Training blueprint from " << _t << " to " << limit << "\n";
   #pragma omp parallel for schedule(static, 1)
-  for(long t = 1; t < T + 1; ++t) {
+  for(int t = _t; t < limit; ++t) {
+    _t = t;
     Deck deck;
     Board board;
     std::vector<Hand> hands{static_cast<size_t>(_n_players)};
