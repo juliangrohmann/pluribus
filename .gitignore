@@ -1,6 +1,7 @@
 build
 venv
 temp
+strategies
 .vscode
 __pycache__
 *.o

@@ -56,7 +56,7 @@ public:
   bool operator==(const ActionHistory& other) const;
   void push_back(Action action);
   Action get(int idx) const;
-  size_t size() const;
+  uint16_t size() const;
   inline const boost::dynamic_bitset<unsigned long>& data() const { return _data; }
   std::string to_string() const;
 
@@ -66,7 +66,7 @@ public:
   }
 private:
   boost::dynamic_bitset<unsigned long> _data;
-  size_t _end_idx = 0;
+  uint16_t _end_idx = 0;
 };
 
 }

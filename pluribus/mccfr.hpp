@@ -21,6 +21,9 @@ struct StrategyState {
   }
 };
 
+using ActionMap = tbb::concurrent_unordered_map<Action, StrategyState>;
+using StrategyMap = tbb::concurrent_unordered_map<InformationSet, ActionMap>;
+
 const int it_per_sec = 24'000;
 const int it_per_min = it_per_sec * 60;
 
@@ -33,7 +36,7 @@ public:
   void save_strategy(std::string fn) const;
   void load_strategy(std::string fn);
   long count_infosets();
-  inline const tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_unordered_map<Action, StrategyState>>& get_strategy() { return _strategy; }
+  inline const StrategyMap& get_strategy() { return _strategy; }
 private:
   int traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
   int traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
@@ -49,7 +52,7 @@ private:
   friend void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
 #endif
 
-  tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_unordered_map<Action, StrategyState>> _strategy;
+  StrategyMap _strategy;
   omp::HandEvaluator _eval;
   long _strategy_interval;
   long _preflop_threshold;

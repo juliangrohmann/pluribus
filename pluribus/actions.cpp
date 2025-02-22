@@ -35,7 +35,7 @@ Action ActionHistory::get(int idx) const {
   return static_cast<Action>(action_id);
 }
 
-size_t ActionHistory::size() const {
+uint16_t ActionHistory::size() const {
   return _end_idx / action_bits;
 }
 
