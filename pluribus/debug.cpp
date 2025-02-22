@@ -99,4 +99,14 @@ void evaluate_strategy(const StrategyMap& hero, const StrategyMap& villain) {
   std::cout << "Villain: " << (results[1][results[1].size() - 1] / static_cast<double>(n_iter)) * 100 << "bb/100\n";
 }
 
+void evaluate_vs_random(const StrategyMap& hero, const StrategyMap& villain) {
+  long n_iter = 1'000'000;
+  std::vector<BlueprintAgent> agents{BlueprintAgent{hero}, BlueprintAgent{villain}};
+  std::vector<Agent*> agents_p;
+  for(auto& agent : agents) agents_p.push_back(&agent);
+  auto results = simulate(agents_p, 10'000, 0, n_iter);
+  std::cout << "Hero: " << (results[0][results[0].size() - 1] / static_cast<double>(n_iter)) * 100 << "bb/100\n";
+  std::cout << "Villain: " << (results[1][results[1].size() - 1] / static_cast<double>(n_iter)) * 100 << "bb/100\n";
+}
+
 }

@@ -7,6 +7,7 @@
 #include <tqdm/tqdm.hpp>
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/unordered_map.hpp>
+#include <pluribus/util.hpp>
 #include <pluribus/rng.hpp>
 #include <pluribus/debug.hpp>
 #include <pluribus/poker.hpp>
@@ -93,13 +94,13 @@ void BlueprintTrainer::mccfr_p(long T) {
       if(verbose) std::cout << "============== Saving & freezing preflop strategy ==============\n";
       std::ostringstream oss;
       oss << date_time_str() << "_preflop.bin";
-      save_strategy(_strategy, oss.str());
+      cereal_save(*this, oss.str());
     }
     else if(t > _preflop_threshold && t % _snapshot_interval == 0) {
       if(verbose) std::cout << "============== Saving snapshot ==============\n";
       std::ostringstream oss;
       oss << date_time_str() << "_t" << std::fixed << std::setprecision(1) << static_cast<double>(t) / 1'000'000 << "M.bin";
-      save_strategy(_strategy, oss.str());
+      cereal_save(*this, oss.str());
     }
   }
 }
@@ -244,22 +245,6 @@ int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Boar
 
 void BlueprintTrainer::log_metrics(int t) {
   std::cout << std::setprecision(2) << "t=" << t << "\n";
-}
-
-void save_strategy(const StrategyMap& strategy, const std::string& fn) {
-  std::cout << "Saving strategy to " << fn << '\n';
-  std::ofstream os(fn, std::ios::binary);
-  cereal::BinaryOutputArchive oarchive(os);
-  oarchive(strategy);
-}
-
-StrategyMap load_strategy(const std::string& fn) {
-  std::cout << "Loading strategy from " << fn << '\n';
-  std::ifstream is(fn, std::ios::binary);
-  cereal::BinaryInputArchive iarchive(is);
-  StrategyMap strategy;
-  iarchive(strategy);
-  return strategy;
 }
 
 long count(const PokerState& state) {

@@ -36,6 +36,13 @@ public:
   void mccfr_p(long T);
   long count_infosets();
   inline const StrategyMap& get_strategy() { return _strategy; }
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_strategy, _strategy_interval, _preflop_threshold, _snapshot_interval, _prune_thresh, _lcfr_thresh, _discount_interval, _log_interval,
+       _prune_cutoff, _regret_floor, _n_players, _n_chips, _ante);
+  }
+
 private:
   int traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
   int traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
@@ -68,8 +75,6 @@ private:
 };
 
 Action sample_action(const StrategyMap& strategy, const InformationSet& info_set);
-void save_strategy(const StrategyMap& strategy, const std::string& fn);
-StrategyMap load_strategy(const std::string& fn);
 
 }
 
