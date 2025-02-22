@@ -1,3 +1,5 @@
+#ifdef UNIT_TEST
+
 #include <iostream>
 #include <string>
 #include <set>
@@ -12,6 +14,7 @@
 #include <hand_isomorphism/hand_index.h>
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
+#include <pluribus/mccfr.hpp>
 
 using namespace pluribus;
 using std::string;
@@ -30,26 +33,26 @@ double simple_equity(const std::string& hero_str, const omp::CardRange villain, 
   return equity(hero, villain, board);
 }
 
-TEST_CASE("Evaluate benchmark", "[eval]") {
-  omp::HandEvaluator evaluator;
-  omp::Hand hero = omp::Hand("Qd") + omp::Hand("As") + omp::Hand("6h") + omp::Hand("Js") + omp::Hand("2c");
-  omp::Hand villain = omp::Hand("3d") + omp::Hand("9h") + omp::Hand("Kc") + omp::Hand("4h") + omp::Hand("8s");
-  BENCHMARK("Eval 5 cards") {
-    bool winner = evaluator.evaluate(hero) > evaluator.evaluate(villain);
-  };
+// TEST_CASE("Evaluate benchmark", "[eval]") {
+//   omp::HandEvaluator evaluator;
+//   omp::Hand hero = omp::Hand("Qd") + omp::Hand("As") + omp::Hand("6h") + omp::Hand("Js") + omp::Hand("2c");
+//   omp::Hand villain = omp::Hand("3d") + omp::Hand("9h") + omp::Hand("Kc") + omp::Hand("4h") + omp::Hand("8s");
+//   BENCHMARK("Eval 5 cards") {
+//     bool winner = evaluator.evaluate(hero) > evaluator.evaluate(villain);
+//   };
   
-  hero += omp::Hand("Jd");
-  villain += omp::Hand("4c");
-  BENCHMARK("Eval 6 cards") {
-    bool winner = evaluator.evaluate(hero) > evaluator.evaluate(villain);
-  };
+//   hero += omp::Hand("Jd");
+//   villain += omp::Hand("4c");
+//   BENCHMARK("Eval 6 cards") {
+//     bool winner = evaluator.evaluate(hero) > evaluator.evaluate(villain);
+//   };
 
-  hero += omp::Hand("6c");
-  villain += omp::Hand("Qc");
-  BENCHMARK("Eval 7 cards") {
-    bool winner = evaluator.evaluate(hero) > evaluator.evaluate(villain);
-  };
-};
+//   hero += omp::Hand("6c");
+//   villain += omp::Hand("Qc");
+//   BENCHMARK("Eval 7 cards") {
+//     bool winner = evaluator.evaluate(hero) > evaluator.evaluate(villain);
+//   };
+// };
 
 TEST_CASE("Isomorphism unindex", "[iso]") {
   hand_indexer_t flop_indexer;
@@ -123,3 +126,35 @@ TEST_CASE("OCHS features", "[ochs]") {
     assign_features(hero, river, feat);
   };
 };
+
+namespace pluribus {
+
+void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, 
+                          const std::vector<Hand>& hands) {
+  trainer.update_strategy(state, i, board, hands);
+}
+
+int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, 
+                        const std::vector<Hand>& hands) {
+  return trainer.traverse_mccfr(state, i, board, hands);
+}
+
+}
+
+TEST_CASE("Blueprint trainer", "[mccfr]") {
+  int n_players = 6;
+  int n_chips= 10'000;
+  int ante = 0;
+  Board board{"AcTd2h3cQs"};
+  std::vector<Hand> hands{Hand{"AsQs"}, Hand{"5c5h"}, Hand{"Kh5d"}, Hand{"Ah3d"}, Hand{"9s9h"}, Hand{"QhJd"}};
+  BlueprintTrainer trainer{n_players, n_chips, ante};
+
+  BENCHMARK("Update strategy") {
+    call_update_strategy(trainer, PokerState{n_players, n_chips, ante}, 0, board, hands);
+  };
+  BENCHMARK("Traverse MCCFR") {
+    call_traverse_mccfr(trainer, PokerState{n_players, n_chips, ante}, 0, board, hands);
+  };
+}
+
+#endif

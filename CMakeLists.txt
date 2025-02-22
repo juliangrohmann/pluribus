@@ -9,6 +9,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 if(VERBOSE)
   add_compile_definitions(VERBOSE)
 endif()
+if(UNIT_TEST)
+  add_compile_definitions(UNIT_TEST)
+endif()
 
 find_package(Catch2 3 REQUIRED)
 find_package(OpenMP REQUIRED)
@@ -30,8 +33,10 @@ target_link_libraries(Pluribus PRIVATE OpenMP::OpenMP_CXX cnpy z PluribusLib Han
 add_executable(Temp temp/temp.cpp)
 target_link_libraries(Temp PRIVATE OpenMP::OpenMP_CXX cnpy z PluribusLib HandIsoLib OMPEvalLib ${Boost_LIBRARIES})
 
-add_executable(Test test/test.cpp)
-target_link_libraries(Test PRIVATE OpenMP::OpenMP_CXX cnpy z PluribusLib HandIsoLib OMPEvalLib Catch2::Catch2WithMain ${Boost_LIBRARIES})
+if(UNIT_TEST) 
+  add_executable(Test test/test.cpp)
+  target_link_libraries(Test PRIVATE OpenMP::OpenMP_CXX cnpy z PluribusLib HandIsoLib OMPEvalLib Catch2::Catch2WithMain ${Boost_LIBRARIES})
+endif()
 
 add_executable(Benchmark benchmark/benchmark.cpp)
 target_link_libraries(Benchmark PRIVATE OpenMP::OpenMP_CXX cnpy z PluribusLib HandIsoLib OMPEvalLib Catch2::Catch2WithMain ${Boost_LIBRARIES})

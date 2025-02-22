@@ -44,6 +44,11 @@ private:
   Action sample(const InformationSet& info_set) const;
   void log_metrics(int t);
 
+#ifdef UNIT_TEST
+  friend int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
+  friend void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
+#endif
+
   std::unordered_map<InformationSet, std::unordered_map<Action, StrategyState>> _strategy;
   omp::HandEvaluator _eval;
   long _cum_regret = 0;

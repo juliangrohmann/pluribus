@@ -1,3 +1,5 @@
+#ifdef UNIT_TEST
+
 #include <iostream>
 #include <string>
 #include <set>
@@ -279,3 +281,5 @@ TEST_CASE("Serialize strategy", "[serialize]") {
 
   REQUIRE(loaded_strategy == trainer.get_strategy());
 }
+
+#endif
