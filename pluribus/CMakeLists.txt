@@ -10,4 +10,4 @@ add_library(
   util.cpp
   debug.cpp
 )
-target_link_libraries(PluribusLib PRIVATE OpenMP::OpenMP_CXX cnpy z HandIsoLib OMPEvalLib ${Boost_LIBRARIES})
+target_link_libraries(PluribusLib PRIVATE TBB::tbb OpenMP::OpenMP_CXX cnpy z HandIsoLib OMPEvalLib ${Boost_LIBRARIES})

@@ -272,7 +272,7 @@ TEST_CASE("Serialize strategy", "[serialize]") {
     oarchive(trainer.get_strategy());
   }
   
-  std::unordered_map<InformationSet, std::unordered_map<Action, StrategyState>> loaded_strategy;
+  tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_unordered_map<Action, StrategyState>> loaded_strategy;
   {
     std::ifstream is("test_strategy.bin", std::ios::binary);
     cereal::BinaryInputArchive iarchive(is);

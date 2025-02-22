@@ -1,6 +1,7 @@
 apt update
 apt upgrade
 apt-get install libboost-all-dev
+apt-get install libtbb-dev
 apt install g++
 apt install cmake
 

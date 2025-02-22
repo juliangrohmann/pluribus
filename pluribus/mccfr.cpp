@@ -22,8 +22,8 @@ std::string minutes_str(int val) {
   return " (" + std::to_string(val / it_per_min) + " m)";
 }
 
-BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, int strategy_interval, int preflop_threshold, int snapshot_interval, 
-                                   int prune_thresh, int prune_cutoff, int regret_floor, int lcfr_thresh, int discount_interval, int log_interval) : 
+BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long strategy_interval, long preflop_threshold, long snapshot_interval, 
+                                   long prune_thresh, int prune_cutoff, int regret_floor, long lcfr_thresh, long discount_interval, long log_interval) : 
     _strategy{}, _eval{}, _n_players{n_players}, _n_chips{n_chips}, _ante{ante}, _strategy_interval{strategy_interval}, 
     _preflop_threshold{preflop_threshold}, _snapshot_interval{snapshot_interval}, _prune_thresh{prune_thresh}, _prune_cutoff{prune_cutoff},
     _regret_floor{regret_floor}, _lcfr_thresh{lcfr_thresh}, _discount_interval{discount_interval}, _log_interval{log_interval} {
@@ -44,10 +44,11 @@ BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, int str
 }
 
 void BlueprintTrainer::mccfr_p(long T) {
-  Deck deck;
-  Board board;
-  std::vector<Hand> hands{static_cast<size_t>(_n_players)};
+  #pragma omp parallel for schedule(static, 1)
   for(long t = 1; t < T + 1; ++t) {
+    Deck deck;
+    Board board;
+    std::vector<Hand> hands{static_cast<size_t>(_n_players)};
     if(verbose) std::cout << "============== t = " << t << " ==============\n";
     if(t % _log_interval == 0) log_metrics(t);
     for(int i = 0; i < _n_players; ++i) {
@@ -192,6 +193,7 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
     InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round()};
     calculate_strategy(state, info_set);
     Action action = sample(info_set);
+    #pragma omp critical
     _strategy.at(info_set).at(action).phi += 1.0f;
     update_strategy(state.apply(action), i, board, hands);
   }
@@ -263,20 +265,16 @@ void BlueprintTrainer::log_metrics(int t) {
 
 void BlueprintTrainer::save_strategy(std::string fn) const {
   std::cout << "Saving strategy to " << fn << '\n';
-  {
-    std::ofstream os(fn, std::ios::binary);
-    cereal::BinaryOutputArchive oarchive(os);
-    oarchive(_strategy);
-  }
+  std::ofstream os(fn, std::ios::binary);
+  cereal::BinaryOutputArchive oarchive(os);
+  oarchive(_strategy);
 }
 
 void BlueprintTrainer::load_strategy(std::string fn) {
   std::cout << "Loading strategy from " << fn << '\n';
-  {
-    std::ifstream is(fn, std::ios::binary);
-    cereal::BinaryInputArchive iarchive(is);
-    iarchive(_strategy);
-  }
+  std::ifstream is(fn, std::ios::binary);
+  cereal::BinaryInputArchive iarchive(is);
+  iarchive(_strategy);
 }
 
 long count(const PokerState& state) {

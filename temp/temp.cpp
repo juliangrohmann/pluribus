@@ -2,6 +2,7 @@
 #include <fstream>
 #include <array>
 #include <cmath>
+#include <chrono>
 #include <unordered_map>
 #include <tqdm/tqdm.hpp>
 #include <hand_isomorphism/hand_index.h>
@@ -26,8 +27,10 @@ using namespace pluribus;
 
 int main(int argc, char* argv[]) {
   BlueprintTrainer trainer{6, 10'000, 0};
-  std::cout << trainer.count_infosets() << "\n";
-  trainer.mccfr_p(10'000'000'000);
+  auto t0 = std::chrono::high_resolution_clock::now();
+  trainer.mccfr_p(1'000'000);
+  auto t1 = std::chrono::high_resolution_clock::now();
+  std::cout << "dt=" << std::chrono::duration_cast<std::chrono::seconds>(t1 - t0).count() << "\n";
   trainer.save_strategy("6p_100bb_t10B.bin");
   return 0;
 }
