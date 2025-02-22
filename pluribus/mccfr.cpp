@@ -93,13 +93,13 @@ void BlueprintTrainer::mccfr_p(long T) {
       if(verbose) std::cout << "============== Saving & freezing preflop strategy ==============\n";
       std::ostringstream oss;
       oss << date_time_str() << "_preflop.bin";
-      save_strategy(oss.str());
+      save_strategy(_strategy, oss.str());
     }
     else if(t > _preflop_threshold && t % _snapshot_interval == 0) {
       if(verbose) std::cout << "============== Saving snapshot ==============\n";
       std::ostringstream oss;
       oss << date_time_str() << "_t" << std::fixed << std::setprecision(1) << static_cast<double>(t) / 1'000'000 << "M.bin";
-      save_strategy(oss.str());
+      save_strategy(_strategy, oss.str());
     }
   }
 }
@@ -135,7 +135,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
   else {
     InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round()};
     calculate_strategy(state, info_set);
-    Action action = sample(info_set);
+    Action action = sample_action(_strategy, info_set);
     return traverse_mccfr_p(state.apply(action), i, board, hands);
   }
 }
@@ -180,7 +180,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
   else {
     InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round()};
     calculate_strategy(state, info_set);
-    Action action = sample(info_set);
+    Action action = sample_action(_strategy, info_set);
     return traverse_mccfr(state.apply(action), i, board, hands);
   }
 }
@@ -192,7 +192,7 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
   else if(state.get_active() == i) {
     InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round()};
     calculate_strategy(state, info_set);
-    Action action = sample(info_set);
+    Action action = sample_action(_strategy, info_set);
     #pragma omp critical
     _strategy.at(info_set).at(action).phi += 1.0f;
     update_strategy(state.apply(action), i, board, hands);
@@ -242,39 +242,24 @@ int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Boar
   return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
 }
 
-Action BlueprintTrainer::sample(const InformationSet& info_set) const {
-  std::vector<Action> actions;
-  std::vector<float> weights;
-  for(const auto& entry : _strategy.at(info_set)) {
-    actions.push_back(entry.first);
-    weights.push_back(entry.second.frequency);
-  }
-  if(verbose) {
-    std::cout << "Sampling: ";
-    for(int idx = 0; idx < actions.size(); ++idx) {
-      std::cout << action_to_str.at(actions[idx]) << " = " << weights[idx] << (idx == actions.size() - 1 ? "\n" : ", ");
-    }
-  }
-  std::discrete_distribution<> dist(weights.begin(), weights.end());
-  return actions[dist(GlobalRNG::instance())];
-}
-
 void BlueprintTrainer::log_metrics(int t) {
   std::cout << std::setprecision(2) << "t=" << t << "\n";
 }
 
-void BlueprintTrainer::save_strategy(std::string fn) const {
+void save_strategy(const StrategyMap& strategy, const std::string& fn) {
   std::cout << "Saving strategy to " << fn << '\n';
   std::ofstream os(fn, std::ios::binary);
   cereal::BinaryOutputArchive oarchive(os);
-  oarchive(_strategy);
+  oarchive(strategy);
 }
 
-void BlueprintTrainer::load_strategy(std::string fn) {
+StrategyMap load_strategy(const std::string& fn) {
   std::cout << "Loading strategy from " << fn << '\n';
   std::ifstream is(fn, std::ios::binary);
   cereal::BinaryInputArchive iarchive(is);
-  iarchive(_strategy);
+  StrategyMap strategy;
+  iarchive(strategy);
+  return strategy;
 }
 
 long count(const PokerState& state) {
@@ -289,6 +274,23 @@ long count(const PokerState& state) {
 long BlueprintTrainer::count_infosets() {
   PokerState state{_n_players, _n_chips, _ante};
   return count(state);
+}
+
+Action sample_action(const StrategyMap& strategy, const InformationSet& info_set) {
+  std::vector<Action> actions;
+  std::vector<float> weights;
+  for(const auto& entry : strategy.at(info_set)) {
+    actions.push_back(entry.first);
+    weights.push_back(entry.second.frequency);
+  }
+  if(verbose) {
+    std::cout << "Sampling: ";
+    for(int idx = 0; idx < actions.size(); ++idx) {
+      std::cout << action_to_str.at(actions[idx]) << " = " << weights[idx] << (idx == actions.size() - 1 ? "\n" : ", ");
+    }
+  }
+  std::discrete_distribution<> dist(weights.begin(), weights.end());
+  return actions[dist(GlobalRNG::instance())];
 }
 
 }

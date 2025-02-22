@@ -52,7 +52,7 @@ std::vector<std::vector<long>> simulate(std::vector<Agent*> agents, int n_chips,
     }
 
     while(state.get_round() <= 3 && state.get_winner() == -1) {
-      state = state.apply(agents[state.get_active()]->act(state));
+      state = state.apply(agents[state.get_active()]->act(state, board, hands[state.get_active()]));
     }
 
     std::vector<long> payoffs = get_payoffs(board, hands, state, eval);
