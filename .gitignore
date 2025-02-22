@@ -1,6 +1,5 @@
 build
 venv
-temp
 .vscode
 __pycache__
 *.o
