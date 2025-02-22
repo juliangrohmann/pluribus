@@ -25,7 +25,7 @@ using namespace std;
 using namespace pluribus;
 
 int main(int argc, char* argv[]) {
-  BlueprintTrainer trainer{9, 10'000, 0};
+  BlueprintTrainer trainer{6, 10'000, 0};
   std::cout << trainer.count_infosets() << "\n";
   trainer.mccfr_p(10'000'000'000);
   trainer.save_strategy("6p_100bb_t10B.bin");
