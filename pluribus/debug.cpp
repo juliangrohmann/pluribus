@@ -62,12 +62,12 @@ void print_similar_boards(std::string board, int n_clusters) {
 }
 
 std::string strategy_str(const std::unordered_map<InformationSet, std::unordered_map<Action, StrategyState>>& strategy, 
-                         const ActionHistory& history, Action action, const Board& board, int round) {
+                         const ActionHistory& history, Action action, const Board& board, int round, int n_players, int n_chips, int ante) {
   std::ostringstream oss;
   for(uint8_t i = 0; i < 52; ++i) {
     for(uint8_t j = i + 1; j < 52; ++j) {
       Hand hand{j, i};
-      InformationSet info_set{history, board, hand, round};
+      InformationSet info_set{history, board, hand, round, n_players, n_chips, ante};
       auto action_map_it = strategy.find(info_set);
       if(action_map_it == strategy.end()) {
         std::cout << cards_to_str(hand.cards().data(), 2) << ": Info set missing.\n";

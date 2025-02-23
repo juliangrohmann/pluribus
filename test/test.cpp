@@ -241,7 +241,7 @@ TEST_CASE("Serialize InformationSet", "[serialize]") {
     Action::CHECK_CALL, Action::BET_33, Action::POSTFLOP_2_BET, Action::CHECK_CALL,
     Action::CHECK_CALL
   };
-  InformationSet info_set{actions, board, hand, 2};
+  InformationSet info_set{actions, board, hand, 2, 3, 10'000, 0};
 
   {
     std::ofstream os("test_info_set.bin", std::ios::binary);

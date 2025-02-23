@@ -28,6 +28,7 @@ BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long st
     _t{1}, _strategy{}, _n_players{n_players}, _n_chips{n_chips}, _ante{ante}, _strategy_interval{strategy_interval}, 
     _preflop_threshold{preflop_threshold}, _snapshot_interval{snapshot_interval}, _prune_thresh{prune_thresh}, _prune_cutoff{prune_cutoff},
     _regret_floor{regret_floor}, _lcfr_thresh{lcfr_thresh}, _discount_interval{discount_interval}, _log_interval{log_interval} {
+  HistoryIndexer::initialize(n_players, n_chips, ante);
   log_state();
 }
 
@@ -101,7 +102,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
     return utility(state, i, board, hands, eval);
   }
   else if(state.get_active() == i) {
-    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round()};
+    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _n_players, _n_chips, _ante};
     calculate_strategy(state, info_set);
     std::unordered_map<Action, bool> explored;
     std::unordered_map<Action, int> values;
@@ -125,7 +126,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
     return v;
   }
   else {
-    InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round()};
+    InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round(), _n_players, _n_chips, _ante};
     calculate_strategy(state, info_set);
     Action action = sample_action(_strategy, info_set);
     return traverse_mccfr_p(state.apply(action), i, board, hands, eval);
@@ -142,7 +143,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
     return u;
   }
   else if(state.get_active() == i) {
-    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round()};
+    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _n_players, _n_chips, _ante};
     calculate_strategy(state, info_set);
     std::unordered_map<Action, int> values;
     int v = 0;
@@ -170,7 +171,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
     return v;
   }
   else {
-    InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round()};
+    InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round(), _n_players, _n_chips, _ante};
     calculate_strategy(state, info_set);
     Action action = sample_action(_strategy, info_set);
     return traverse_mccfr(state.apply(action), i, board, hands, eval);
@@ -182,7 +183,7 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
     return;
   }
   else if(state.get_active() == i) {
-    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round()};
+    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _n_players, _n_chips, _ante};
     calculate_strategy(state, info_set);
     Action action = sample_action(_strategy, info_set);
     #pragma omp critical

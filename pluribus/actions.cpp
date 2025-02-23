@@ -63,11 +63,18 @@ void HistoryIndexer::initialize(int n_players, int n_chips, int ante) {
     std::cout << "Initializing history map: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
     _history_map[fn] = cereal_load<HistoryMap>(fn);
   }
+  else {
+    std::cout << "Already initialized: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
+  }
 }
 int HistoryIndexer::index(const ActionHistory& history, int n_players, int n_chips, int ante) {
-  initialize(n_players, n_chips, ante);
   std::string fn = history_map_filename(n_players, n_chips, ante);
-  return _history_map.at(fn).at(history);
+  auto it = _history_map.find(fn);
+  if(it == _history_map.end()) {
+    initialize(n_players, n_chips, ante);
+    return _history_map.at(fn).at(history);
+  }
+  return it->second.at(history);
 }
 
 void collect_histories(const PokerState& state, std::vector<ActionHistory>& histories) {

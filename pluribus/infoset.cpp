@@ -17,7 +17,8 @@ std::array<hand_indexer_t, 4> init_indexer_vec() {
 const std::array<hand_indexer_t, 4> InformationSet::_indexers = init_indexer_vec();
 const std::array<std::vector<uint16_t>, 4> InformationSet::_cluster_map = init_cluster_map(200);
 
-InformationSet::InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round) : _history{history} {
+InformationSet::InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round, int n_players, int n_chips, int ante) {
+  _history_idx = HistoryIndexer::index(history, n_players, n_chips, ante);
   int card_sum = round == 0 ? 2 : 4 + round;
   std::vector<uint8_t> cards(card_sum);
   std::copy(hand.cards().begin(), hand.cards().end(), cards.data());
@@ -27,11 +28,11 @@ InformationSet::InformationSet(const ActionHistory& history, const Board& board,
 }
 
 bool InformationSet::operator==(const InformationSet& other) const {
-  return _cluster == other._cluster && _history == other._history;
+  return _cluster == other._cluster && _history_idx == other._history_idx;
 }
 
 std::string InformationSet::to_string() const {
-  return "Cluster: " + std::to_string(_cluster) + ", History: " + _history.to_string();
+  return "Cluster: " + std::to_string(_cluster) + ", History index: " + std::to_string(_history_idx);
 }
 
 long count(const PokerState& state, bool infosets) {

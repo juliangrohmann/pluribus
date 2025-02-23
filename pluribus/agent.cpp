@@ -7,15 +7,15 @@
 
 namespace pluribus {
 
-Action RandomAgent::act(const PokerState& state, const Board& board, const Hand& hand) {
+Action RandomAgent::act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) {
   std::vector<Action> actions = valid_actions(state);
   assert(actions.size() > 0 && "No valid actions available.");
   std::uniform_int_distribution<int> dist(0, actions.size() - 1);
   return actions[dist(GlobalRNG::instance())];
 }
 
-Action BlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand) {
-  InformationSet info_set{state.get_action_history(), board, hand, state.get_round()};
+Action BlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) {
+  InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), n_players, n_chips, ante};
   return sample_action(_strategy, info_set);
 }
 
