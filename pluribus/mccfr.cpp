@@ -235,7 +235,7 @@ int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Boar
 }
 
 void BlueprintTrainer::log_metrics(int t) const {
-  std::cout << std::setprecision(2) << "t=" << t << "\n";
+  std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M\n";
 }
 
 void BlueprintTrainer::log_state() const {
