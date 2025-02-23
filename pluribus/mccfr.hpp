@@ -34,7 +34,6 @@ public:
                    long lcfr_thresh = 400 * it_per_min, long discount_interval = 10 * it_per_min, long log_interval = it_per_min);
   void set_strategy(const StrategyMap& strategy) { _strategy = strategy; }
   void mccfr_p(long T);
-  long count_infosets() const;
   void log_state() const;
   inline const StrategyMap& get_strategy() { return _strategy; }
 

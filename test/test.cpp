@@ -261,7 +261,6 @@ TEST_CASE("Serialize InformationSet", "[serialize]") {
 
 TEST_CASE("Serialize strategy", "[serialize]") {
   BlueprintTrainer trainer{2, 10'000, 0};
-  std::cout << trainer.count_infosets() << "\n";
   trainer.mccfr_p(1000);
 
   {

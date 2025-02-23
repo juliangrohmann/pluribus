@@ -255,20 +255,6 @@ void BlueprintTrainer::log_state() const {
   std::cout << "Log interval: " << _log_interval << minutes_str(_log_interval) << "\n";
 }
 
-long count(const PokerState& state) {
-  if(state.is_terminal()) return 0;
-  long c = state.get_round() == 0 ? 169 : 200;
-  for(Action a : valid_actions(state)) {
-    c += count(state.apply(a));
-  }
-  return c;
-}
-
-long BlueprintTrainer::count_infosets() const {
-  PokerState state{_n_players, _n_chips, _ante};
-  return count(state);
-}
-
 Action sample_action(const StrategyMap& strategy, const InformationSet& info_set) {
   std::vector<Action> actions;
   std::vector<float> weights;

@@ -34,4 +34,27 @@ std::string InformationSet::to_string() const {
   return "Cluster: " + std::to_string(_cluster) + ", History: " + _history.to_string();
 }
 
+long count(const PokerState& state, bool infosets) {
+  if(state.is_terminal()) return 0;
+  long c;
+  if(infosets) {
+    c = state.get_round() == 0 ? 169 : 200;
+  }
+  else {
+    c = 1;
+  }
+  for(Action a : valid_actions(state)) {
+    c += count(state.apply(a), infosets);
+  }
+  return c;
+}
+
+long count_infosets(const PokerState& state) {
+  return count(state, true);
+}
+
+long count_actionsets(const PokerState& state) {
+  return count(state, false);
+}
+
 }

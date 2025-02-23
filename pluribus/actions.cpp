@@ -1,4 +1,8 @@
 #include <iostream>
+#include <vector>
+#include <cereal/cereal.hpp>
+#include <pluribus/util.hpp>
+#include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
 
 namespace pluribus {
@@ -45,6 +49,46 @@ std::string ActionHistory::to_string() const {
     str += action_to_str.at(get(i)) + (i == size() - 1 ? "" : " -> ");
   }
   return str;
+}
+
+std::string history_map_filename(int n_players, int n_chips, int ante) {
+  return "history_index_p" + std::to_string(n_players) + "_" + std::to_string(n_chips / 100) + "bb_" + std::to_string(ante) + "ante.bin";
+}
+
+std::unordered_map<std::string, HistoryMap> HistoryIndexer::_history_map;
+
+void HistoryIndexer::initialize(int n_players, int n_chips, int ante) {
+  std::string fn = history_map_filename(n_players, n_chips, ante);
+  if(_history_map.find(fn) == _history_map.end()) {
+    std::cout << "Initializing history map: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
+    _history_map[fn] = cereal_load<HistoryMap>(fn);
+  }
+}
+int HistoryIndexer::index(const ActionHistory& history, int n_players, int n_chips, int ante) {
+  initialize(n_players, n_chips, ante);
+  std::string fn = history_map_filename(n_players, n_chips, ante);
+  return _history_map.at(fn).at(history);
+}
+
+void collect_histories(const PokerState& state, std::vector<ActionHistory>& histories) {
+  if(state.is_terminal()) return;
+  histories.push_back(state.get_action_history());
+  for(Action a : valid_actions(state)) {
+    collect_histories(state.apply(a), histories);
+  }
+}
+
+void build_history_map(int n_players, int n_chips, int ante) {
+  std::cout << "Building history map: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
+  std::vector<ActionHistory> histories;
+  PokerState state{n_players, n_chips, ante};
+  collect_histories(state, histories);
+  HistoryMap history_map;
+  for(long i = 0; i < histories.size(); ++i) {
+    history_map[histories[i]] = i;
+  }
+  std::cout << "n=" << histories.size() << "\n";
+  cereal_save(history_map, history_map_filename(n_players, n_chips, ante));
 }
 
 }

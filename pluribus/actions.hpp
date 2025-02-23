@@ -69,6 +69,18 @@ private:
   uint16_t _end_idx = 0;
 };
 
+using HistoryMap = std::unordered_map<ActionHistory, int>;
+
+class HistoryIndexer {
+public:
+  static void initialize(int n_players, int n_chips, int ante);
+  static int index(const ActionHistory& history, int n_players, int n_chips, int ante);
+private:
+  static std::unordered_map<std::string, HistoryMap> _history_map;
+};
+
+void build_history_map(int n_players, int n_chips, int ante);
+
 }
 
 namespace std {

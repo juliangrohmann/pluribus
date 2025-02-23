@@ -25,6 +25,9 @@ private:
   uint16_t _cluster;
 };
 
+long count_infosets(const PokerState& state);
+long count_actionsets(const PokerState& state);
+
 }
 
 namespace std {
