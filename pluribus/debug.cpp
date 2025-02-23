@@ -89,24 +89,47 @@ std::string strategy_str(const std::unordered_map<InformationSet, std::unordered
   return oss.str();
 }
 
-void evaluate_strategy(const StrategyMap& hero, const StrategyMap& villain) {
-  long n_iter = 1'000'000;
-  std::vector<BlueprintAgent> agents{BlueprintAgent{hero}, BlueprintAgent{villain}};
-  std::vector<Agent*> agents_p;
-  for(auto& agent : agents) agents_p.push_back(&agent);
-  auto results = simulate(agents_p, 10'000, 0, n_iter);
-  std::cout << "Hero: " << (results[0][results[0].size() - 1] / static_cast<double>(n_iter)) * 100 << "bb/100\n";
-  std::cout << "Villain: " << (results[1][results[1].size() - 1] / static_cast<double>(n_iter)) * 100 << "bb/100\n";
+template <class T>
+std::vector<T> shift(const std::vector<T>& data, int n) {
+  std::vector<T> shifted;
+  for(int i = n; i < n + static_cast<int>(data.size()); ++i) {
+    if(i < 0) shifted.push_back(data[i + data.size()]);
+    else if(i >= data.size()) shifted.push_back(data[i - data.size()]);
+    else shifted.push_back(data[i]);
+  }
+  return shifted;
 }
 
-void evaluate_vs_random(const StrategyMap& hero, const StrategyMap& villain) {
-  long n_iter = 1'000'000;
-  std::vector<BlueprintAgent> agents{BlueprintAgent{hero}, BlueprintAgent{villain}};
+void evaluate_agents(const std::vector<Agent*>& agents, long n_iter) {
+  long iter_per_pos = n_iter / agents.size();
+  std::vector<double> winrates(6, 0.0);
+  for(int i = 0; i < agents.size(); ++i) {
+    auto shifted_agents = shift(agents, i);
+    auto shifted_results = simulate(shifted_agents, 10'000, 0, iter_per_pos);
+    auto results = shift(shifted_results, -i);
+    for(int j = 0; j < agents.size(); ++j) {
+      winrates[j] += results[j] / static_cast<double>(iter_per_pos);
+    }
+  }
+  for(int i = 0; i < agents.size(); ++i) {
+    std::cout << "Player " << i << ": " << std::setprecision(2) << std::fixed << winrates[i] / agents.size() << " bb/100\n";
+  }
+}
+
+void evaluate_strategies(const std::vector<StrategyMap>& strategies, long n_iter) {
+  std::vector<BlueprintAgent> agents;
+  for(const auto& strat : strategies) agents.push_back(BlueprintAgent{strat});
   std::vector<Agent*> agents_p;
   for(auto& agent : agents) agents_p.push_back(&agent);
-  auto results = simulate(agents_p, 10'000, 0, n_iter);
-  std::cout << "Hero: " << (results[0][results[0].size() - 1] / static_cast<double>(n_iter)) * 100 << "bb/100\n";
-  std::cout << "Villain: " << (results[1][results[1].size() - 1] / static_cast<double>(n_iter)) * 100 << "bb/100\n";
+  evaluate_agents(agents_p, n_iter);
+}
+
+void evaluate_vs_random(const StrategyMap& hero, int n_players, long n_iter) {
+  BlueprintAgent bp_agent{hero};
+  std::vector<RandomAgent> rng_agents(n_players - 1);
+  std::vector<Agent*> agents_p{&bp_agent};
+  for(auto& agent : rng_agents) agents_p.push_back(&agent);
+  evaluate_agents(agents_p, n_iter);
 }
 
 }

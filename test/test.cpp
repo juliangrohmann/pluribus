@@ -158,14 +158,12 @@ TEST_CASE("Simulate hands", "[poker]") {
   for(int i = 0; i < 9; ++i) {
     agents.push_back(new RandomAgent());
   }
-  auto results = simulate(agents, 100 * 100, 0, 10'000);
-  for(int t = 0; t < results.size(); ++t) {
-    long net = 0;
-    for(const auto& result : results) {
-      net += result[t];
-    }
-    REQUIRE(net == 0);
+  auto results = simulate(agents, 10'000, 0, 100'000);
+  long net = 0l;
+  for(long result : results) {
+    net += result;
   }
+  REQUIRE(net == 0l);
 }
 
 TEST_CASE("Split pot", "[poker]") {

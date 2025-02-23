@@ -26,9 +26,9 @@ T cereal_load(const std::string& fn) {
   std::cout << "Loading from " << fn << '\n';
   std::ifstream is(fn, std::ios::binary);
   cereal::BinaryInputArchive iarchive(is);
-  T strategy;
-  iarchive(strategy);
-  return strategy;
+  T data;
+  iarchive(data);
+  return data;
 }
 
 }
