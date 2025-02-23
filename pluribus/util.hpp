@@ -14,11 +14,11 @@ std::string cards_to_str(const uint8_t cards[], int n);
 int init_indexer(hand_indexer_t& indexer, int round);
 
 template <class T>
-void cereal_save(const T& strategy, const std::string& fn) {
+void cereal_save(const T& data, const std::string& fn) {
   std::cout << "Saving to " << fn << '\n';
   std::ofstream os(fn, std::ios::binary);
   cereal::BinaryOutputArchive oarchive(os);
-  oarchive(strategy);
+  oarchive(data);
 }
 
 template <class T>

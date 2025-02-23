@@ -135,8 +135,8 @@ void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, in
 }
 
 int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, 
-                        const std::vector<Hand>& hands) {
-  return trainer.traverse_mccfr(state, i, board, hands);
+                        const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
+  return trainer.traverse_mccfr(state, i, board, hands, eval);
 }
 
 }
@@ -145,6 +145,7 @@ TEST_CASE("Blueprint trainer", "[mccfr]") {
   int n_players = 6;
   int n_chips= 10'000;
   int ante = 0;
+  omp::HandEvaluator eval;
   Board board{"AcTd2h3cQs"};
   std::vector<Hand> hands{Hand{"AsQs"}, Hand{"5c5h"}, Hand{"Kh5d"}, Hand{"Ah3d"}, Hand{"9s9h"}, Hand{"QhJd"}};
   BlueprintTrainer trainer{n_players, n_chips, ante};
@@ -153,7 +154,7 @@ TEST_CASE("Blueprint trainer", "[mccfr]") {
     call_update_strategy(trainer, PokerState{n_players, n_chips, ante}, 0, board, hands);
   };
   BENCHMARK("Traverse MCCFR") {
-    call_traverse_mccfr(trainer, PokerState{n_players, n_chips, ante}, 0, board, hands);
+    call_traverse_mccfr(trainer, PokerState{n_players, n_chips, ante}, 0, board, hands, eval);
   };
 }
 

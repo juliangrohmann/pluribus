@@ -34,7 +34,8 @@ public:
                    long lcfr_thresh = 400 * it_per_min, long discount_interval = 10 * it_per_min, long log_interval = it_per_min);
   void set_strategy(const StrategyMap& strategy) { _strategy = strategy; }
   void mccfr_p(long T);
-  long count_infosets();
+  long count_infosets() const;
+  void log_state() const;
   inline const StrategyMap& get_strategy() { return _strategy; }
 
   template <class Archive>
@@ -44,22 +45,21 @@ public:
   }
 
 private:
-  int traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
-  int traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
+  int traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
+  int traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
   void calculate_strategy(const PokerState& state, const InformationSet& info_set);
-  int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands) const;
-  int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands) const;
-  Action sample(const InformationSet& info_set) const;
-  void log_metrics(int t);
+  int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
+  int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
+  void log_metrics(int t) const;
 
 #ifdef UNIT_TEST
-  friend int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
+  friend int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
+                                 const omp::HandEvaluator& eval);
   friend void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
 #endif
 
   StrategyMap _strategy;
-  omp::HandEvaluator _eval;
   long _t;
   long _strategy_interval;
   long _preflop_threshold;

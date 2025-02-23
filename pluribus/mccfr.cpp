@@ -25,34 +25,22 @@ std::string minutes_str(int val) {
 
 BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long strategy_interval, long preflop_threshold, long snapshot_interval, 
                                    long prune_thresh, int prune_cutoff, int regret_floor, long lcfr_thresh, long discount_interval, long log_interval) : 
-    _t{1}, _strategy{}, _eval{}, _n_players{n_players}, _n_chips{n_chips}, _ante{ante}, _strategy_interval{strategy_interval}, 
+    _t{1}, _strategy{}, _n_players{n_players}, _n_chips{n_chips}, _ante{ante}, _strategy_interval{strategy_interval}, 
     _preflop_threshold{preflop_threshold}, _snapshot_interval{snapshot_interval}, _prune_thresh{prune_thresh}, _prune_cutoff{prune_cutoff},
     _regret_floor{regret_floor}, _lcfr_thresh{lcfr_thresh}, _discount_interval{discount_interval}, _log_interval{log_interval} {
-  std::cout << "N players: " << _n_players << "\n";
-  std::cout << "N chips: " << _n_chips << "\n";
-  std::cout << "Ante: " << _ante << "\n";
-  std::cout << "Iterations/s: " << it_per_sec << "\n";
-  std::cout << "Iterations/min: " << it_per_min << "\n";
-  std::cout << "Strategy interval: " << _strategy_interval << "\n";
-  std::cout << "Preflop threshold: " << _preflop_threshold << minutes_str(_preflop_threshold) << "\n";
-  std::cout << "Snapshot interval: " << _snapshot_interval << minutes_str(_snapshot_interval) << "\n";
-  std::cout << "Prune threshold: " << _prune_thresh << minutes_str(_prune_thresh) << "\n";
-  std::cout << "Prune cutoff: " << _prune_cutoff << "\n";
-  std::cout << "Regret floor: " << _regret_floor << "\n";
-  std::cout << "LCFR threshold: " << _lcfr_thresh << minutes_str(_lcfr_thresh) << "\n";
-  std::cout << "Discount interval: " << _discount_interval << minutes_str(_discount_interval) << "\n";
-  std::cout << "Log interval: " << _log_interval << minutes_str(_log_interval) << "\n";
+  log_state();
 }
 
 void BlueprintTrainer::mccfr_p(long T) {
   long limit = _t + T;
   std::cout << "Training blueprint from " << _t << " to " << limit << "\n";
   #pragma omp parallel for schedule(static, 1)
-  for(int t = _t; t < limit; ++t) {
+  for(long t = _t; t < limit; ++t) {
+    thread_local omp::HandEvaluator eval;
+    thread_local Deck deck;
+    thread_local Board board;
+    thread_local std::vector<Hand> hands{static_cast<size_t>(_n_players)};
     _t = t;
-    Deck deck;
-    Board board;
-    std::vector<Hand> hands{static_cast<size_t>(_n_players)};
     if(verbose) std::cout << "============== t = " << t << " ==============\n";
     if(t % _log_interval == 0) log_metrics(t);
     for(int i = 0; i < _n_players; ++i) {
@@ -70,16 +58,16 @@ void BlueprintTrainer::mccfr_p(long T) {
         float q = dist(GlobalRNG::instance());
         if(q < 0.05f) {
           if(verbose) std::cout << "============== Traverse MCCFR ==============\n";
-          traverse_mccfr(PokerState{_n_players, _n_chips, _ante}, i, board, hands);
+          traverse_mccfr(PokerState{_n_players, _n_chips, _ante}, i, board, hands, eval);
         }
         else {
           if(verbose) std::cout << "============== Traverse MCCFR-P ==============\n";
-          traverse_mccfr_p(PokerState{_n_players, _n_chips, _ante}, i, board, hands);
+          traverse_mccfr_p(PokerState{_n_players, _n_chips, _ante}, i, board, hands, eval);
         }
       }
       else {
         if(verbose) std::cout << "============== Traverse MCCFR ==============\n";
-        traverse_mccfr(PokerState{_n_players, _n_chips, _ante}, i, board, hands);
+        traverse_mccfr(PokerState{_n_players, _n_chips, _ante}, i, board, hands, eval);
       }
     }
     if(t < _lcfr_thresh && t % _discount_interval == 0) {
@@ -108,9 +96,9 @@ void BlueprintTrainer::mccfr_p(long T) {
   }
 }
 
-int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands) {
+int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
   if(state.is_terminal()) {
-    return utility(state, i, board, hands);
+    return utility(state, i, board, hands, eval);
   }
   else if(state.get_active() == i) {
     InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round()};
@@ -120,7 +108,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
     int v = 0;
     for(const auto& entry : _strategy.at(info_set)) {
       if(entry.second.regret > _prune_cutoff) {
-        int v_a = traverse_mccfr_p(state.apply(entry.first), i, board, hands);
+        int v_a = traverse_mccfr_p(state.apply(entry.first), i, board, hands, eval);
         values[entry.first] = v_a;
         explored[entry.first] = true;
         v += entry.second.frequency * v_a;
@@ -140,13 +128,13 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
     InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round()};
     calculate_strategy(state, info_set);
     Action action = sample_action(_strategy, info_set);
-    return traverse_mccfr_p(state.apply(action), i, board, hands);
+    return traverse_mccfr_p(state.apply(action), i, board, hands, eval);
   }
 }
 
-int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands) {
+int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
   if(state.is_terminal()) {
-    int u = utility(state, i, board, hands);
+    int u = utility(state, i, board, hands, eval);
     if(verbose) {
       std::cout << state.get_action_history().to_string() << "\n";
       std::cout << "\tu(z) = " << u << "\n";
@@ -159,7 +147,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
     std::unordered_map<Action, int> values;
     int v = 0;
     for(const auto& entry : _strategy.at(info_set)) {
-      int v_a = traverse_mccfr(state.apply(entry.first), i, board, hands);
+      int v_a = traverse_mccfr(state.apply(entry.first), i, board, hands, eval);
       values[entry.first] = v_a;
       v += entry.second.frequency * v_a;
       if(verbose) {
@@ -185,7 +173,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
     InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round()};
     calculate_strategy(state, info_set);
     Action action = sample_action(_strategy, info_set);
-    return traverse_mccfr(state.apply(action), i, board, hands);
+    return traverse_mccfr(state.apply(action), i, board, hands, eval);
   }
 }
 
@@ -228,26 +216,43 @@ void BlueprintTrainer::calculate_strategy(const PokerState& state, const Informa
   }
 }
 
-int BlueprintTrainer::utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands) const {
+int BlueprintTrainer::utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const {
   if(state.get_winner() != -1) {
     return state.get_players()[i].get_chips() - _n_chips + (state.get_winner() == i ? state.get_pot() : 0);
   }
   else if(state.get_round() >= 4) {
-    return state.get_players()[i].get_chips() - _n_chips + showdown_payoff(state, i, board, hands);
+    return state.get_players()[i].get_chips() - _n_chips + showdown_payoff(state, i, board, hands, eval);
   }
   else {
     throw std::runtime_error("Non-terminal state does not have utility.");
   }
 }
 
-int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands) const {
+int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const {
   if(state.get_players()[i].has_folded()) return 0;
-  std::vector<uint8_t> win_idxs = winners(state, hands, board, _eval);
+  std::vector<uint8_t> win_idxs = winners(state, hands, board, eval);
   return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
 }
 
-void BlueprintTrainer::log_metrics(int t) {
+void BlueprintTrainer::log_metrics(int t) const {
   std::cout << std::setprecision(2) << "t=" << t << "\n";
+}
+
+void BlueprintTrainer::log_state() const {
+  std::cout << "N players: " << _n_players << "\n";
+  std::cout << "N chips: " << _n_chips << "\n";
+  std::cout << "Ante: " << _ante << "\n";
+  std::cout << "Iterations/s: " << it_per_sec << "\n";
+  std::cout << "Iterations/min: " << it_per_min << "\n";
+  std::cout << "Strategy interval: " << _strategy_interval << "\n";
+  std::cout << "Preflop threshold: " << _preflop_threshold << minutes_str(_preflop_threshold) << "\n";
+  std::cout << "Snapshot interval: " << _snapshot_interval << minutes_str(_snapshot_interval) << "\n";
+  std::cout << "Prune threshold: " << _prune_thresh << minutes_str(_prune_thresh) << "\n";
+  std::cout << "Prune cutoff: " << _prune_cutoff << "\n";
+  std::cout << "Regret floor: " << _regret_floor << "\n";
+  std::cout << "LCFR threshold: " << _lcfr_thresh << minutes_str(_lcfr_thresh) << "\n";
+  std::cout << "Discount interval: " << _discount_interval << minutes_str(_discount_interval) << "\n";
+  std::cout << "Log interval: " << _log_interval << minutes_str(_log_interval) << "\n";
 }
 
 long count(const PokerState& state) {
@@ -259,7 +264,7 @@ long count(const PokerState& state) {
   return c;
 }
 
-long BlueprintTrainer::count_infosets() {
+long BlueprintTrainer::count_infosets() const {
   PokerState state{_n_players, _n_chips, _ante};
   return count(state);
 }
