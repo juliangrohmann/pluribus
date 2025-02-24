@@ -35,8 +35,8 @@ std::string InformationSet::to_string() const {
   return "Cluster: " + std::to_string(_cluster) + ", History index: " + std::to_string(_history_idx);
 }
 
-long count(const PokerState& state, bool infosets) {
-  if(state.is_terminal()) return 0;
+long count(const PokerState& state, int max_round, bool infosets) {
+  if(state.is_terminal() || state.get_round() > max_round) return 0;
   long c;
   if(infosets) {
     c = state.get_round() == 0 ? 169 : 200;
@@ -45,17 +45,17 @@ long count(const PokerState& state, bool infosets) {
     c = 1;
   }
   for(Action a : valid_actions(state)) {
-    c += count(state.apply(a), infosets);
+    c += count(state.apply(a), max_round, infosets);
   }
   return c;
 }
 
-long count_infosets(const PokerState& state) {
-  return count(state, true);
+long count_infosets(const PokerState& state, int max_round) {
+  return count(state, max_round, true);
 }
 
-long count_actionsets(const PokerState& state) {
-  return count(state, false);
+long count_actionsets(const PokerState& state, int max_round) {
+  return count(state, max_round, false);
 }
 
 }
