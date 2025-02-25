@@ -19,10 +19,11 @@ public:
 
 class BlueprintAgent : public Agent {
 public:
-  BlueprintAgent(const StrategyMap& strategy) : _strategy{strategy} {};
+  BlueprintAgent(BlueprintTrainer& trainer);
   Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) override;
 private:
-  StrategyMap _strategy; 
+  std::unordered_map<InformationSet, Action> _strategy;
+  void populate(const PokerState& state, BlueprintTrainer& trainer);
 };
 
 }

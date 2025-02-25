@@ -209,30 +209,6 @@ TEST_CASE("Serialize ActionHistory", "[serialize]") {
   }
 }
 
-TEST_CASE("Serialize StrategyState", "[serialize]") {
-  StrategyState state;
-  state.regret = 69;
-  state.frequency = 0.42;
-  state.phi = 7;
-
-  {
-    std::ofstream os("test_strategy_state.bin", std::ios::binary);
-    cereal::BinaryOutputArchive oarchive(os);
-    oarchive(state);
-  }
-  
-  StrategyState loaded_state;
-  {
-    std::ifstream is("test_strategy_state.bin", std::ios::binary);
-    cereal::BinaryInputArchive iarchive(is);
-    iarchive(loaded_state);
-  }
-
-  REQUIRE(loaded_state.regret == state.regret);
-  REQUIRE(loaded_state.frequency == state.frequency);
-  REQUIRE(loaded_state.phi == state.phi);
-}
-
 TEST_CASE("Serialize InformationSet", "[serialize]") {
   Hand hand{"KsTc"};
   Board board{"AdKh9s9h5c"};
@@ -259,24 +235,24 @@ TEST_CASE("Serialize InformationSet", "[serialize]") {
   REQUIRE(loaded_info_set == info_set);
 }
 
-TEST_CASE("Serialize strategy", "[serialize]") {
+TEST_CASE("Serialize StrategyMap", "[serialize]") {
   BlueprintTrainer trainer{2, 10'000, 0};
   trainer.mccfr_p(1000);
 
   {
     std::ofstream os("test_strategy.bin", std::ios::binary);
     cereal::BinaryOutputArchive oarchive(os);
-    oarchive(trainer.get_strategy());
+    oarchive(trainer.get_regrets());
   }
   
-  StrategyMap loaded_strategy;
+  StrategyMap loaded_regrets;
   {
     std::ifstream is("test_strategy.bin", std::ios::binary);
     cereal::BinaryInputArchive iarchive(is);
-    iarchive(loaded_strategy);
+    iarchive(loaded_regrets);
   }
 
-  REQUIRE(loaded_strategy == trainer.get_strategy());
+  REQUIRE(loaded_regrets == trainer.get_regrets());
 }
 
 #endif

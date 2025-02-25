@@ -17,8 +17,8 @@ std::array<hand_indexer_t, 4> init_indexer_vec() {
 const std::array<hand_indexer_t, 4> InformationSet::_indexers = init_indexer_vec();
 const std::array<std::vector<uint16_t>, 4> InformationSet::_cluster_map = init_cluster_map(200);
 
-InformationSet::InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round, int n_players, int n_chips, int ante) {
-  _history_idx = HistoryIndexer::index(history, n_players, n_chips, ante);
+InformationSet::InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round, int n_players, int n_chips, int ante) : 
+    _history_idx{HistoryIndexer::index(history, n_players, n_chips, ante)} {
   int card_sum = round == 0 ? 2 : 4 + round;
   std::vector<uint8_t> cards(card_sum);
   std::copy(hand.cards().begin(), hand.cards().end(), cards.data());
@@ -26,6 +26,9 @@ InformationSet::InformationSet(const ActionHistory& history, const Board& board,
   hand_index_t idx = hand_index_last(&_indexers[round], cards.data());
   _cluster = _cluster_map[round][idx];
 }
+
+InformationSet::InformationSet(const ActionHistory& history, uint16_t cluster, int n_players, int n_chips, int ante) : 
+    _history_idx{HistoryIndexer::index(history, n_players, n_chips, ante)}, _cluster{cluster} {}
 
 bool InformationSet::operator==(const InformationSet& other) const {
   return _cluster == other._cluster && _history_idx == other._history_idx;
