@@ -287,7 +287,7 @@ int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Boar
   return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
 }
 
-void BlueprintTrainer::log_metrics(int t) const {
+void BlueprintTrainer::log_metrics(long t) const {
   std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M\n";
 }
 

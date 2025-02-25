@@ -99,7 +99,7 @@ private:
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
   int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
   int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
-  void log_metrics(int t) const;
+  void log_metrics(long t) const;
 
 #ifdef UNIT_TEST
   friend int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
