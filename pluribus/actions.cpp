@@ -62,6 +62,7 @@ void HistoryIndexer::initialize(int n_players, int n_chips, int ante) {
   if(_history_map.find(fn) == _history_map.end()) {
     std::cout << "Initializing history map: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
     _history_map[fn] = cereal_load<HistoryMap>(fn);
+    std::cout << "History map initialized.\n";
   }
   else {
     std::cout << "Already initialized: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
