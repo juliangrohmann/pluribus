@@ -13,18 +13,18 @@ namespace pluribus {
 
 using PreflopMap = tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_vector<float>>;
 
-struct atomic_int {
-  atomic_int() noexcept : value(0) {}
-  atomic_int(int val) noexcept : value(val) {}
-  atomic_int(const atomic_int& other) noexcept : value(other.value.load()) {}
-  atomic_int(atomic_int&& other) noexcept : value(other.value.load()) {}
+struct atom_int {
+  atom_int() noexcept : value(0) {}
+  atom_int(int val) noexcept : value(val) {}
+  atom_int(const atom_int& other) noexcept : value(other.value.load()) {}
+  atom_int(atom_int&& other) noexcept : value(other.value.load()) {}
 
-  atomic_int& operator=(atomic_int&& other) noexcept {
+  atom_int& operator=(atom_int&& other) noexcept {
     value.store(other.value.load());
     return *this;
   }
-  atomic_int& operator=(const atomic_int&) = delete;
-  bool operator==(const atomic_int& other) const { return value.load() == other.load(); }
+  atom_int& operator=(const atom_int&) = delete;
+  bool operator==(const atom_int& other) const { return value.load() == other.load(); }
 
   std::atomic<int> value;
 
@@ -47,8 +47,8 @@ public:
   std::atomic<int>& operator[](const InformationSet& info_set);
   const std::atomic<int>& operator[](const InformationSet& info_set) const;
   bool operator==(const RegretStorage& other) const;
-  inline std::vector<atomic_int>& data() { return _data; }
-  inline const std::vector<atomic_int>& data() const { return _data; }
+  inline std::vector<atom_int>& data() { return _data; }
+  inline const std::vector<atom_int>& data() const { return _data; }
   inline size_t size() { return _data.size(); }
   inline int get_n_clusters() const { return _n_clusters; }
 
@@ -59,7 +59,7 @@ public:
 private:
   size_t idx(const InformationSet& info_set) const;
   
-  std::vector<atomic_int> _data;
+  std::vector<atom_int> _data;
   int _n_clusters;
   int _n_actions;
 };
