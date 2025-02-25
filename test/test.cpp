@@ -235,7 +235,7 @@ TEST_CASE("Serialize InformationSet", "[serialize]") {
   REQUIRE(loaded_info_set == info_set);
 }
 
-TEST_CASE("Serialize StrategyMap", "[serialize]") {
+TEST_CASE("Serialize RegretStorage", "[serialize]") {
   BlueprintTrainer trainer{2, 10'000, 0};
   trainer.mccfr_p(1000);
 
@@ -245,7 +245,8 @@ TEST_CASE("Serialize StrategyMap", "[serialize]") {
     oarchive(trainer.get_regrets());
   }
   
-  StrategyMap loaded_regrets;
+  int n_histories = HistoryIndexer::count(trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante());
+  RegretStorage loaded_regrets{trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante(), 200, n_histories};
   {
     std::ifstream is("test_strategy.bin", std::ios::binary);
     cereal::BinaryInputArchive iarchive(is);
