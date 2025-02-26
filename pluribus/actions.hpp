@@ -75,7 +75,7 @@ class HistoryIndexer {
 public:
   static void initialize(int n_players, int n_chips, int ante);
   static int index(const ActionHistory& history, int n_players, int n_chips, int ante);
-  static size_t count(int n_players, int n_chips, int ante);
+  static size_t size(int n_players, int n_chips, int ante);
 private:
   static std::unordered_map<std::string, HistoryMap> _history_map;
 };

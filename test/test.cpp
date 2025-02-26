@@ -245,7 +245,7 @@ TEST_CASE("Serialize RegretStorage", "[serialize]") {
     oarchive(trainer.get_regrets());
   }
   
-  int n_histories = HistoryIndexer::count(trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante());
+  int n_histories = HistoryIndexer::size(trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante());
   RegretStorage loaded_regrets{trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante(), 200, n_histories};
   {
     std::ifstream is("test_strategy.bin", std::ios::binary);

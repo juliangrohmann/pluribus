@@ -78,7 +78,7 @@ int HistoryIndexer::index(const ActionHistory& history, int n_players, int n_chi
   return it->second.at(history);
 }
 
-size_t HistoryIndexer::count(int n_players, int n_chips, int ante) {
+size_t HistoryIndexer::size(int n_players, int n_chips, int ante) {
   std::string fn = history_map_filename(n_players, n_chips, ante);
   auto it = _history_map.find(fn);
   return it != _history_map.end() ? it->second.size() : -1;

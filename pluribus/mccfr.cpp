@@ -7,6 +7,7 @@
 #include <atomic>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <tqdm/tqdm.hpp>
 #include <cereal/archives/binary.hpp>
@@ -21,7 +22,9 @@ namespace pluribus {
 
 RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_clusters, int n_actions) : _n_clusters{n_clusters}, _n_actions{n_actions} {
   HistoryIndexer::initialize(n_players, n_chips, ante);
-  size_t n_histories = HistoryIndexer::count(n_players, n_chips, ante);
+  std::cout << "Counting histories... ";
+  size_t n_histories = HistoryIndexer::size(n_players, n_chips, ante);
+  std::cout << n_histories << "\n";
   _size = n_histories * n_clusters * n_actions;
   std::cout << "Opening regret map file... ";
   _fd = open("atomic_regret.dat", O_RDWR | O_CREAT | O_TRUNC, 0666);
@@ -36,8 +39,18 @@ RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_cluster
     throw std::runtime_error("Failed to resize file.");
   }
 
+  struct stat st;
+  if (fstat(_fd, &st) == -1) {
+    close(_fd);
+    throw std::runtime_error("fstat failed");
+  }
+  if (st.st_size != static_cast<off_t>(file_size)) {
+    close(_fd);
+    throw std::runtime_error("File size mismatch: expected " + std::to_string(file_size) + ", got " + std::to_string(st.st_size));
+  }
+
   std::cout << "Mapping file... ";
-  void* ptr = mmap(NULL, _size * sizeof(std::atomic<int>), PROT_READ | PROT_WRITE, MAP_PRIVATE, _fd, 0);
+  void* ptr = mmap(NULL, _size * sizeof(std::atomic<int>), PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
   if(ptr == MAP_FAILED) {
     close(_fd);
     throw std::runtime_error("Failed to map file to memory.");
@@ -46,7 +59,13 @@ RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_cluster
 
   std::cout << "Initializing regrets... ";
   for(size_t i = 0; i < _size; ++i) {
-    _data[i].store(0, std::memory_order_relaxed);
+    (_data + i)->store(0, std::memory_order_relaxed);
+  }
+
+  std::cout << "Testing memory access... ";
+  for (size_t i = 0; i < _size; i += 1024) {
+    (_data + i)->store(0, std::memory_order_relaxed);
+    volatile int test = (_data + i)->load(std::memory_order_relaxed); // Force page fault
   }
   std::cout << "Success.\n";
 }
