@@ -143,7 +143,7 @@ void BlueprintTrainer::mccfr_p(long T) {
   while(_t < limit) {
     long init_t = _t;
     _t = std::min(std::min(next_discount, next_snapshot), limit);
-    std::cout << "Next step: " << _t << "\n";
+    std::cout << std::setprecision(1) << std::fixed << "Next step: " << _t / 1'000'000.0 << "M\n";
     #pragma omp parallel for schedule(static, 1)
     for(long t = init_t; t < _t; ++t) {
       thread_local omp::HandEvaluator eval;
@@ -184,7 +184,7 @@ void BlueprintTrainer::mccfr_p(long T) {
     if(_t == next_discount) {
       std::cout << "============== Discounting ==============\n";
       double d = static_cast<double>(_t / _discount_interval) / (_t / _discount_interval + 1);
-      std::cout << "Discount factor: " << d << "\n";
+      std::cout << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
       lcfr_discount(_regrets, d);
       lcfr_discount(_phi, d);
     }
