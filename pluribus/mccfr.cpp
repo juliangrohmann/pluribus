@@ -40,7 +40,7 @@ RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_cluster
   }
 
   std::cout << "Mapping file... ";
-  void* ptr = mmap(NULL, _size * sizeof(std::atomic<int>), PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
+  void* ptr = mmap(NULL, _size * sizeof(std::atomic<int>), PROT_READ | PROT_WRITE, MAP_PRIVATE, _fd, 0);
   if(ptr == MAP_FAILED) {
     close(_fd);
     throw std::runtime_error("Failed to map file to memory.");
@@ -48,7 +48,9 @@ RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_cluster
   _data = static_cast<std::atomic<int>*>(ptr);
 
   std::cout << "Initializing regrets... " << std::flush;
+  #pragma omp parallel for schedule(static, 1)
   for(size_t i = 0; i < _size; ++i) {
+    // std::cout << i << '\n' << std::flush;
     (_data + i)->store(0, std::memory_order_relaxed);
   }
   std::cout << "Success.\n";
