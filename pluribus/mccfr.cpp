@@ -183,7 +183,7 @@ void BlueprintTrainer::mccfr_p(long T) {
 
     if(_t == next_discount) {
       std::cout << "============== Discounting ==============\n";
-      double d = (_t / _discount_interval) / (_t / _discount_interval + 1);
+      double d = static_cast<double>(_t / _discount_interval) / (_t / _discount_interval + 1);
       std::cout << "Discount factor: " << d << "\n";
       lcfr_discount(_regrets, d);
       lcfr_discount(_phi, d);
