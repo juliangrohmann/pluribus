@@ -135,62 +135,71 @@ BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long st
 
 void BlueprintTrainer::mccfr_p(long T) {
   long limit = _t + T;
+  long next_discount = _discount_interval;
+  long next_snapshot = _preflop_threshold;
   std::cout << "Training blueprint from " << _t << " to " << limit << "\n";
-  #pragma omp parallel for schedule(static, 1)
-  for(long t = _t; t < limit; ++t) {
-    thread_local omp::HandEvaluator eval;
-    thread_local Deck deck;
-    thread_local Board board;
-    thread_local std::vector<Hand> hands{static_cast<size_t>(_n_players)};
-    _t = t;
-    if(verbose) std::cout << "============== t = " << t << " ==============\n";
-    if(t % _log_interval == 0) log_metrics(t);
-    for(int i = 0; i < _n_players; ++i) {
-      if(verbose) std::cout << "============== i = " << i << " ==============\n";
-      deck.shuffle();
-      board.deal(deck);
-      for(Hand& hand : hands) hand.deal(deck);
+  while(_t < limit) {
+    long init_t = _t;
+    _t = std::min(std::min(next_discount, next_snapshot), limit);
+    #pragma omp parallel for schedule(static, 1)
+    for(long t = init_t; t < _t; ++t) {
+      thread_local omp::HandEvaluator eval;
+      thread_local Deck deck;
+      thread_local Board board;
+      thread_local std::vector<Hand> hands{static_cast<size_t>(_n_players)};
+      if(verbose) std::cout << "============== t = " << t << " ==============\n";
+      if(t % _log_interval == 0) log_metrics(t);
+      for(int i = 0; i < _n_players; ++i) {
+        if(verbose) std::cout << "============== i = " << i << " ==============\n";
+        deck.shuffle();
+        board.deal(deck);
+        for(Hand& hand : hands) hand.deal(deck);
 
-      if(t <= _preflop_threshold && t % _strategy_interval == 0) {
-        if(verbose) std::cout << "============== Updating strategy ==============\n";
-        update_strategy(PokerState{_n_players, _n_chips, _ante}, i, board, hands);
-      }
-      if(t > _prune_thresh) {
-        std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-        float q = dist(GlobalRNG::instance());
-        if(q < 0.05f) {
+        if(t <= _preflop_threshold && t % _strategy_interval == 0) {
+          if(verbose) std::cout << "============== Updating strategy ==============\n";
+          update_strategy(PokerState{_n_players, _n_chips, _ante}, i, board, hands);
+        }
+        if(t > _prune_thresh) {
+          std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+          float q = dist(GlobalRNG::instance());
+          if(q < 0.05f) {
+            if(verbose) std::cout << "============== Traverse MCCFR ==============\n";
+            traverse_mccfr(PokerState{_n_players, _n_chips, _ante}, i, board, hands, eval);
+          }
+          else {
+            if(verbose) std::cout << "============== Traverse MCCFR-P ==============\n";
+            traverse_mccfr_p(PokerState{_n_players, _n_chips, _ante}, i, board, hands, eval);
+          }
+        }
+        else {
           if(verbose) std::cout << "============== Traverse MCCFR ==============\n";
           traverse_mccfr(PokerState{_n_players, _n_chips, _ante}, i, board, hands, eval);
         }
-        else {
-          if(verbose) std::cout << "============== Traverse MCCFR-P ==============\n";
-          traverse_mccfr_p(PokerState{_n_players, _n_chips, _ante}, i, board, hands, eval);
-        }
-      }
-      else {
-        if(verbose) std::cout << "============== Traverse MCCFR ==============\n";
-        traverse_mccfr(PokerState{_n_players, _n_chips, _ante}, i, board, hands, eval);
       }
     }
-    if(t < _lcfr_thresh && t % _discount_interval == 0) {
+
+    if(_t == next_discount) {
       if(verbose) std::cout << "============== Discounting ==============\n";
-      double d = (t / _discount_interval) / (t / _discount_interval + 1);
+      double d = (_t / _discount_interval) / (_t / _discount_interval + 1);
       if(verbose) std::cout << "Discount factor: " << d << "\n";
       lcfr_discount(_regrets, d);
       lcfr_discount(_phi, d);
     }
-    if(t == _preflop_threshold) {
+    if(_t == _preflop_threshold) {
       if(verbose) std::cout << "============== Saving & freezing preflop strategy ==============\n";
       std::ostringstream oss;
       oss << date_time_str() << "_preflop.bin";
       cereal_save(*this, oss.str());
     }
-    else if(t > _preflop_threshold && t % _snapshot_interval == 0) {
+    else if(_t > _preflop_threshold && _t == next_snapshot) {
       if(verbose) std::cout << "============== Saving snapshot ==============\n";
       std::ostringstream oss;
-      oss << date_time_str() << "_t" << std::fixed << std::setprecision(1) << static_cast<double>(t) / 1'000'000 << "M.bin";
+      oss << date_time_str() << "_t" << std::fixed << std::setprecision(1) << static_cast<double>(_t) / 1'000'000 << "M.bin";
       cereal_save(*this, oss.str());
     }
+    
+    next_discount = next_discount + _discount_interval < _lcfr_thresh ? next_discount + _discount_interval : limit + 1;
+    next_snapshot += _snapshot_interval;
   }
 }
 
@@ -246,7 +255,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
     auto freq = calculate_strategy(_regrets[info_set], actions.size());
     std::unordered_map<Action, int> values;
     int v = 0;
-    for(int a_idx; a_idx < actions.size(); ++a_idx) {
+    for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       int v_a = traverse_mccfr(state.apply(a), i, board, hands, eval);
       values[a] = v_a;
@@ -261,7 +270,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
       std::cout << "\t u(sigma) = " << v << "\n";
     }
     auto action_regret_p = _regrets[info_set];
-    for(int a_idx; a_idx < actions.size(); ++a_idx) {
+    for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       int dR = values[actions[a_idx]] - v;
       int next_r = (action_regret_p + a_idx)->load() + dR;
       (action_regret_p + a_idx)->store(std::max(next_r, _regret_floor));
