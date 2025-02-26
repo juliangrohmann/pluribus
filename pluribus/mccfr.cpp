@@ -107,14 +107,9 @@ int sample_action_idx(const std::vector<float>& freq) {
   return dist(GlobalRNG::instance());
 }
 
-void atomic_multiply(std::atomic<int>& x, int factor) {
-  int current = x.load();
-  while (!x.compare_exchange_strong(current, current * factor)) {}
-}
-
 void lcfr_discount(RegretStorage& data, double d) {
   for(auto it = data.data(); it != data.data() + data.size(); ++it) {
-    atomic_multiply(*it, d);
+    it->store(it->load() * d);
   }
 }
 
