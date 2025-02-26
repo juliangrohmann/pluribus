@@ -4,6 +4,10 @@
 #include <string>
 #include <algorithm>
 #include <stdexcept>
+#include <atomic>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <tqdm/tqdm.hpp>
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/unordered_map.hpp>
@@ -18,25 +22,57 @@ namespace pluribus {
 RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_clusters, int n_actions) : _n_clusters{n_clusters}, _n_actions{n_actions} {
   HistoryIndexer::initialize(n_players, n_chips, ante);
   size_t n_histories = HistoryIndexer::count(n_players, n_chips, ante);
-  size_t n_regrets = n_histories * n_clusters * n_actions;
-  std::cout << "Initializing " << n_regrets << " regrets... ";
-  _data.resize(n_regrets);
-  std::cout << "Initialized.\n";
+  _size = n_histories * n_clusters * n_actions;
+  std::cout << "Opening regret map file... ";
+  _fd = open("atomic_regret.dat", O_RDWR | O_CREAT | O_TRUNC, 0666);
+  if(_fd == -1) {
+    throw std::runtime_error("Failed to map file.");
+  }
+
+  size_t file_size = _size * sizeof(std::atomic<int>);
+  std::cout << "Resizing file to " << file_size << " bytes ...";
+  if(ftruncate(_fd, file_size) == -1) {
+    close(_fd);
+    throw std::runtime_error("Failed to resize file.");
+  }
+
+  std::cout << "Mapping file... ";
+  void* ptr = mmap(NULL, _size * sizeof(std::atomic<int>), PROT_READ | PROT_WRITE, MAP_PRIVATE, _fd, 0);
+  if(ptr == MAP_FAILED) {
+    close(_fd);
+    throw std::runtime_error("Failed to map file to memory.");
+  }
+  _data = static_cast<std::atomic<int>*>(ptr);
+
+  std::cout << "Initializing regrets... ";
+  for(size_t i = 0; i < _size; ++i) {
+    _data[i].store(0, std::memory_order_relaxed);
+  }
+  std::cout << "Success.\n";
 }
 
-std::atomic<int>& RegretStorage::operator[](const InformationSet& info_set) {
-  return _data[idx(info_set)].value;
+RegretStorage::~RegretStorage() {
+  if(_data) munmap(_data, _size * sizeof(std::atomic<int>));
+  if(_fd != -1) close(_fd);
 }
 
-const std::atomic<int>& RegretStorage::operator[](const InformationSet& info_set) const {
-  return _data[idx(info_set)].value;
+std::atomic<int>* RegretStorage::operator[](const InformationSet& info_set) {
+  return _data + info_offset(info_set);
+}
+
+const std::atomic<int>* RegretStorage::operator[](const InformationSet& info_set) const {
+  return _data + info_offset(info_set);
 }
 
 bool RegretStorage::operator==(const RegretStorage& other) const {
-  return _n_clusters == other._n_clusters && _n_actions == other._n_actions && _data == other._data;
+  if(_size != other._size) return false;
+  for(size_t i = 0; i < _size; ++i) {
+    if(*(_data + i) != *(other._data + i)) return false;
+  }
+  return true;
 }
 
-size_t RegretStorage::idx(const InformationSet& info_set) const {
+size_t RegretStorage::info_offset(const InformationSet& info_set) const {
   return (info_set.get_history_idx() * _n_clusters + info_set.get_cluster()) * _n_actions;
 }
 
@@ -72,8 +108,8 @@ void atomic_multiply(std::atomic<int>& x, int factor) {
 }
 
 void lcfr_discount(RegretStorage& data, double d) {
-  for(auto& val : data.data()) {
-    atomic_multiply(val.value, d);
+  for(auto it = data.data(); it != data.data() + data.size(); ++it) {
+    atomic_multiply(*it, d);
   }
 }
 
@@ -165,7 +201,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
   else if(state.get_active() == i) {
     InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _n_players, _n_chips, _ante};
     auto actions = valid_actions(state);
-    auto action_regret_p = &_regrets[info_set];
+    auto action_regret_p = _regrets[info_set];
     auto freq = calculate_strategy(action_regret_p, actions.size());
     std::unordered_map<Action, int> values;
     int v = 0;
@@ -189,7 +225,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
   else {
     InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round(), _n_players, _n_chips, _ante};
     auto actions = valid_actions(state);
-    auto freq = calculate_strategy(&_regrets[info_set], actions.size());
+    auto freq = calculate_strategy(_regrets[info_set], actions.size());
     Action a = actions[sample_action_idx(freq)];
     return traverse_mccfr_p(state.apply(a), i, board, hands, eval);
   }
@@ -207,7 +243,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
   else if(state.get_active() == i) {
     InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _n_players, _n_chips, _ante};
     auto actions = valid_actions(state);
-    auto freq = calculate_strategy(&_regrets[info_set], actions.size());
+    auto freq = calculate_strategy(_regrets[info_set], actions.size());
     std::unordered_map<Action, int> values;
     int v = 0;
     for(int a_idx; a_idx < actions.size(); ++a_idx) {
@@ -224,7 +260,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
       std::cout << state.get_action_history().to_string() << "\n";
       std::cout << "\t u(sigma) = " << v << "\n";
     }
-    auto action_regret_p = &_regrets[info_set];
+    auto action_regret_p = _regrets[info_set];
     for(int a_idx; a_idx < actions.size(); ++a_idx) {
       int dR = values[actions[a_idx]] - v;
       int next_r = (action_regret_p + a_idx)->load() + dR;
@@ -239,7 +275,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
   else {
     InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round(), _n_players, _n_chips, _ante};
     auto actions = valid_actions(state);
-    auto freq = calculate_strategy(&_regrets[info_set], actions.size());
+    auto freq = calculate_strategy(_regrets[info_set], actions.size());
     Action a = actions[sample_action_idx(freq)];
     return traverse_mccfr(state.apply(a), i, board, hands, eval);
   }
@@ -252,7 +288,7 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
   else if(state.get_active() == i) {
     InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _n_players, _n_chips, _ante};
     auto actions = valid_actions(state);
-    auto freq = calculate_strategy(&_regrets[info_set], actions.size());
+    auto freq = calculate_strategy(_regrets[info_set], actions.size());
     int a_idx = sample_action_idx(freq);
     auto& phi_regrets = _phi[info_set];
     if(phi_regrets.size() == 0) {

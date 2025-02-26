@@ -65,7 +65,7 @@ void HistoryIndexer::initialize(int n_players, int n_chips, int ante) {
     std::cout << "History map initialized.\n";
   }
   else {
-    std::cout << "Already initialized: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
+    std::cout << "History map already initialized: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
   }
 }
 int HistoryIndexer::index(const ActionHistory& history, int n_players, int n_chips, int ante) {

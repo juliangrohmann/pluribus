@@ -3,6 +3,9 @@
 #include <array>
 #include <vector>
 #include <atomic>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <cereal/cereal.hpp>
 #include <tbb/concurrent_vector.h>
 #include <tbb/concurrent_unordered_map.h>
@@ -13,55 +16,42 @@ namespace pluribus {
 
 using PreflopMap = tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_vector<float>>;
 
-struct atom_int {
-  atom_int() noexcept : value(0) {}
-  atom_int(int val) noexcept : value(val) {}
-  atom_int(const atom_int& other) noexcept : value(other.value.load()) {}
-  atom_int(atom_int&& other) noexcept : value(other.value.load()) {}
-
-  atom_int& operator=(atom_int&& other) noexcept {
-    value.store(other.value.load());
-    return *this;
-  }
-  atom_int& operator=(const atom_int&) = delete;
-  bool operator==(const atom_int& other) const { return value.load() == other.load(); }
-
-  std::atomic<int> value;
-
-  template <class Archive>
-  void serialize(Archive& ar) {
-    int tmp = value.load(); // Get the current value for output
-    ar(tmp);                // Serialize/deserialize the plain int
-    if constexpr (std::is_same_v<Archive, cereal::BinaryInputArchive>) {
-      value.store(tmp);     // Only store on input
-    }
-  }
-
-  int load() const noexcept { return value.load(); }
-  void store(int val) noexcept { value.store(val); }
-};
-
 class RegretStorage {
 public:
   RegretStorage(int n_players, int n_chips, int ante, int n_clusters, int n_actions);
-  std::atomic<int>& operator[](const InformationSet& info_set);
-  const std::atomic<int>& operator[](const InformationSet& info_set) const;
+  ~RegretStorage();
+  std::atomic<int>* operator[](const InformationSet& info_set);
+  const std::atomic<int>* operator[](const InformationSet& info_set) const;
   bool operator==(const RegretStorage& other) const;
-  inline std::vector<atom_int>& data() { return _data; }
-  inline const std::vector<atom_int>& data() const { return _data; }
-  inline size_t size() { return _data.size(); }
+  inline std::atomic<int>* data() { return _data; }
+  inline const std::atomic<int>* data() const { return _data; }
+  inline size_t size() { return _size; }
   inline int get_n_clusters() const { return _n_clusters; }
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_data, _n_clusters, _n_actions);
+    ar(_size, _n_clusters, _n_actions);
+    if(Archive::is_loading::value) {
+      _fd = open("atomic_regret.dat", O_RDWR | O_CREAT, 0666);
+      if(_fd == -1) throw std::runtime_error("Failed to reopen file during deserialization");
+      void* ptr = mmap(NULL, _size * sizeof(std::atomic<int>), PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
+      if(ptr == MAP_FAILED) {
+        close(_fd);
+        throw std::runtime_error("Failed to remap memory during deserialization");
+      }
+      _data = static_cast<std::atomic<int>*>(ptr);
+    }
+    ar(cereal::binary_data(_data, _size * sizeof(std::atomic<int>)));
   }
+
 private:
-  size_t idx(const InformationSet& info_set) const;
+  size_t info_offset(const InformationSet& info_set) const;
   
-  std::vector<atom_int> _data;
+  std::atomic<int>* _data;
+  size_t _size;
   int _n_clusters;
   int _n_actions;
+  int _fd;
 };
 
 std::vector<float> calculate_strategy(std::atomic<int>* regret_p, int n_actions);
@@ -132,7 +122,9 @@ template<class Archive>
 void serialize(Archive& archive, std::atomic<int>& atomic_int) {
     int value = atomic_int.load(std::memory_order_relaxed);
     archive(value);
-    atomic_int.store(value, std::memory_order_relaxed);
+    if(Archive::is_loading::value) {
+      atomic_int.store(value, std::memory_order_relaxed);
+    }
 }
 
 template<class Archive, class T>
