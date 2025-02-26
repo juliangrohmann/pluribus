@@ -26,27 +26,17 @@ RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_cluster
   size_t n_histories = HistoryIndexer::size(n_players, n_chips, ante);
   std::cout << n_histories << "\n";
   _size = n_histories * n_clusters * n_actions;
-  std::cout << "Opening regret map file... ";
+  std::cout << "Opening regret map file... " << std::flush;
   _fd = open("atomic_regret.dat", O_RDWR | O_CREAT | O_TRUNC, 0666);
   if(_fd == -1) {
     throw std::runtime_error("Failed to map file.");
   }
 
   size_t file_size = _size * sizeof(std::atomic<int>);
-  std::cout << "Resizing file to " << file_size << " bytes ...";
+  std::cout << "Resizing file to " << file_size << " bytes... " << std::flush;
   if(ftruncate(_fd, file_size) == -1) {
     close(_fd);
     throw std::runtime_error("Failed to resize file.");
-  }
-
-  struct stat st;
-  if (fstat(_fd, &st) == -1) {
-    close(_fd);
-    throw std::runtime_error("fstat failed");
-  }
-  if (st.st_size != static_cast<off_t>(file_size)) {
-    close(_fd);
-    throw std::runtime_error("File size mismatch: expected " + std::to_string(file_size) + ", got " + std::to_string(st.st_size));
   }
 
   std::cout << "Mapping file... ";
@@ -57,15 +47,9 @@ RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_cluster
   }
   _data = static_cast<std::atomic<int>*>(ptr);
 
-  std::cout << "Initializing regrets... ";
+  std::cout << "Initializing regrets... " << std::flush;
   for(size_t i = 0; i < _size; ++i) {
     (_data + i)->store(0, std::memory_order_relaxed);
-  }
-
-  std::cout << "Testing memory access... ";
-  for (size_t i = 0; i < _size; i += 1024) {
-    (_data + i)->store(0, std::memory_order_relaxed);
-    volatile int test = (_data + i)->load(std::memory_order_relaxed); // Force page fault
   }
   std::cout << "Success.\n";
 }
@@ -92,7 +76,7 @@ bool RegretStorage::operator==(const RegretStorage& other) const {
 }
 
 size_t RegretStorage::info_offset(const InformationSet& info_set) const {
-  return (info_set.get_history_idx() * _n_clusters + info_set.get_cluster()) * _n_actions;
+  return (static_cast<size_t>(info_set.get_history_idx()) * _n_clusters + info_set.get_cluster()) * _n_actions;
 }
 
 std::vector<float> calculate_strategy(std::atomic<int>* regret_p, int n_actions) {
