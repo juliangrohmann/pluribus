@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <omp.h>
 #include <tqdm/tqdm.hpp>
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/unordered_map.hpp>
@@ -134,6 +135,7 @@ BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long st
 }
 
 void BlueprintTrainer::mccfr_p(long T) {
+  if(verbose) omp_set_num_threads(1);
   long limit = _t + T;
   long next_discount = _discount_interval;
   long next_snapshot = _preflop_threshold;
@@ -141,6 +143,7 @@ void BlueprintTrainer::mccfr_p(long T) {
   while(_t < limit) {
     long init_t = _t;
     _t = std::min(std::min(next_discount, next_snapshot), limit);
+    std::cout << "Next step: " << _t << "\n";
     #pragma omp parallel for schedule(static, 1)
     for(long t = init_t; t < _t; ++t) {
       thread_local omp::HandEvaluator eval;
@@ -179,20 +182,20 @@ void BlueprintTrainer::mccfr_p(long T) {
     }
 
     if(_t == next_discount) {
-      if(verbose) std::cout << "============== Discounting ==============\n";
+      std::cout << "============== Discounting ==============\n";
       double d = (_t / _discount_interval) / (_t / _discount_interval + 1);
-      if(verbose) std::cout << "Discount factor: " << d << "\n";
+      std::cout << "Discount factor: " << d << "\n";
       lcfr_discount(_regrets, d);
       lcfr_discount(_phi, d);
     }
     if(_t == _preflop_threshold) {
-      if(verbose) std::cout << "============== Saving & freezing preflop strategy ==============\n";
+      std::cout << "============== Saving & freezing preflop strategy ==============\n";
       std::ostringstream oss;
       oss << date_time_str() << "_preflop.bin";
       cereal_save(*this, oss.str());
     }
     else if(_t > _preflop_threshold && _t == next_snapshot) {
-      if(verbose) std::cout << "============== Saving snapshot ==============\n";
+      std::cout << "============== Saving snapshot ==============\n";
       std::ostringstream oss;
       oss << date_time_str() << "_t" << std::fixed << std::setprecision(1) << static_cast<double>(_t) / 1'000'000 << "M.bin";
       cereal_save(*this, oss.str());
