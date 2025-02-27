@@ -190,19 +190,9 @@ TEST_CASE("Serialize ActionHistory", "[serialize]") {
     Action::CHECK_CALL, Action::CHECK_CALL
   };
   
-  {
-    std::ofstream os("test_actions.bin", std::ios::binary);
-    cereal::BinaryOutputArchive oarchive(os);
-    oarchive(actions);
-  }
-  
-  ActionHistory loaded_actions;
-  {
-    std::ifstream is("test_actions.bin", std::ios::binary);
-    cereal::BinaryInputArchive iarchive(is);
-    iarchive(loaded_actions);
-  }
-
+  std::string fn = "test_actions.bin";
+  cereal_save(actions, fn);
+  auto loaded_actions = cereal_load<ActionHistory>(fn);
   REQUIRE(loaded_actions.size() == actions.size());
   for(int i = 0; i < loaded_actions.size(); ++i) {
     REQUIRE(loaded_actions.get(i) == actions.get(i));
@@ -219,41 +209,25 @@ TEST_CASE("Serialize InformationSet", "[serialize]") {
   };
   InformationSet info_set{actions, board, hand, 2, 3, 10'000, 0};
 
-  {
-    std::ofstream os("test_info_set.bin", std::ios::binary);
-    cereal::BinaryOutputArchive oarchive(os);
-    oarchive(info_set);
-  }
-  
-  InformationSet loaded_info_set;
-  {
-    std::ifstream is("test_info_set.bin", std::ios::binary);
-    cereal::BinaryInputArchive iarchive(is);
-    iarchive(loaded_info_set);
-  }
-
+  std::string fn = "test_info_set.bin";
+  cereal_save(info_set, fn);
+  InformationSet loaded_info_set = cereal_load<InformationSet>(fn);
   REQUIRE(loaded_info_set == info_set);
 }
 
-TEST_CASE("Serialize RegretStorage", "[serialize]") {
+TEST_CASE("Serialize RegretStorage, BlueprintTrainer", "[serialize]") {
   BlueprintTrainer trainer{2, 10'000, 0};
   trainer.mccfr_p(1000);
 
-  {
-    std::ofstream os("test_strategy.bin", std::ios::binary);
-    cereal::BinaryOutputArchive oarchive(os);
-    oarchive(trainer.get_regrets());
-  }
-  
-  int n_histories = HistoryIndexer::size(trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante());
-  RegretStorage loaded_regrets{trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante(), 200, n_histories};
-  {
-    std::ifstream is("test_strategy.bin", std::ios::binary);
-    cereal::BinaryInputArchive iarchive(is);
-    iarchive(loaded_regrets);
-  }
-
+  std::string regrets_fn = "test_regrets.bin";
+  cereal_save(trainer.get_regrets(), regrets_fn);
+  RegretStorage loaded_regrets = cereal_load<RegretStorage>(regrets_fn);
   REQUIRE(loaded_regrets == trainer.get_regrets());
+
+  std::string bp_fn = "test_bp_trainer.bin";
+  cereal_save(trainer, bp_fn);
+  BlueprintTrainer loaded_bp = cereal_load<BlueprintTrainer>(bp_fn);
+  REQUIRE(loaded_bp == trainer);
 }
 
 #endif

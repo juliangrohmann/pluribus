@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <atomic>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -23,7 +24,7 @@ namespace pluribus {
 
 RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_clusters, int n_actions) : _n_clusters{n_clusters}, _n_actions{n_actions} {
   HistoryIndexer::initialize(n_players, n_chips, ante);
-  std::cout << "Counting histories... ";
+  std::cout << "Counting histories... " << std::flush;
   size_t n_histories = HistoryIndexer::size(n_players, n_chips, ante);
   std::cout << n_histories << "\n";
   _size = n_histories * n_clusters * n_actions;
@@ -32,7 +33,6 @@ RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_cluster
   std::cout << "Initializing regrets... " << std::flush;
   #pragma omp parallel for schedule(static, 1)
   for(size_t i = 0; i < _size; ++i) {
-    // std::cout << i << '\n' << std::flush;
     (_data + i)->store(0, std::memory_order_relaxed);
   }
   std::cout << "Success.\n";
@@ -40,10 +40,13 @@ RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_cluster
 
 void RegretStorage::map_memory() {
   std::cout << "Opening regret map file... " << std::flush;
-  _fd = open("atomic_regret.dat", O_RDWR | O_CREAT | O_TRUNC, 0666);
+  char fn_temp[] = "atom_regrets_XXXXXX";
+  _fd = mkstemp(fn_temp);
   if(_fd == -1) {
-    throw std::runtime_error("Failed to map file.");
+    throw std::runtime_error("Failed to create temporary regret file.");
   }
+  _fn = fn_temp;
+  std::cout << "Opened " + _fn + "... " << std::flush;
 
   size_t file_size = _size * sizeof(std::atomic<int>);
   std::cout << "Resizing file to " << file_size << " bytes... " << std::flush;
@@ -61,9 +64,20 @@ void RegretStorage::map_memory() {
   _data = static_cast<std::atomic<int>*>(ptr);
 }
 
-RegretStorage::~RegretStorage() {
+void RegretStorage::unmap_memory() {
+  std::cout << "Unmapping regret memory... " << std::flush;
   if(_data) munmap(_data, _size * sizeof(std::atomic<int>));
   if(_fd != -1) close(_fd);
+  if(unlink(_fn.c_str()) != 0) {
+    std::cerr << "Failed to delete file " << _fn << ": " << strerror(errno) << "\n";
+  } 
+  else {
+    std::cout << "Unmapped.\n";
+  }
+}
+
+RegretStorage::~RegretStorage() {
+  unmap_memory();
 }
 
 std::atomic<int>* RegretStorage::operator[](const InformationSet& info_set) {
@@ -75,7 +89,7 @@ const std::atomic<int>* RegretStorage::operator[](const InformationSet& info_set
 }
 
 bool RegretStorage::operator==(const RegretStorage& other) const {
-  if(_size != other._size) return false;
+  if(_size != other._size || _n_clusters != other._n_clusters || _n_actions != other._n_actions) return false;
   for(size_t i = 0; i < _size; ++i) {
     if(*(_data + i) != *(other._data + i)) return false;
   }
@@ -358,6 +372,24 @@ void BlueprintTrainer::log_state() const {
   std::cout << "LCFR threshold: " << _lcfr_thresh << minutes_str(_lcfr_thresh) << "\n";
   std::cout << "Discount interval: " << _discount_interval << minutes_str(_discount_interval) << "\n";
   std::cout << "Log interval: " << _log_interval << minutes_str(_log_interval) << "\n";
+}
+
+bool BlueprintTrainer::operator==(const BlueprintTrainer& other) {
+  return _regrets == other._regrets &&
+         _phi == other._phi;
+         _t == other._t &&
+         _strategy_interval == other._strategy_interval &&
+         _preflop_threshold == other._preflop_threshold &&
+         _snapshot_interval == other._snapshot_interval &&
+         _prune_thresh == other._prune_thresh &&
+         _lcfr_thresh == other._lcfr_thresh &&
+         _discount_interval == other._discount_interval &&
+         _log_interval == other._log_interval &&
+         _prune_cutoff == other._prune_cutoff &&
+         _regret_floor == other._regret_floor &&
+         _n_players == other._n_players &&
+         _n_chips == other._n_chips &&
+         _ante == other._ante;
 }
 
 }

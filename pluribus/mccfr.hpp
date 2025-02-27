@@ -18,7 +18,7 @@ using PreflopMap = tbb::concurrent_unordered_map<InformationSet, tbb::concurrent
 
 class RegretStorage {
 public:
-  RegretStorage(int n_players, int n_chips, int ante, int n_clusters, int n_actions);
+  RegretStorage(int n_players = 2, int n_chips = 10'000, int ante = 0, int n_clusters = 200, int n_actions = 5);
   ~RegretStorage();
   std::atomic<int>* operator[](const InformationSet& info_set);
   const std::atomic<int>* operator[](const InformationSet& info_set) const;
@@ -28,8 +28,17 @@ public:
   inline size_t size() { return _size; }
   inline int get_n_clusters() const { return _n_clusters; }
 
+  void log(int n) {
+    for(int i = 0; i < n; ++i) {
+      std::cout << i << ": " << *(_data + i) << "\n";
+    }
+  }
+
   template <class Archive>
   void serialize(Archive& ar) {
+    if(Archive::is_loading::value) {
+      unmap_memory();
+    }
     ar(_size, _n_clusters, _n_actions);
     if(Archive::is_loading::value) {
       map_memory();
@@ -40,8 +49,11 @@ public:
 private:
   size_t info_offset(const InformationSet& info_set) const;
   void map_memory();
+  void unmap_memory();
+  
   std::atomic<int>* _data;
   size_t _size;
+  std::string _fn;
   int _n_clusters;
   int _n_actions;
   int _fd;
@@ -63,13 +75,14 @@ public:
                    long log_interval = it_per_min);
   void mccfr_p(long T);
   void log_state() const;
+  bool operator==(const BlueprintTrainer& other);
   inline const RegretStorage& get_regrets() const { return _regrets; }
   inline RegretStorage& get_regrets() { return _regrets; }
   inline const PreflopMap& get_phi() const { return _phi; }
   inline int get_n_players() const { return _n_players; }
   inline int get_n_chips() const { return _n_chips; }
   inline int get_ante() const { return _ante; }
-
+  
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_regrets, _phi, _t, _strategy_interval, _preflop_threshold, _snapshot_interval, _prune_thresh, _lcfr_thresh, _discount_interval,
