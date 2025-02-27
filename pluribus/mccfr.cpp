@@ -187,22 +187,22 @@ void BlueprintTrainer::mccfr_p(long T) {
       std::cout << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
       lcfr_discount(_regrets, d);
       lcfr_discount(_phi, d);
+      next_discount = next_discount + _discount_interval < _lcfr_thresh ? next_discount + _discount_interval : limit + 1;
     }
     if(_t == _preflop_threshold) {
       std::cout << "============== Saving & freezing preflop strategy ==============\n";
       std::ostringstream oss;
       oss << date_time_str() << "_preflop.bin";
       cereal_save(*this, oss.str());
+      next_snapshot += _snapshot_interval;
     }
     else if(_t > _preflop_threshold && _t == next_snapshot) {
       std::cout << "============== Saving snapshot ==============\n";
       std::ostringstream oss;
       oss << date_time_str() << "_t" << std::fixed << std::setprecision(1) << static_cast<double>(_t) / 1'000'000 << "M.bin";
       cereal_save(*this, oss.str());
+      next_snapshot += _snapshot_interval;
     }
-    
-    next_discount = next_discount + _discount_interval < _lcfr_thresh ? next_discount + _discount_interval : limit + 1;
-    next_snapshot += _snapshot_interval;
   }
 }
 
