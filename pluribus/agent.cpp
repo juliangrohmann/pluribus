@@ -14,6 +14,12 @@ Action RandomAgent::act(const PokerState& state, const Board& board, const Hand&
   return actions[dist(GlobalRNG::instance())];
 }
 
+Action BlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) {
+  InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), n_players, n_chips, ante};
+  auto actions = valid_actions(state);
+  auto freq = calculate_strategy(_trainer_p->get_regrets()[info_set], actions.size());
+  return actions[sample_action_idx(freq)];
+}
 
 // BlueprintAgent::BlueprintAgent(BlueprintTrainer& trainer) {
 //   populate(PokerState{trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante()}, trainer);

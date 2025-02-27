@@ -32,21 +32,14 @@ public:
   void serialize(Archive& ar) {
     ar(_size, _n_clusters, _n_actions);
     if(Archive::is_loading::value) {
-      _fd = open("atomic_regret.dat", O_RDWR | O_CREAT, 0666);
-      if(_fd == -1) throw std::runtime_error("Failed to reopen file during deserialization");
-      void* ptr = mmap(NULL, _size * sizeof(std::atomic<int>), PROT_READ | PROT_WRITE, MAP_SHARED, _fd, 0);
-      if(ptr == MAP_FAILED) {
-        close(_fd);
-        throw std::runtime_error("Failed to remap memory during deserialization");
-      }
-      _data = static_cast<std::atomic<int>*>(ptr);
+      map_memory();
     }
     ar(cereal::binary_data(_data, _size * sizeof(std::atomic<int>)));
   }
 
 private:
   size_t info_offset(const InformationSet& info_set) const;
-  
+  void map_memory();
   std::atomic<int>* _data;
   size_t _size;
   int _n_clusters;
@@ -54,7 +47,7 @@ private:
   int _fd;
 };
 
-std::vector<float> calculate_strategy(std::atomic<int>* regret_p, int n_actions);
+std::vector<float> calculate_strategy(const std::atomic<int>* regret_p, int n_actions);
 int sample_action_idx(const std::vector<float>& freq);
 void lcfr_discount(RegretStorage& strategy, double d);
 void lcfr_discount(PreflopMap& strategy, double d);
@@ -64,7 +57,7 @@ const int it_per_min = it_per_sec * 60;
 
 class BlueprintTrainer {
 public:
-  BlueprintTrainer(int n_players = 6, int n_chips = 10'000, int ante = 0, long strategy_interval = 10'000, long preflop_threshold = 800 * it_per_min, 
+  BlueprintTrainer(int n_players = 2, int n_chips = 10'000, int ante = 0, long strategy_interval = 10'000, long preflop_threshold = 800 * it_per_min, 
                    long snapshot_interval = 200 * it_per_min, long prune_thresh = 200 * it_per_min, int prune_cutoff = -300'000'000, 
                    int regret_floor = -310'000'000, long lcfr_thresh = 400 * it_per_min, long discount_interval = 10 * it_per_min, 
                    long log_interval = it_per_min);

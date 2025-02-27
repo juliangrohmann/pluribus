@@ -17,13 +17,12 @@ public:
   Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) override;
 };
 
-// class BlueprintAgent : public Agent {
-// public:
-//   BlueprintAgent(BlueprintTrainer& trainer);
-//   Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) override;
-// private:
-//   std::unordered_map<InformationSet, Action> _strategy;
-//   void populate(const PokerState& state, BlueprintTrainer& trainer);
-// };
+class BlueprintAgent : public Agent {
+public:
+  BlueprintAgent(const BlueprintTrainer* trainer_p) : _trainer_p{trainer_p} {};
+  Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) override;
+private:
+  const BlueprintTrainer* _trainer_p;
+};
 
 }

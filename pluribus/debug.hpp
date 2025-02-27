@@ -27,9 +27,8 @@ constexpr bool verbose = is_debug &
 std::string round_to_str(int round);
 void print_cluster(int cluster, int round, int n_clusters);
 void print_similar_boards(std::string board, int n_clusters=200);
-// std::string strategy_str(const BlueprintTrainer& trainer, const ActionHistory& history, Action action, const Board& board,
-                        //  int round, int n_players, int n_chips, int ante);
-// void evaluate_strategies(const std::vector<StrategyMap>& strategies, long n_iter);
-// void evaluate_vs_random(const StrategyMap& hero, int n_players, long n_iter);
+std::string strategy_str(const BlueprintTrainer& trainer, const PokerState& state, Action action, const Board& board);
+void evaluate_strategies(const std::vector<BlueprintTrainer*>& strategies, long n_iter);
+void evaluate_vs_random(const BlueprintTrainer* hero, long n_iter);
 
 }

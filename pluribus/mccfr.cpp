@@ -27,6 +27,18 @@ RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_cluster
   size_t n_histories = HistoryIndexer::size(n_players, n_chips, ante);
   std::cout << n_histories << "\n";
   _size = n_histories * n_clusters * n_actions;
+  map_memory();
+
+  std::cout << "Initializing regrets... " << std::flush;
+  #pragma omp parallel for schedule(static, 1)
+  for(size_t i = 0; i < _size; ++i) {
+    // std::cout << i << '\n' << std::flush;
+    (_data + i)->store(0, std::memory_order_relaxed);
+  }
+  std::cout << "Success.\n";
+}
+
+void RegretStorage::map_memory() {
   std::cout << "Opening regret map file... " << std::flush;
   _fd = open("atomic_regret.dat", O_RDWR | O_CREAT | O_TRUNC, 0666);
   if(_fd == -1) {
@@ -47,14 +59,6 @@ RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_cluster
     throw std::runtime_error("Failed to map file to memory.");
   }
   _data = static_cast<std::atomic<int>*>(ptr);
-
-  std::cout << "Initializing regrets... " << std::flush;
-  #pragma omp parallel for schedule(static, 1)
-  for(size_t i = 0; i < _size; ++i) {
-    // std::cout << i << '\n' << std::flush;
-    (_data + i)->store(0, std::memory_order_relaxed);
-  }
-  std::cout << "Success.\n";
 }
 
 RegretStorage::~RegretStorage() {
@@ -82,7 +86,7 @@ size_t RegretStorage::info_offset(const InformationSet& info_set) const {
   return (static_cast<size_t>(info_set.get_history_idx()) * _n_clusters + info_set.get_cluster()) * _n_actions;
 }
 
-std::vector<float> calculate_strategy(std::atomic<int>* regret_p, int n_actions) {
+std::vector<float> calculate_strategy(const std::atomic<int>* regret_p, int n_actions) {
   int sum = 0;
   for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
     sum += std::max((regret_p + a_idx)->load(), 0);
