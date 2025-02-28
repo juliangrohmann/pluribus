@@ -241,6 +241,12 @@ void BlueprintTrainer::mccfr_p(long T) {
       }
     }
   }
+
+  std::cout << "============== Blueprint training complete ==============\n";
+  std::ostringstream oss;
+  oss << date_time_str() << _n_players << "p_" << _n_chips / 100 << "bb_" << _ante << "ante_"
+      << std::setprecision(1) << std::fixed << limit / 1'000'000'000.0 << "B.bin";
+  cereal_save(*this, oss.str());
 }
 
 int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
