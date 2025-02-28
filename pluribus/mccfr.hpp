@@ -3,6 +3,7 @@
 #include <array>
 #include <vector>
 #include <atomic>
+#include <filesystem>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -69,7 +70,7 @@ public:
   BlueprintTrainer(int n_players = 2, int n_chips = 10'000, int ante = 0, long strategy_interval = 10'000, long preflop_threshold_m = 800, 
                    long snapshot_interval_m = 200, long prune_thresh_m = 200, int prune_cutoff = -300'000'000, 
                    int regret_floor = -310'000'000, long lcfr_thresh_m = 400, long discount_interval_m = 10, 
-                   long log_interval_m = 1, long profiling_thresh = 1'000'000);
+                   long log_interval_m = 1, long profiling_thresh = 1'000'000, std::string snapshot_dir = "");
   void mccfr_p(long T);
   void log_state() const;
   bool operator==(const BlueprintTrainer& other);
@@ -79,11 +80,12 @@ public:
   inline int get_n_players() const { return _n_players; }
   inline int get_n_chips() const { return _n_chips; }
   inline int get_ante() const { return _ante; }
+  inline void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
   
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_regrets, _phi, _t, _strategy_interval, _preflop_threshold_m, _snapshot_interval_m, _prune_thresh_m, _lcfr_thresh_m, _discount_interval_m,
-       _log_interval_m, _prune_cutoff, _regret_floor, _n_players, _n_chips, _ante);
+       _log_interval_m, _it_per_min, _profiling_thresh, _prune_cutoff, _regret_floor, _n_players, _n_chips, _ante);
   }
 
 private:
@@ -102,6 +104,7 @@ private:
 
   RegretStorage _regrets;
   PreflopMap _phi;
+  std::filesystem::path _snapshot_dir;
   long _t;
   long _strategy_interval;
   long _preflop_threshold_m;

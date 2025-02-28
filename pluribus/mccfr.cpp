@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <atomic>
 #include <limits>
+#include <filesystem>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <sys/mman.h>
@@ -143,11 +144,12 @@ void lcfr_discount(PreflopMap& data, double d) {
 
 BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long strategy_interval, long preflop_threshold_m, long snapshot_interval_m,
                                    long prune_thresh_m, int prune_cutoff, int regret_floor, long lcfr_thresh_m, long discount_interval_m, 
-                                   long log_interval_m, long profiling_thresh) : 
+                                   long log_interval_m, long profiling_thresh, std::string snapshot_dir) : 
     _t{1}, _regrets{n_players, n_chips, ante, 200, 5}, _phi{}, _n_players{n_players}, _n_chips{n_chips}, _ante{ante}, 
     _strategy_interval{strategy_interval}, _preflop_threshold_m{preflop_threshold_m}, _snapshot_interval_m{snapshot_interval_m},
     _prune_thresh_m{prune_thresh_m}, _prune_cutoff{prune_cutoff}, _regret_floor{regret_floor}, _lcfr_thresh_m{lcfr_thresh_m},
-    _discount_interval_m{discount_interval_m}, _log_interval_m{log_interval_m}, _profiling_thresh{profiling_thresh}, _it_per_min{50'000} {
+    _discount_interval_m{discount_interval_m}, _log_interval_m{log_interval_m}, _profiling_thresh{profiling_thresh}, _it_per_min{50'000},
+    _snapshot_dir{snapshot_dir} {
   log_state();
 }
 
@@ -223,18 +225,17 @@ void BlueprintTrainer::mccfr_p(long T) {
         lcfr_discount(_phi, d);
         next_discount = next_discount + discount_interval < _lcfr_thresh_m * _it_per_min ? next_discount + discount_interval : limit + 1;
       }
-      if(_t == _preflop_threshold_m * _it_per_min) {
-        std::cout << "============== Saving & freezing preflop strategy ==============\n";
-        std::ostringstream oss;
-        oss << date_time_str() << "_preflop.bin";
-        cereal_save(*this, oss.str());
-        next_snapshot += _snapshot_interval_m * _it_per_min;
-      }
-      else if(_t > _preflop_threshold_m * _it_per_min && _t == next_snapshot) {
-        std::cout << "============== Saving snapshot ==============\n";
-        std::ostringstream oss;
-        oss << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
-        cereal_save(*this, oss.str());
+      if(_t == next_snapshot) {
+        std::ostringstream fn_stream;
+        if(_t == _preflop_threshold_m * _it_per_min) {
+          std::cout << "============== Saving & freezing preflop strategy ==============\n";
+          fn_stream << date_time_str() << "_preflop.bin";
+        }
+        else {
+          std::cout << "============== Saving snapshot ==============\n";
+          fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
+        }
+        cereal_save(*this, (_snapshot_dir / fn_stream.str()).string());
         next_snapshot += _snapshot_interval_m * _it_per_min;
       }
     }
