@@ -64,15 +64,12 @@ int sample_action_idx(const std::vector<float>& freq);
 void lcfr_discount(RegretStorage& strategy, double d);
 void lcfr_discount(PreflopMap& strategy, double d);
 
-const int it_per_sec = 24'000;
-const int it_per_min = it_per_sec * 60;
-
 class BlueprintTrainer {
 public:
-  BlueprintTrainer(int n_players = 2, int n_chips = 10'000, int ante = 0, long strategy_interval = 10'000, long preflop_threshold = 800 * it_per_min, 
-                   long snapshot_interval = 200 * it_per_min, long prune_thresh = 200 * it_per_min, int prune_cutoff = -300'000'000, 
-                   int regret_floor = -310'000'000, long lcfr_thresh = 400 * it_per_min, long discount_interval = 10 * it_per_min, 
-                   long log_interval = it_per_min);
+  BlueprintTrainer(int n_players = 2, int n_chips = 10'000, int ante = 0, long strategy_interval = 10'000, long preflop_threshold_m = 800, 
+                   long snapshot_interval_m = 200, long prune_thresh_m = 200, int prune_cutoff = -300'000'000, 
+                   int regret_floor = -310'000'000, long lcfr_thresh_m = 400, long discount_interval_m = 10, 
+                   long log_interval_m = 1, long profiling_thresh = 1'000'000);
   void mccfr_p(long T);
   void log_state() const;
   bool operator==(const BlueprintTrainer& other);
@@ -85,8 +82,8 @@ public:
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_regrets, _phi, _t, _strategy_interval, _preflop_threshold, _snapshot_interval, _prune_thresh, _lcfr_thresh, _discount_interval,
-       _log_interval,_prune_cutoff, _regret_floor, _n_players, _n_chips, _ante);
+    ar(_regrets, _phi, _t, _strategy_interval, _preflop_threshold_m, _snapshot_interval_m, _prune_thresh_m, _lcfr_thresh_m, _discount_interval_m,
+       _log_interval_m, _prune_cutoff, _regret_floor, _n_players, _n_chips, _ante);
   }
 
 private:
@@ -107,12 +104,14 @@ private:
   PreflopMap _phi;
   long _t;
   long _strategy_interval;
-  long _preflop_threshold;
-  long _snapshot_interval;
-  long _prune_thresh;
-  long _lcfr_thresh;
-  long _discount_interval;
-  long _log_interval;
+  long _preflop_threshold_m;
+  long _snapshot_interval_m;
+  long _prune_thresh_m;
+  long _lcfr_thresh_m;
+  long _discount_interval_m;
+  long _log_interval_m;
+  long _it_per_min;
+  long _profiling_thresh;
   int _prune_cutoff;
   int _regret_floor;
   int _n_players;
