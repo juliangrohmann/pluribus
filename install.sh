@@ -20,7 +20,6 @@ make
 make install
 cd ../..
 
-git clone https://github.com/juliangrohmann/pluribus.git
 cd pluribus
 mkdir build
 cd build
