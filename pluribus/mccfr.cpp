@@ -154,13 +154,12 @@ BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long st
 void BlueprintTrainer::mccfr_p(long T) {
   if(verbose) omp_set_num_threads(1);
   long limit = std::numeric_limits<long>::max();
-  std::cout << "Training blueprint from " << _t << " to " << limit << "\n";
   long next_discount = limit;
   long next_snapshot = limit;
-  bool profiled = false;
+  std::cout << "Training blueprint from " << _t << " to " << (_t < _profiling_thresh ? "TBD" : std::to_string(limit)) << " (" << T << " min)\n";
   while(_t < limit) {
     long init_t = _t;
-    _t = !profiled ? _profiling_thresh : std::min(std::min(next_discount, next_snapshot), limit);
+    _t = _t < _profiling_thresh ? _profiling_thresh : std::min(std::min(next_discount, next_snapshot), limit);
     auto interval_start = std::chrono::high_resolution_clock::now();
     std::cout << std::setprecision(1) << std::fixed << "Next step: " << _t / 1'000'000.0 << "M\n";
     #pragma omp parallel for schedule(static, 1)
@@ -203,16 +202,15 @@ void BlueprintTrainer::mccfr_p(long T) {
     auto duration = std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start);
 
     if(_t == _profiling_thresh) {
-      long it_per_sec = (_profiling_thresh / duration.count());
+      long it_per_sec = ((_profiling_thresh - init_t) / duration.count());
       _it_per_min = 60 * it_per_sec;
       next_discount = _t + _discount_interval_m * _it_per_min;
       next_snapshot = _t + _preflop_threshold_m * _it_per_min;
       limit = T * _it_per_min;
-      profiled = true;
       std::cout << "============== Profiling ==============\n";
       std::cout << "It/sec: " << it_per_sec << "\n";
-      std::cout << "It/min: " << _it_per_min << "\n";
-      std::cout << "Limit: " << limit << "\n";
+      std::cout << std::setprecision(1) << std::fixed << "It/min: " << _it_per_min / 1'000'000.0 << "M\n"
+                << "Limit: " << limit / 1'000'000'000.0 << "B\n";
     }
     else {
       std::cout << "Step duration: " << duration.count() << " s.\n";
@@ -235,7 +233,7 @@ void BlueprintTrainer::mccfr_p(long T) {
       else if(_t > _preflop_threshold_m * _it_per_min && _t == next_snapshot) {
         std::cout << "============== Saving snapshot ==============\n";
         std::ostringstream oss;
-        oss << date_time_str() << "_t" << std::fixed << std::setprecision(1) << static_cast<double>(_t) / 1'000'000 << "M.bin";
+        oss << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
         cereal_save(*this, oss.str());
         next_snapshot += _snapshot_interval_m * _it_per_min;
       }
