@@ -164,7 +164,7 @@ void BlueprintTrainer::mccfr_p(long T) {
     _t = _t < _profiling_thresh ? _profiling_thresh : std::min(std::min(next_discount, next_snapshot), limit);
     auto interval_start = std::chrono::high_resolution_clock::now();
     std::cout << std::setprecision(1) << std::fixed << "Next step: " << _t / 1'000'000.0 << "M\n";
-    #pragma omp parallel for schedule(static, 1)
+    #pragma omp parallel for schedule(dynamic, 1)
     for(long t = init_t; t < _t; ++t) {
       thread_local omp::HandEvaluator eval;
       thread_local Deck deck;
@@ -206,8 +206,8 @@ void BlueprintTrainer::mccfr_p(long T) {
     if(_t == _profiling_thresh) {
       long it_per_sec = ((_profiling_thresh - init_t) / duration.count());
       _it_per_min = 60 * it_per_sec;
-      next_discount = _t + _discount_interval_m * _it_per_min;
-      next_snapshot = _t + _preflop_threshold_m * _it_per_min;
+      next_discount = _discount_interval_m * _it_per_min;
+      next_snapshot = _preflop_threshold_m * _it_per_min;
       limit = T * _it_per_min;
       std::cout << "============== Profiling ==============\n";
       std::cout << "It/sec: " << it_per_sec << "\n";
