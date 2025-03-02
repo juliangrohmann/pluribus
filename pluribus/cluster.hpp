@@ -3,6 +3,7 @@
 #include <string>
 #include <array>
 #include <vector>
+#include <memory>
 #include <omp/EquityCalculator.h>
 #include <omp/Hand.h>
 #include <hand_isomorphism/hand_index.h>
@@ -24,6 +25,28 @@ void assign_features(const std::string& hand, const std::string& board, float* d
 double equity(const omp::Hand& hero, const omp::CardRange villain, const omp::Hand& board);
 void build_ochs_features(int round);
 std::string cluster_filename(int round, int n_clusters, int split);
-std::array<std::vector<uint16_t>, 4> init_cluster_map(int n_clusters);
+std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(int n_clusters);
+
+class FlatClusterMap {
+public:
+  uint16_t cluster(int round, uint64_t index) { return _cluster_map[round][index]; }
+
+  static FlatClusterMap* get_instance() {
+    if(!_instance) {
+      _instance = std::unique_ptr<FlatClusterMap>(new FlatClusterMap());
+    }
+    return _instance.get();
+  }
+
+  FlatClusterMap(const FlatClusterMap&) = delete;
+  FlatClusterMap& operator=(const FlatClusterMap&) = delete;
+
+private:
+  FlatClusterMap();
+
+  std::array<std::vector<uint16_t>, 4> _cluster_map;
+
+  static std::unique_ptr<FlatClusterMap> _instance;
+};
 
 }

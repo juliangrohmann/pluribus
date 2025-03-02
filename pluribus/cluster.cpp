@@ -3,6 +3,7 @@
 #include <fstream>
 #include <vector>
 #include <chrono>
+#include <memory>
 #include <omp.h>
 #include <cnpy.h>
 #include <tqdm/tqdm.hpp>
@@ -140,10 +141,11 @@ std::string cluster_filename(int round, int n_clusters, int split) {
   return base + (round == 3 ? "_p" + std::to_string(split) + ".npy": ".npy");
 }
 
-std::array<std::vector<uint16_t>, 4> init_cluster_map(int n_clusters) {
+std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(int n_clusters) {
+  std::cout << "Initializing flat cluster map (n_clusters=" << n_clusters << ")...\n";
   std::array<std::vector<uint16_t>, 4> cluster_map;
   for(int i = 0; i < 4; ++i) {
-    std::cout << "Loading round " << i << " clusters...\n";
+    std::cout << "(Flat: " << n_clusters << " clusters) Loading round " << i << "... " << std::flush;
     if(i == 0)  {
       cluster_map[i].resize(169);
       std::iota(cluster_map[i].begin(), cluster_map[i].end(), 0);
@@ -158,8 +160,15 @@ std::array<std::vector<uint16_t>, 4> init_cluster_map(int n_clusters) {
     else {
       cluster_map[i] = cnpy::npy_load(cluster_filename(i, n_clusters, 1)).as_vec<uint16_t>();
     }
+    std::cout << "Success.\n";
   }
   return cluster_map;
+}
+
+std::unique_ptr<FlatClusterMap> FlatClusterMap::_instance = nullptr;
+
+FlatClusterMap::FlatClusterMap() {
+  _cluster_map = init_flat_cluster_map(200);
 }
 
 }

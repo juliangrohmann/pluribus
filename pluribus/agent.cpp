@@ -21,34 +21,57 @@ Action BlueprintAgent::act(const PokerState& state, const Board& board, const Ha
   return actions[sample_action_idx(freq)];
 }
 
-// BlueprintAgent::BlueprintAgent(BlueprintTrainer& trainer) {
-//   populate(PokerState{trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante()}, trainer);
-// }
+SampledBlueprintAgent::SampledBlueprintAgent(const BlueprintTrainer& trainer) : _strategy{trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante(), trainer.get_regrets().get_n_clusters()} {
+  std::cout << "Populating sampled blueprint...\n";
+  populate(PokerState{trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante()}, trainer);
+}
 
-// Action BlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) {
-//   InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), n_players, n_chips, ante};
-//   return _strategy.at(info_set);
-// }
+Action SampledBlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) {
+  InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), n_players, n_chips, ante};
+  return _strategy[info_set];
+}
 
-// void BlueprintAgent::populate(const PokerState& state, BlueprintTrainer& trainer) {
-//   int n_clusters = state.get_round() == 0 ? 169 : 200;
-//   for(uint16_t c = 0; c < n_clusters; ++c) {
-//     InformationSet info_set{state.get_action_history(), c, trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante()};
-//     StrategyMap& strategy_map = state.get_round() == 0 ? trainer.get_phi() : trainer.get_regrets();
-//     auto action_it = strategy_map.find(info_set);
-//     FrequencyMap freq;
-//     if(action_it != strategy_map.end()) {
-//       freq = calculate_strategy(action_it->second, state);
-//     }
-//     else {
-//       ActionMap action_map;
-//       freq = calculate_strategy(action_map, state);
-//     }
-//     _strategy[info_set] = sample_action(freq);
-//   }
-//   for(Action a : valid_actions(state)) {
-//     populate(state.apply(a), trainer);
-//   }
-// }
+std::vector<float> calculate_strategy(const tbb::concurrent_vector<float>& phi_map, int n_actions) {
+  float sum = 0;
+  for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
+    sum += std::max(phi_map[a_idx], 0.0f);
+  }
+
+  std::vector<float> freq;
+  freq.reserve(n_actions);
+  if(sum > 0.0f) {
+    for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
+      freq.push_back(std::max(phi_map[a_idx], 0.0f) / static_cast<double>(sum));
+    }
+  }
+  else {
+    for(int i = 0; i < n_actions; ++i) {
+      freq.push_back(1.0 / n_actions);
+    }
+  }
+  return freq;
+}
+
+void SampledBlueprintAgent::populate(const PokerState& state, const BlueprintTrainer& trainer) {
+  if(state.is_terminal()) return;
+
+  int n_clusters = state.get_round() == 0 ? 169 : 200;
+  for(uint16_t c = 0; c < n_clusters; ++c) {
+    InformationSet info_set{state.get_action_history(), c, trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante()};
+    auto actions = valid_actions(state);
+    std::vector<float> freq;
+    if(state.get_round() == 0) {
+      freq = calculate_strategy(trainer.get_phi().at(info_set), actions.size());
+    }
+    else {
+      freq = calculate_strategy(trainer.get_regrets()[info_set], actions.size());
+    }
+    int a_idx = sample_action_idx(freq);
+    _strategy[info_set] = actions[a_idx];
+  }
+  for(Action a : valid_actions(state)) {
+    populate(state.apply(a), trainer);
+  }
+}
 
 }

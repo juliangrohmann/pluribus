@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include <initializer_list>
+#include <memory>
 #include <cereal/cereal.hpp>
 #include <cereal/types/string.hpp>
 #include <cereal/archives/json.hpp>
@@ -73,11 +74,25 @@ using HistoryMap = std::unordered_map<ActionHistory, int>;
 
 class HistoryIndexer {
 public:
-  static void initialize(int n_players, int n_chips, int ante);
-  static int index(const ActionHistory& history, int n_players, int n_chips, int ante);
-  static size_t size(int n_players, int n_chips, int ante);
+  void initialize(int n_players, int n_chips, int ante);
+  int index(const ActionHistory& history, int n_players, int n_chips, int ante);
+  size_t size(int n_players, int n_chips, int ante);
+
+  static HistoryIndexer* get_instance() {
+    if(!_instance) {
+      _instance = std::unique_ptr<HistoryIndexer>(new HistoryIndexer());
+    }
+    return _instance.get();
+  }
+
+  HistoryIndexer(const HistoryIndexer&) = delete;
+  HistoryIndexer& operator==(const HistoryIndexer&) = delete;
 private:
-  static std::unordered_map<std::string, HistoryMap> _history_map;
+  HistoryIndexer() {}
+
+  std::unordered_map<std::string, HistoryMap> _history_map;
+
+  static std::unique_ptr<HistoryIndexer> _instance;
 };
 
 void build_history_map(int n_players, int n_chips, int ante);

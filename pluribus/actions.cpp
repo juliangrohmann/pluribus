@@ -55,19 +55,18 @@ std::string history_map_filename(int n_players, int n_chips, int ante) {
   return "history_index_p" + std::to_string(n_players) + "_" + std::to_string(n_chips / 100) + "bb_" + std::to_string(ante) + "ante.bin";
 }
 
-std::unordered_map<std::string, HistoryMap> HistoryIndexer::_history_map;
+std::unique_ptr<HistoryIndexer> HistoryIndexer::_instance = nullptr;
+
 
 void HistoryIndexer::initialize(int n_players, int n_chips, int ante) {
   std::string fn = history_map_filename(n_players, n_chips, ante);
   if(_history_map.find(fn) == _history_map.end()) {
-    std::cout << "Initializing history map: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
+    std::cout << "Initializing history map (n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << ")... " << std::flush;
     _history_map[fn] = cereal_load<HistoryMap>(fn);
-    std::cout << "History map initialized.\n";
-  }
-  else {
-    std::cout << "History map already initialized: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
+    std::cout << "Success.\n";
   }
 }
+
 int HistoryIndexer::index(const ActionHistory& history, int n_players, int n_chips, int ante) {
   std::string fn = history_map_filename(n_players, n_chips, ante);
   auto it = _history_map.find(fn);
@@ -81,7 +80,12 @@ int HistoryIndexer::index(const ActionHistory& history, int n_players, int n_chi
 size_t HistoryIndexer::size(int n_players, int n_chips, int ante) {
   std::string fn = history_map_filename(n_players, n_chips, ante);
   auto it = _history_map.find(fn);
-  return it != _history_map.end() ? it->second.size() : -1;
+  if(it != _history_map.end()) {
+    return it->second.size();
+  }
+  else {
+    throw std::runtime_error("HistoryIndexer::size --- HistoryIndexer is uninitialized.");
+  }
 }
 
 void collect_histories(const PokerState& state, std::vector<ActionHistory>& histories) {

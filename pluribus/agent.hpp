@@ -4,6 +4,7 @@
 #include <random>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/poker.hpp>
+#include <pluribus/storage.hpp>
 
 namespace pluribus {
 
@@ -23,6 +24,16 @@ public:
   Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) override;
 private:
   const BlueprintTrainer* _trainer_p;
+};
+
+class SampledBlueprintAgent : public Agent {
+public:
+  SampledBlueprintAgent(const BlueprintTrainer& trainer);
+  Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) override;
+private:
+  void populate(const PokerState& state, const BlueprintTrainer& trainer);
+
+  ActionStorage _strategy;
 };
 
 }

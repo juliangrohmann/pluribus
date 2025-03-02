@@ -12,53 +12,11 @@
 #include <tbb/concurrent_unordered_map.h>
 #include <pluribus/poker.hpp>
 #include <pluribus/infoset.hpp>
+#include <pluribus/storage.hpp>
 
 namespace pluribus {
 
 using PreflopMap = tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_vector<float>>;
-
-class RegretStorage {
-public:
-  RegretStorage(int n_players = 2, int n_chips = 10'000, int ante = 0, int n_clusters = 200, int n_actions = 5);
-  ~RegretStorage();
-  std::atomic<int>* operator[](const InformationSet& info_set);
-  const std::atomic<int>* operator[](const InformationSet& info_set) const;
-  bool operator==(const RegretStorage& other) const;
-  inline std::atomic<int>* data() { return _data; }
-  inline const std::atomic<int>* data() const { return _data; }
-  inline size_t size() { return _size; }
-  inline int get_n_clusters() const { return _n_clusters; }
-
-  void log(int n) {
-    for(int i = 0; i < n; ++i) {
-      std::cout << i << ": " << *(_data + i) << "\n";
-    }
-  }
-
-  template <class Archive>
-  void serialize(Archive& ar) {
-    if(Archive::is_loading::value) {
-      unmap_memory();
-    }
-    ar(_size, _n_clusters, _n_actions);
-    if(Archive::is_loading::value) {
-      map_memory();
-    }
-    ar(cereal::binary_data(_data, _size * sizeof(std::atomic<int>)));
-  }
-
-private:
-  size_t info_offset(const InformationSet& info_set) const;
-  void map_memory();
-  void unmap_memory();
-  
-  std::atomic<int>* _data;
-  size_t _size;
-  std::string _fn;
-  int _n_clusters;
-  int _n_actions;
-  int _fd;
-};
 
 std::vector<float> calculate_strategy(const std::atomic<int>* regret_p, int n_actions);
 int sample_action_idx(const std::vector<float>& freq);

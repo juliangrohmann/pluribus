@@ -7,6 +7,7 @@ add_library(
   actions.cpp
   infoset.cpp
   mccfr.cpp
+  storage.cpp
   util.cpp
   debug.cpp
 )

@@ -6,12 +6,6 @@
 #include <stdexcept>
 #include <atomic>
 #include <limits>
-#include <filesystem>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
 #include <omp.h>
 #include <tqdm/tqdm.hpp>
 #include <cereal/archives/binary.hpp>
@@ -20,87 +14,10 @@
 #include <pluribus/rng.hpp>
 #include <pluribus/debug.hpp>
 #include <pluribus/poker.hpp>
+#include <pluribus/cluster.hpp>
 #include <pluribus/mccfr.hpp>
 
 namespace pluribus {
-
-RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_clusters, int n_actions) : _n_clusters{n_clusters}, _n_actions{n_actions} {
-  HistoryIndexer::initialize(n_players, n_chips, ante);
-  std::cout << "Counting histories... " << std::flush;
-  size_t n_histories = HistoryIndexer::size(n_players, n_chips, ante);
-  std::cout << n_histories << "\n";
-  _size = n_histories * n_clusters * n_actions;
-  map_memory();
-
-  std::cout << "Initializing regrets... " << std::flush;
-  #pragma omp parallel for schedule(static, 1)
-  for(size_t i = 0; i < _size; ++i) {
-    (_data + i)->store(0, std::memory_order_relaxed);
-  }
-  std::cout << "Success.\n";
-}
-
-void RegretStorage::map_memory() {
-  std::cout << "Opening regret map file... " << std::flush;
-  char fn_temp[] = "atom_regrets_XXXXXX";
-  _fd = mkstemp(fn_temp);
-  if(_fd == -1) {
-    throw std::runtime_error("Failed to create temporary regret file.");
-  }
-  _fn = fn_temp;
-  std::cout << "Opened " + _fn + "... " << std::flush;
-
-  size_t file_size = _size * sizeof(std::atomic<int>);
-  std::cout << "Resizing file to " << file_size << " bytes... " << std::flush;
-  if(ftruncate(_fd, file_size) == -1) {
-    close(_fd);
-    throw std::runtime_error("Failed to resize file.");
-  }
-
-  std::cout << "Mapping file... ";
-  void* ptr = mmap(NULL, _size * sizeof(std::atomic<int>), PROT_READ | PROT_WRITE, MAP_PRIVATE, _fd, 0);
-  if(ptr == MAP_FAILED) {
-    close(_fd);
-    throw std::runtime_error("Failed to map file to memory.");
-  }
-  _data = static_cast<std::atomic<int>*>(ptr);
-}
-
-void RegretStorage::unmap_memory() {
-  std::cout << "Unmapping regret memory... " << std::flush;
-  if(_data) munmap(_data, _size * sizeof(std::atomic<int>));
-  if(_fd != -1) close(_fd);
-  if(unlink(_fn.c_str()) != 0) {
-    std::cerr << "Failed to delete file " << _fn << ": " << strerror(errno) << "\n";
-  } 
-  else {
-    std::cout << "Unmapped.\n";
-  }
-}
-
-RegretStorage::~RegretStorage() {
-  unmap_memory();
-}
-
-std::atomic<int>* RegretStorage::operator[](const InformationSet& info_set) {
-  return _data + info_offset(info_set);
-}
-
-const std::atomic<int>* RegretStorage::operator[](const InformationSet& info_set) const {
-  return _data + info_offset(info_set);
-}
-
-bool RegretStorage::operator==(const RegretStorage& other) const {
-  if(_size != other._size || _n_clusters != other._n_clusters || _n_actions != other._n_actions) return false;
-  for(size_t i = 0; i < _size; ++i) {
-    if(*(_data + i) != *(other._data + i)) return false;
-  }
-  return true;
-}
-
-size_t RegretStorage::info_offset(const InformationSet& info_set) const {
-  return (static_cast<size_t>(info_set.get_history_idx()) * _n_clusters + info_set.get_cluster()) * _n_actions;
-}
 
 std::vector<float> calculate_strategy(const std::atomic<int>* regret_p, int n_actions) {
   int sum = 0;
@@ -150,6 +67,9 @@ BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long st
     _prune_thresh_m{prune_thresh_m}, _prune_cutoff{prune_cutoff}, _regret_floor{regret_floor}, _lcfr_thresh_m{lcfr_thresh_m},
     _discount_interval_m{discount_interval_m}, _log_interval_m{log_interval_m}, _profiling_thresh{profiling_thresh}, _it_per_min{50'000},
     _snapshot_dir{snapshot_dir} {
+  std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
+  std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
+  HistoryIndexer::get_instance()->initialize(n_players, n_chips, ante);
   log_state();
 }
 

@@ -1,9 +1,32 @@
 #pragma once
 
 #include <hand_isomorphism/hand_index.h>
+#include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
 
 namespace pluribus {
+
+class HandIndexer {
+public:
+  uint64_t index(const uint8_t cards[], int round) { return hand_index_last(&_indexers[round], cards); }
+
+  static HandIndexer* get_instance() {
+    if(!_instance) {
+      _instance = std::unique_ptr<HandIndexer>(new HandIndexer());
+    }
+    return _instance.get();
+  }
+
+  HandIndexer(const HandIndexer&) = delete;
+  HandIndexer& operator=(const HandIndexer&) = delete;
+
+private:
+  HandIndexer();
+
+  std::array<hand_indexer_t, 4> _indexers;
+
+  static std::unique_ptr<HandIndexer> _instance;
+};
 
 class InformationSet {
 public:
@@ -20,8 +43,6 @@ public:
     ar(_history_idx, _cluster);
   }
 private:
-  static const std::array<hand_indexer_t, 4> _indexers;
-  static const std::array<std::vector<uint16_t>, 4> _cluster_map;
   int _history_idx;
   uint16_t _cluster;
 };
