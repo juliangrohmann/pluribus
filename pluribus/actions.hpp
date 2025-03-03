@@ -80,33 +80,6 @@ public:
   BlueprintActionProfile();
 };
 
-using HistoryMap = std::unordered_map<ActionHistory, int>;
-
-class HistoryIndexer {
-public:
-  void initialize(int n_players, int n_chips, int ante);
-  int index(const ActionHistory& history, int n_players, int n_chips, int ante);
-  size_t size(int n_players, int n_chips, int ante);
-
-  static HistoryIndexer* get_instance() {
-    if(!_instance) {
-      _instance = std::unique_ptr<HistoryIndexer>(new HistoryIndexer());
-    }
-    return _instance.get();
-  }
-
-  HistoryIndexer(const HistoryIndexer&) = delete;
-  HistoryIndexer& operator==(const HistoryIndexer&) = delete;
-private:
-  HistoryIndexer() {}
-
-  std::unordered_map<std::string, HistoryMap> _history_map;
-
-  static std::unique_ptr<HistoryIndexer> _instance;
-};
-
-void build_history_map(int n_players, int n_chips, int ante);
-
 }
 
 namespace std {
@@ -129,32 +102,5 @@ struct hash<pluribus::ActionHistory> {
     return seed;
   }
 };
-
-}
-
-namespace cereal {
-
-template<class Archive, typename Block, typename Allocator>
-void save(Archive& ar, const boost::dynamic_bitset<Block, Allocator>& bits) {
-  size_t size = bits.size();
-  ar(size);
-  std::string bitStr;
-  boost::to_string(bits, bitStr);
-  ar(bitStr);
-}
-
-template<class Archive, typename Block, typename Allocator>
-void load(Archive& ar, boost::dynamic_bitset<Block, Allocator>& bits) {
-  size_t size;
-  ar(size);
-  std::string bitStr;
-  ar(bitStr);
-  bits = boost::dynamic_bitset<Block, Allocator>(bitStr);
-}
-
-// template<class Archive, typename Block, typename Allocator>
-// inline void serialize(Archive& ar, boost::dynamic_bitset<Block, Allocator>& bits) {
-//   cereal::split_free(ar, bits);
-// }
 
 }

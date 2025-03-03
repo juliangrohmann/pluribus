@@ -16,6 +16,7 @@
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/history_index.hpp>
 #include <pluribus/mccfr.hpp>
 
 namespace pluribus {

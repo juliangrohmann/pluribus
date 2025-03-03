@@ -1,4 +1,5 @@
 #include <pluribus/storage.hpp>
+#include <pluribus/history_index.hpp>
 
 namespace pluribus {
 

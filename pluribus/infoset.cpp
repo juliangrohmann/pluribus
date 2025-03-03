@@ -5,6 +5,7 @@
 #include <pluribus/util.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
+#include <pluribus/history_index.hpp>
 #include <pluribus/infoset.hpp>
 
 namespace pluribus {

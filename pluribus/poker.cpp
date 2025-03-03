@@ -203,12 +203,14 @@ void PokerState::next_player() {
 }
 
 int total_bet_size(const PokerState& state, Action action) {
+  const Player& active_player = state.get_players()[state.get_active()];
   if(action == Action::ALL_IN) {
-    const Player& active_player = state.get_players()[state.get_active()];
     return active_player.get_chips() + active_player.get_betsize();
   }
   else if(action.get_bet_type() > 0.0f) {
-    return state.get_pot() * action.get_bet_type();
+    int missing = state.get_max_bet() - active_player.get_betsize();
+    int real_pot = state.get_pot() + missing;
+    return real_pot * action.get_bet_type() + missing + active_player.get_betsize();
   }
   else {
     throw std::runtime_error("Invalid action bet size: " + std::to_string(action.get_bet_type()));

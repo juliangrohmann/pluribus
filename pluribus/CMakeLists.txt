@@ -5,6 +5,7 @@ add_library(
   agent.cpp
   simulate.cpp
   actions.cpp
+  history_index.cpp
   infoset.cpp
   mccfr.cpp
   storage.cpp
