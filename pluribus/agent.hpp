@@ -15,7 +15,10 @@ public:
 
 class RandomAgent : public Agent {
 public:
+  RandomAgent(const ActionProfile& action_profile) : _action_profile{action_profile} {};
   Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) override;
+private:
+  ActionProfile _action_profile;
 };
 
 class BlueprintAgent : public Agent {
@@ -34,6 +37,7 @@ private:
   void populate(const PokerState& state, const BlueprintTrainer& trainer);
 
   ActionStorage _strategy;
+  ActionProfile _action_profile;
 };
 
 }

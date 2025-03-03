@@ -155,10 +155,10 @@ TEST_CASE("Simple equity solver", "[equity]") {
 }
 
 TEST_CASE("Simulate hands", "[poker]") {
+  std::vector<RandomAgent> rng_agents;
+  for(int i = 0; i < 9; ++i) rng_agents.push_back(RandomAgent{BlueprintActionProfile{}});
   std::vector<Agent*> agents;
-  for(int i = 0; i < 9; ++i) {
-    agents.push_back(new RandomAgent());
-  }
+  for(int i = 0; i < 9; ++i) agents.push_back(&rng_agents[i]);
   auto results = simulate(agents, 10'000, 0, 100'000);
   long net = 0l;
   for(long result : results) {
@@ -172,12 +172,12 @@ TEST_CASE("Split pot", "[poker]") {
   std::vector<Hand> hands{{"KsTc"}, {"As4c"}, {"Ac2h"}};
   Board board{"AdKh9s9h5c"};
   ActionHistory actions = {
-    Action::PREFLOP_2_BET, Action::FOLD, Action::CHECK_CALL,
-    Action::CHECK_CALL, Action::BET_33, Action::POSTFLOP_2_BET, Action::CHECK_CALL,
+    Action{2.0f}, Action::FOLD, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action{0.33f}, Action{1.50f}, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL
   };
-  auto result = simulate_round(board, hands, actions, 10000, 0);
+  auto result = simulate_round(board, hands, actions, 10'000, 0);
   REQUIRE(result[0] == -50);
   REQUIRE(result[1] == 25);
   REQUIRE(result[2] == 25);
@@ -185,8 +185,8 @@ TEST_CASE("Split pot", "[poker]") {
 
 TEST_CASE("Serialize ActionHistory", "[serialize]") {
   ActionHistory actions = {
-    Action::PREFLOP_2_BET, Action::FOLD, Action::CHECK_CALL,
-    Action::CHECK_CALL, Action::BET_33, Action::POSTFLOP_2_BET, Action::CHECK_CALL,
+    Action{2.0f}, Action::FOLD, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action{0.33f}, Action{1.50f}, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL
   };
@@ -205,8 +205,8 @@ TEST_CASE("Serialize InformationSet", "[serialize]") {
   Hand hand{"KsTc"};
   Board board{"AdKh9s9h5c"};
   ActionHistory actions = {
-    Action::PREFLOP_2_BET, Action::FOLD, Action::CHECK_CALL,
-    Action::CHECK_CALL, Action::BET_33, Action::POSTFLOP_2_BET, Action::CHECK_CALL,
+    Action{2.0f}, Action::FOLD, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action{0.33f}, Action{1.50f}, Action::CHECK_CALL,
     Action::CHECK_CALL
   };
   InformationSet info_set{actions, board, hand, 2, 3, 10'000, 0};

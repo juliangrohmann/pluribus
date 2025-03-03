@@ -75,12 +75,10 @@ PokerState::PokerState(int n_players, int chips, int ante) : _pot{150}, _max_bet
 
 PokerState PokerState::next_state(Action action) const {
   const Player& player = get_players()[get_active()];
-  switch(action) {
-    case Action::FOLD: return fold(); break;
-    case Action::CHECK_CALL: return player.get_betsize() == _max_bet ? check() : call(); break;
-    case Action::ALL_IN: return bet(player.get_chips()); break;
-    default: return bet(total_bet_size(*this, action) - player.get_betsize()); break;
-  }
+  if(action == Action::ALL_IN) return bet(player.get_chips());
+  if(action == Action::FOLD) return fold();
+  if(action == Action::CHECK_CALL) return player.get_betsize() == _max_bet ? check() : call();
+  return bet(total_bet_size(*this, action) - player.get_betsize());
 }
 
 PokerState PokerState::apply(Action action) const {
@@ -205,65 +203,45 @@ void PokerState::next_player() {
 }
 
 int total_bet_size(const PokerState& state, Action action) {
-  switch(action) {
-    case Action::BET_33: return state.get_pot() * 0.33;
-    case Action::BET_50: return state.get_pot() * 0.50;
-    case Action::BET_75: return state.get_pot() * 0.75;
-    case Action::BET_100: return state.get_pot() * 1.00;
-    case Action::BET_150: return state.get_pot() * 1.50;
-    case Action::PREFLOP_2_BET: return state.get_players()[state.get_active()].get_chips() > 5000 ? 300 : 250;
-    case Action::PREFLOP_3_BET: return state.get_pot() * 2.00;
-    case Action::PREFLOP_4_BET: return state.get_pot() * 1.66;
-    case Action::PREFLOP_5_BET: return state.get_pot() * 1.5;
-    case Action::POSTFLOP_2_BET: return state.get_pot() * 1.5;
-    case Action::POSTFLOP_3_BET: return state.get_pot() * 1.5;
-    case Action::ALL_IN: return state.get_players()[state.get_active()].get_chips() + state.get_players()[state.get_active()].get_betsize();
-    default: 
-    std::cout << "Action: " << static_cast<int>(action) << "\n";
-    assert(false && "Unknown bet action.");
-    return -1;
+  if(action == Action::ALL_IN) {
+    const Player& active_player = state.get_players()[state.get_active()];
+    return active_player.get_chips() + active_player.get_betsize();
   }
-}
-
-std::vector<Action> all_actions(const PokerState& state) {
-  if(state.get_round() == 0) {
-    switch(state.get_bet_level()) {
-      case 1:
-        if(state.get_active() == big_blind_idx(state)) {
-          return {Action::CHECK_CALL, Action::PREFLOP_2_BET, Action::ALL_IN};
-        }
-        else {
-          return {Action::FOLD, Action::CHECK_CALL, Action::PREFLOP_2_BET, Action::ALL_IN};
-        }
-      case 2: return {Action::FOLD, Action::CHECK_CALL, Action::PREFLOP_3_BET, Action::ALL_IN};
-      case 3: return {Action::FOLD, Action::CHECK_CALL, Action::PREFLOP_4_BET, Action::ALL_IN};
-      case 4: return {Action::FOLD, Action::CHECK_CALL, Action::PREFLOP_5_BET, Action::ALL_IN};
-      default: return {Action::FOLD, Action::CHECK_CALL, Action::ALL_IN};
-    }
+  else if(action.get_bet_type() > 0.0f) {
+    return state.get_pot() * action.get_bet_type();
   }
   else {
-    switch(state.get_bet_level()) {
-      case 0: return state.get_round() == 1 ? std::vector<Action>{Action::CHECK_CALL, Action::BET_33, Action::BET_75, Action::ALL_IN} : 
-                                              std::vector<Action>{Action::CHECK_CALL, Action::BET_50, Action::BET_100, Action::ALL_IN};
-      case 1: return {Action::FOLD, Action::CHECK_CALL, Action::POSTFLOP_2_BET, Action::ALL_IN};
-      case 2: return {Action::FOLD, Action::CHECK_CALL, Action::POSTFLOP_3_BET, Action::ALL_IN};
-      default: return {Action::FOLD, Action::CHECK_CALL, Action::ALL_IN};
-    }
+    throw std::runtime_error("Invalid action bet size: " + std::to_string(action.get_bet_type()));
   }
 }
 
-std::vector<Action> valid_actions(const PokerState& state) {
-  std::vector<Action> actions = all_actions(state);
+std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile) {
+  const std::vector<Action>& actions = profile.get_actions(state.get_round(), state.get_bet_level());
+  // std::cout << "all: ";
+  // for(Action a : actions) std::cout << a.to_string() << ", ";
+  // std::cout << "\n";
+  std::vector<Action> valid;
   const Player& player = state.get_players()[state.get_active()];
-  for(int i = actions.size() - 1; i >= 0; --i) {
-    if(actions[i] == Action::CHECK_CALL || actions[i] == Action::FOLD) continue;
-    int total_bet = total_bet_size(state, actions[i]);
-    int required = total_bet - player.get_betsize();
-    if(required > player.get_chips() || total_bet <= state.get_max_bet()) {
-      actions.erase(actions.begin() + i);
+  for(Action a : actions) {
+    if(a == Action::CHECK_CALL) {
+      valid.push_back(a);
+      continue;
+    }
+    else if(a == Action::FOLD) {
+      if(player.get_betsize() < state.get_max_bet()) {
+        valid.push_back(a);
+      }
+      continue;
+    }
+    else {
+      int total_bet = total_bet_size(state, a);
+      int required = total_bet - player.get_betsize();
+      if(required <= player.get_chips() && total_bet > state.get_max_bet()) {
+        valid.push_back(a);
+      }
     }
   }
-  return actions;
+  return valid;
 }
 
 std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board board_cards, const omp::HandEvaluator& eval) {

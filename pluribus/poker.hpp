@@ -114,8 +114,7 @@ private:
 };
 
 int total_bet_size(const PokerState& state, Action action);
-std::vector<Action> all_actions(const PokerState& state);
-std::vector<Action> valid_actions(const PokerState& state);
+std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile);
 
 std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board board_cards, const omp::HandEvaluator& eval);
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands);

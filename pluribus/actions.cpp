@@ -1,54 +1,82 @@
 #include <iostream>
+#include <iomanip>
 #include <vector>
+#include <sstream>
 #include <cereal/cereal.hpp>
 #include <pluribus/util.hpp>
+#include <pluribus/debug.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
 
 namespace pluribus {
 
-ActionHistory::ActionHistory(std::initializer_list<Action> list) {
-  for(Action action : list) {
-    push_back(action);
-  }
-};
-
-bool ActionHistory::operator==(const ActionHistory& other) const {
-  return _data == other._data;
+std::string Action::to_string() const {
+  if(_bet_type == -3.0f) return "Undefined";
+  if(_bet_type == -2.0f) return "All-in";
+  if(_bet_type == -1.0f) return "Fold";
+  if(_bet_type == 0.0f) return "Check/Call";
+  std::ostringstream oss; 
+  oss << "Bet " << std::setprecision(0) << std::fixed << _bet_type * 100.0f << "%";
+  return oss.str();
 }
 
-void ActionHistory::push_back(Action action) {
-  if(_end_idx >= _data.size()) {
-    int block_bits = std::numeric_limits<decltype(_data)::block_type>::digits;
-    _data.resize(_data.size() + block_bits);
-  }
-  assert(_end_idx % action_bits == 0 && "ActionHistory end index is misaligned.");
-  assert(_end_idx + action_bits <= _data.size() && "Action counter is out of range.");
-  uint8_t action_id = static_cast<uint8_t>(action);
-  for(int i = 0; i < action_bits; ++i) {
-    _data[_end_idx + i] = action_id & (1 << i);
-  }
-  _end_idx += action_bits;
-}
-
-Action ActionHistory::get(int idx) const {
-  uint8_t action_id = 0;
-  for(int i = 0; i < action_bits; ++i) {
-    action_id |= _data[action_bits * idx + i] << i;
-  }
-  return static_cast<Action>(action_id);
-}
-
-uint16_t ActionHistory::size() const {
-  return _end_idx / action_bits;
-}
+Action Action::UNDEFINED{-3.0f};
+Action Action::ALL_IN{-2.0f};
+Action Action::FOLD{-1.0f};
+Action Action::CHECK_CALL{0.0f};
 
 std::string ActionHistory::to_string() const {
   std::string str = "";
-  for(int i = 0; i < size(); ++i) {
-    str += action_to_str.at(get(i)) + (i == size() - 1 ? "" : " -> ");
+  for(int i = 0; i < _history.size(); ++i) {
+    str += _history[i].to_string() + (i == _history.size() - 1 ? "" : ", ");
   }
   return str;
+}
+
+void ActionProfile::set_actions(const std::vector<Action>& actions, int round, int bet_level) {
+  if(bet_level >= _profile[round].size()) _profile[round].resize(bet_level + 1);
+  _profile[round][bet_level] = actions;
+}
+
+const std::vector<Action>& ActionProfile::get_actions(int round, int bet_level) const { 
+  int max_level = _profile[round].size() - 1;
+  return _profile[round][std::min(bet_level, max_level)]; 
+}
+
+void ActionProfile::add_action(const Action& action, int round, int bet_level) {
+  if(bet_level < _profile[round].size()) _profile[round].resize(bet_level);
+  _profile[round][bet_level].push_back(action);
+}
+
+std::string ActionProfile::to_string() const {
+  std::ostringstream oss;
+  for(int round = 0; round < 4; ++round) {
+    oss << round_to_str(round) << " action profile:\n";
+    for(int bet_level = 0; bet_level < _profile[round].size(); ++bet_level) {
+      oss << "\tBet level " << bet_level << ":\n";
+      for(Action a : _profile[round][bet_level]) {
+        oss << "\t\t" << a.to_string() << "\n";
+      }
+    }
+  }
+  return oss.str();
+}
+
+BlueprintActionProfile::BlueprintActionProfile() {
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{2.00f}, Action::ALL_IN}, 0, 1);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{2.00f}, Action::ALL_IN}, 0, 2);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.66f}, Action::ALL_IN}, 0, 3);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.50f}, Action::ALL_IN}, 0, 4);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action::ALL_IN}, 0, 5);
+
+  set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.75f}, Action::ALL_IN}, 1, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.50f}, Action::ALL_IN}, 1, 1);
+
+  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 2, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.50f}, Action::ALL_IN}, 2, 1);
+
+  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 3, 0);  
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.50f}, Action::ALL_IN}, 3, 1);
 }
 
 std::string history_map_filename(int n_players, int n_chips, int ante) {
@@ -56,7 +84,6 @@ std::string history_map_filename(int n_players, int n_chips, int ante) {
 }
 
 std::unique_ptr<HistoryIndexer> HistoryIndexer::_instance = nullptr;
-
 
 void HistoryIndexer::initialize(int n_players, int n_chips, int ante) {
   std::string fn = history_map_filename(n_players, n_chips, ante);
@@ -88,19 +115,19 @@ size_t HistoryIndexer::size(int n_players, int n_chips, int ante) {
   }
 }
 
-void collect_histories(const PokerState& state, std::vector<ActionHistory>& histories) {
+void collect_histories(const PokerState& state, std::vector<ActionHistory>& histories, const ActionProfile& action_profile) {
   if(state.is_terminal()) return;
   histories.push_back(state.get_action_history());
-  for(Action a : valid_actions(state)) {
-    collect_histories(state.apply(a), histories);
+  for(Action a : valid_actions(state, action_profile)) {
+    collect_histories(state.apply(a), histories, action_profile);
   }
 }
 
-void build_history_map(int n_players, int n_chips, int ante) {
+void build_history_map(int n_players, int n_chips, int ante, const ActionProfile& action_profile) {
   std::cout << "Building history map: n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << "\n";
   std::vector<ActionHistory> histories;
   PokerState state{n_players, n_chips, ante};
-  collect_histories(state, histories);
+  collect_histories(state, histories, action_profile);
   HistoryMap history_map;
   for(long i = 0; i < histories.size(); ++i) {
     history_map[histories[i]] = i;

@@ -15,6 +15,7 @@
 #include <pluribus/debug.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
+#include <pluribus/actions.hpp>
 #include <pluribus/mccfr.hpp>
 
 namespace pluribus {
@@ -62,8 +63,8 @@ void lcfr_discount(PreflopMap& data, double d) {
 BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long strategy_interval, long preflop_threshold_m, long snapshot_interval_m,
                                    long prune_thresh_m, int prune_cutoff, int regret_floor, long lcfr_thresh_m, long discount_interval_m, 
                                    long log_interval_m, long profiling_thresh, std::string snapshot_dir) : 
-    _t{1}, _regrets{n_players, n_chips, ante, 200, 5}, _phi{}, _n_players{n_players}, _n_chips{n_chips}, _ante{ante}, 
-    _strategy_interval{strategy_interval}, _preflop_threshold_m{preflop_threshold_m}, _snapshot_interval_m{snapshot_interval_m},
+    _t{1}, _regrets{n_players, n_chips, ante, 200, 5}, _phi{}, _action_profile{BlueprintActionProfile{}}, _n_players{n_players}, _n_chips{n_chips}, 
+    _ante{ante}, _strategy_interval{strategy_interval}, _preflop_threshold_m{preflop_threshold_m}, _snapshot_interval_m{snapshot_interval_m},
     _prune_thresh_m{prune_thresh_m}, _prune_cutoff{prune_cutoff}, _regret_floor{regret_floor}, _lcfr_thresh_m{lcfr_thresh_m},
     _discount_interval_m{discount_interval_m}, _log_interval_m{log_interval_m}, _profiling_thresh{profiling_thresh}, _it_per_min{50'000},
     _snapshot_dir{snapshot_dir} {
@@ -174,7 +175,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
   }
   else if(state.get_active() == i) {
     InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _n_players, _n_chips, _ante};
-    auto actions = valid_actions(state);
+    auto actions = valid_actions(state, _action_profile);
     auto action_regret_p = _regrets[info_set];
     auto freq = calculate_strategy(action_regret_p, actions.size());
     std::unordered_map<Action, int> values;
@@ -198,7 +199,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
   }
   else {
     InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round(), _n_players, _n_chips, _ante};
-    auto actions = valid_actions(state);
+    auto actions = valid_actions(state, _action_profile);
     auto freq = calculate_strategy(_regrets[info_set], actions.size());
     Action a = actions[sample_action_idx(freq)];
     return traverse_mccfr_p(state.apply(a), i, board, hands, eval);
@@ -216,7 +217,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
   }
   else if(state.get_active() == i) {
     InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _n_players, _n_chips, _ante};
-    auto actions = valid_actions(state);
+    auto actions = valid_actions(state, _action_profile);
     auto freq = calculate_strategy(_regrets[info_set], actions.size());
     std::unordered_map<Action, int> values;
     int v = 0;
@@ -227,7 +228,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
       v += freq[a_idx] * v_a;
       if(verbose) {
         std::cout << state.get_action_history().to_string() << "\n";
-        std::cout << "\t u(" << action_to_str.at(a) << ") @ " << freq[a_idx] << " = " << v_a << "\n";
+        std::cout << "\t u(" << a.to_string() << ") @ " << freq[a_idx] << " = " << v_a << "\n";
       }
     }
     if(verbose) {
@@ -240,15 +241,15 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
       int next_r = (action_regret_p + a_idx)->load() + dR;
       (action_regret_p + a_idx)->store(std::max(next_r, _regret_floor));
       if(verbose) {
-        std::cout << "\t R(" << action_to_str.at(actions[a_idx]) << ") = " << dR << "\n";
-        std::cout << "\t cum R(" << action_to_str.at(actions[a_idx]) << ") = " << (action_regret_p + a_idx)->load() << "\n";
+        std::cout << "\t R(" << actions[a_idx].to_string() << ") = " << dR << "\n";
+        std::cout << "\t cum R(" << actions[a_idx].to_string() << ") = " << (action_regret_p + a_idx)->load() << "\n";
       }
     }
     return v;
   }
   else {
     InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round(), _n_players, _n_chips, _ante};
-    auto actions = valid_actions(state);
+    auto actions = valid_actions(state, _action_profile);
     auto freq = calculate_strategy(_regrets[info_set], actions.size());
     Action a = actions[sample_action_idx(freq)];
     return traverse_mccfr(state.apply(a), i, board, hands, eval);
@@ -261,7 +262,7 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
   }
   else if(state.get_active() == i) {
     InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _n_players, _n_chips, _ante};
-    auto actions = valid_actions(state);
+    auto actions = valid_actions(state, _action_profile);
     auto freq = calculate_strategy(_regrets[info_set], actions.size());
     int a_idx = sample_action_idx(freq);
     auto& phi_regrets = _phi[info_set];
@@ -273,7 +274,7 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
     update_strategy(state.apply(actions[a_idx]), i, board, hands);
   }
   else {
-    for(Action action : valid_actions(state)) {
+    for(Action action : valid_actions(state, _action_profile)) {
       update_strategy(state.apply(action), i, board, hands);
     }
   }

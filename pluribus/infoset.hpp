@@ -47,8 +47,8 @@ private:
   uint16_t _cluster;
 };
 
-long count_infosets(const PokerState& state, int max_round = 4);
-long count_actionsets(const PokerState& state, int max_round = 4);
+long count_infosets(const PokerState& state, const ActionProfile& action_profile, int max_round = 4);
+long count_actionsets(const PokerState& state, const ActionProfile& action_profile, int max_round = 4);
 
 }
 

@@ -35,6 +35,7 @@ public:
   inline const RegretStorage& get_regrets() const { return _regrets; }
   inline RegretStorage& get_regrets() { return _regrets; }
   inline const PreflopMap& get_phi() const { return _phi; }
+  inline const ActionProfile& get_action_profile() const { return _action_profile; }
   inline int get_n_players() const { return _n_players; }
   inline int get_n_chips() const { return _n_chips; }
   inline int get_ante() const { return _ante; }
@@ -42,7 +43,7 @@ public:
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_regrets, _phi, _t, _strategy_interval, _preflop_threshold_m, _snapshot_interval_m, _prune_thresh_m, _lcfr_thresh_m, _discount_interval_m,
+    ar(_regrets, _phi, _action_profile, _t, _strategy_interval, _preflop_threshold_m, _snapshot_interval_m, _prune_thresh_m, _lcfr_thresh_m, _discount_interval_m,
        _log_interval_m, _it_per_min, _profiling_thresh, _prune_cutoff, _regret_floor, _n_players, _n_chips, _ante);
   }
 
@@ -62,6 +63,7 @@ private:
 
   RegretStorage _regrets;
   PreflopMap _phi;
+  ActionProfile _action_profile;
   std::filesystem::path _snapshot_dir;
   long _t;
   long _strategy_interval;
