@@ -172,8 +172,8 @@ TEST_CASE("Split pot", "[poker]") {
   std::vector<Hand> hands{{"KsTc"}, {"As4c"}, {"Ac2h"}};
   Board board{"AdKh9s9h5c"};
   ActionHistory actions = {
-    Action{2.0f}, Action::FOLD, Action::CHECK_CALL,
-    Action::CHECK_CALL, Action{0.33f}, Action{1.50f}, Action::CHECK_CALL,
+    Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action{0.33f}, Action{1.00f}, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL
   };
@@ -185,8 +185,8 @@ TEST_CASE("Split pot", "[poker]") {
 
 TEST_CASE("Serialize ActionHistory", "[serialize]") {
   ActionHistory actions = {
-    Action{2.0f}, Action::FOLD, Action::CHECK_CALL,
-    Action::CHECK_CALL, Action{0.33f}, Action{1.50f}, Action::CHECK_CALL,
+    Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action{0.33f}, Action{1.00f}, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL
   };
@@ -205,8 +205,8 @@ TEST_CASE("Serialize InformationSet", "[serialize]") {
   Hand hand{"KsTc"};
   Board board{"AdKh9s9h5c"};
   ActionHistory actions = {
-    Action{2.0f}, Action::FOLD, Action::CHECK_CALL,
-    Action::CHECK_CALL, Action{0.33f}, Action{1.50f}, Action::CHECK_CALL,
+    Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action{0.33f}, Action{1.00f}, Action::CHECK_CALL,
     Action::CHECK_CALL
   };
   InformationSet info_set{actions, board, hand, 2, 3, 10'000, 0};
