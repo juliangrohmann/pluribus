@@ -81,7 +81,8 @@ std::string BlueprintTrainerConfig::to_string() const {
 }
 
 BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const std::string& snapshot_dir) 
-    : _regrets{config.poker}, _phi{}, _config{config}, _snapshot_dir{snapshot_dir}, _t{1}, _it_per_min{50'000} {
+    : _regrets{config.poker, 200, config.action_profile.max_actions()}, _phi{}, _config{config}, _snapshot_dir{snapshot_dir}, 
+      _t{1}, _it_per_min{50'000} {
   std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
   HistoryIndexer::get_instance()->initialize(_config.poker);
