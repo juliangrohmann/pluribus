@@ -48,6 +48,16 @@ void ActionProfile::add_action(const Action& action, int round, int bet_level) {
   _profile[round][bet_level].push_back(action);
 }
 
+int ActionProfile::max_actions() const {
+  int ret;
+  for(auto& round : _profile) {
+    for(auto& level : round) {
+      ret = std::max(static_cast<int>(level.size()), ret);
+    }
+  }
+  return ret;
+}
+
 std::string ActionProfile::to_string() const {
   std::ostringstream oss;
   for(int round = 0; round < 4; ++round) {

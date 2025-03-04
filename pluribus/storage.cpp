@@ -5,7 +5,7 @@ namespace pluribus {
 
 RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_clusters, int n_actions) : _n_clusters{n_clusters}, _n_actions{n_actions} {
   HistoryIndexer::get_instance()->initialize(n_players, n_chips, ante);
-  std::cout << "Constructing regret storage... " << std::flush;
+  std::cout << "Constructing regret storage (" << "n_clusters=" << n_clusters << ", n_actions=" << n_actions << ")... " << std::flush;
   size_t n_histories = HistoryIndexer::get_instance()->size(n_players, n_chips, ante);
   _size = n_histories * n_clusters * n_actions;
   _fn = "atomic_regrets_XXXXXX";

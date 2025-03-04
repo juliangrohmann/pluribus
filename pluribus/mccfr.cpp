@@ -64,11 +64,11 @@ void lcfr_discount(PreflopMap& data, double d) {
 BlueprintTrainer::BlueprintTrainer(int n_players, int n_chips, int ante, long strategy_interval, long preflop_threshold_m, long snapshot_interval_m,
                                    long prune_thresh_m, int prune_cutoff, int regret_floor, long lcfr_thresh_m, long discount_interval_m, 
                                    long log_interval_m, long profiling_thresh, std::string snapshot_dir) : 
-    _t{1}, _regrets{n_players, n_chips, ante, 200, 5}, _phi{}, _action_profile{BlueprintActionProfile{}}, _n_players{n_players}, _n_chips{n_chips}, 
-    _ante{ante}, _strategy_interval{strategy_interval}, _preflop_threshold_m{preflop_threshold_m}, _snapshot_interval_m{snapshot_interval_m},
-    _prune_thresh_m{prune_thresh_m}, _prune_cutoff{prune_cutoff}, _regret_floor{regret_floor}, _lcfr_thresh_m{lcfr_thresh_m},
-    _discount_interval_m{discount_interval_m}, _log_interval_m{log_interval_m}, _profiling_thresh{profiling_thresh}, _it_per_min{50'000},
-    _snapshot_dir{snapshot_dir} {
+    _t{1}, _action_profile{BlueprintActionProfile{}}, _regrets{n_players, n_chips, ante, 200, _action_profile.max_actions()}, _phi{}, 
+    _n_players{n_players}, _n_chips{n_chips}, _ante{ante}, _strategy_interval{strategy_interval}, _preflop_threshold_m{preflop_threshold_m}, 
+    _snapshot_interval_m{snapshot_interval_m}, _prune_thresh_m{prune_thresh_m}, _prune_cutoff{prune_cutoff}, _regret_floor{regret_floor}, 
+    _lcfr_thresh_m{lcfr_thresh_m}, _discount_interval_m{discount_interval_m}, _log_interval_m{log_interval_m}, _profiling_thresh{profiling_thresh}, 
+    _it_per_min{50'000}, _snapshot_dir{snapshot_dir} {
   std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
   HistoryIndexer::get_instance()->initialize(n_players, n_chips, ante);
