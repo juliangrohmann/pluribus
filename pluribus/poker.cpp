@@ -4,6 +4,7 @@
 #include <vector>
 #include <array>
 #include <string>
+#include <sstream>
 #include <initializer_list>
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
@@ -73,6 +74,8 @@ PokerState::PokerState(int n_players, int chips, int ante) : _pot{150}, _max_bet
   }
 }
 
+PokerState::PokerState(const PokerConfig& config) : PokerState{config.n_players, config.n_chips, config.ante} {}
+
 PokerState PokerState::next_state(Action action) const {
   const Player& player = get_players()[get_active()];
   if(action == Action::ALL_IN) return bet(player.get_chips());
@@ -101,6 +104,12 @@ int8_t find_winner(const PokerState& state) {
 
 int big_blind_idx(const PokerState& state) {
   return state.get_players().size() == 2 ? 0 : 1;
+}
+
+std::string PokerConfig::to_string() const {
+  std::ostringstream oss;
+  oss << "PokerConfig{n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante;
+  return oss.str();
 }
 
 PokerState PokerState::bet(int amount) const {

@@ -22,8 +22,8 @@ HandIndexer::HandIndexer() {
   _indexers = init_indexer_vec();
 }
 
-InformationSet::InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round, int n_players, int n_chips, int ante) : 
-    _history_idx{HistoryIndexer::get_instance()->index(history, n_players, n_chips, ante)} {
+InformationSet::InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round, const PokerConfig& config) : 
+    _history_idx{HistoryIndexer::get_instance()->index(history, config)} {
   int card_sum = round == 0 ? 2 : 4 + round;
   std::vector<uint8_t> cards(card_sum);
   std::copy(hand.cards().begin(), hand.cards().end(), cards.data());
@@ -32,8 +32,8 @@ InformationSet::InformationSet(const ActionHistory& history, const Board& board,
   _cluster = FlatClusterMap::get_instance()->cluster(round, idx);
 }
 
-InformationSet::InformationSet(const ActionHistory& history, uint16_t cluster, int n_players, int n_chips, int ante) : 
-    _history_idx{HistoryIndexer::get_instance()->index(history, n_players, n_chips, ante)}, _cluster{cluster} {}
+InformationSet::InformationSet(const ActionHistory& history, uint16_t cluster, const PokerConfig& config) : 
+    _history_idx{HistoryIndexer::get_instance()->index(history, config)}, _cluster{cluster} {}
 
 bool InformationSet::operator==(const InformationSet& other) const {
   return _cluster == other._cluster && _history_idx == other._history_idx;

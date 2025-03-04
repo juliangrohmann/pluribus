@@ -21,7 +21,7 @@ public:
   float get_bet_type() const { return _bet_type; };
   std::string to_string() const;
 
-  bool operator==(const Action& other) const { return _bet_type == other._bet_type; }
+  bool operator==(const Action& other) const = default;
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -44,11 +44,11 @@ public:
 
   const std::vector<Action> get_history() const { return _history; }
   void push_back(const Action& action) { _history.push_back(action); }
-  const Action& get(int i ) { return _history[i]; }
+  const Action& get(int i) const { return _history[i]; }
   size_t size() const { return _history.size(); }
   std::string to_string() const;
 
-  bool operator==(const ActionHistory& other) const { return _history == other._history; }
+  bool operator==(const ActionHistory& other) const = default;
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -66,6 +66,8 @@ public:
   void add_action(const Action& action, int round, int bet_level);
   int max_actions() const;
   std::string to_string() const;
+
+  bool operator==(const ActionProfile&) const = default;
 
   template <class Archive>
   void serialize(Archive& ar) {

@@ -184,7 +184,11 @@ void CardRange::addCombo(unsigned c1, unsigned c2)
     omp_assert(c1 != c2);
     if (c1 >> 2 < c2 >> 2 || (c1 >> 2 == c2 >> 2 && (c1 & 3) < (c2 & 3)))
         std::swap(c1, c2);
+
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wstringop-overflow"
     mCombinations.push_back({(uint8_t)c1, (uint8_t)c2});
+    #pragma GCC diagnostic pop
 }
 
 // Removes duplicate combos.

@@ -3,10 +3,10 @@
 
 namespace pluribus {
 
-RegretStorage::RegretStorage(int n_players, int n_chips, int ante, int n_clusters, int n_actions) : _n_clusters{n_clusters}, _n_actions{n_actions} {
-  HistoryIndexer::get_instance()->initialize(n_players, n_chips, ante);
+RegretStorage::RegretStorage(const PokerConfig& config, int n_clusters, int n_actions) : _n_clusters{n_clusters}, _n_actions{n_actions} {
+  HistoryIndexer::get_instance()->initialize(config);
   std::cout << "Constructing regret storage (" << "n_clusters=" << n_clusters << ", n_actions=" << n_actions << ")... " << std::flush;
-  size_t n_histories = HistoryIndexer::get_instance()->size(n_players, n_chips, ante);
+  size_t n_histories = HistoryIndexer::get_instance()->size(config);
   _size = n_histories * n_clusters * n_actions;
   _fn = "atomic_regrets_XXXXXX";
   _data = map_memory<std::atomic<int>>(_size, _fn, _fd);
@@ -43,10 +43,10 @@ size_t RegretStorage::info_offset(const InformationSet& info_set) const {
   return (static_cast<size_t>(info_set.get_history_idx()) * _n_clusters + info_set.get_cluster()) * _n_actions;
 }
 
-ActionStorage::ActionStorage(int n_players, int n_chips, int ante, int n_clusters) : _n_clusters{n_clusters} {
-  HistoryIndexer::get_instance()->initialize(n_players, n_chips, ante);
+ActionStorage::ActionStorage(const PokerConfig& config, int n_clusters) : _n_clusters{n_clusters} {
+  HistoryIndexer::get_instance()->initialize(config);
   std::cout << "Constructing action storage... " << std::flush;
-  size_t n_histories = HistoryIndexer::get_instance()->size(n_players, n_chips, ante);
+  size_t n_histories = HistoryIndexer::get_instance()->size(config);
   _size = n_histories * n_clusters;
   _fn = "action_storage_XXXXXX";
   _data = map_memory<Action>(_size, _fn, _fd);

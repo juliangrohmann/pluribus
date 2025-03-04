@@ -23,28 +23,48 @@ int sample_action_idx(const std::vector<float>& freq);
 void lcfr_discount(RegretStorage& strategy, double d);
 void lcfr_discount(PreflopMap& strategy, double d);
 
+struct BlueprintTrainerConfig {
+  BlueprintTrainerConfig(int n_players = 2, int n_chips = 10'000, int ante = 0) : poker{n_players, n_chips, ante} {}
+  BlueprintTrainerConfig(const PokerConfig& poker_) : poker{poker_} {}
+
+  std::string to_string() const;
+
+  bool operator==(const BlueprintTrainerConfig&) const = default;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(poker, action_profile, strategy_interval, preflop_threshold_m, snapshot_interval_m, prune_thresh_m, lcfr_thresh_m, discount_interval_m,
+       log_interval_m, profiling_thresh, prune_cutoff, regret_floor);
+  }
+
+  PokerConfig poker;
+  ActionProfile action_profile = BlueprintActionProfile{};
+  long strategy_interval = 10'000;
+  long preflop_threshold_m = 800;
+  long snapshot_interval_m = 200;
+  long prune_thresh_m = 200;
+  long lcfr_thresh_m = 400;
+  long discount_interval_m = 10;
+  long log_interval_m = 1;
+  long profiling_thresh = 5'000'000;
+  int prune_cutoff = -300'000'000;
+  int regret_floor = -310'000'000;
+};
+
 class BlueprintTrainer {
 public:
-  BlueprintTrainer(int n_players = 2, int n_chips = 10'000, int ante = 0, long strategy_interval = 10'000, long preflop_threshold_m = 800, 
-                   long snapshot_interval_m = 200, long prune_thresh_m = 200, int prune_cutoff = -300'000'000, 
-                   int regret_floor = -310'000'000, long lcfr_thresh_m = 400, long discount_interval_m = 10, 
-                   long log_interval_m = 1, long profiling_thresh = 1'000'000, std::string snapshot_dir = "");
+  BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, const std::string& snapshot_dir = "");
   void mccfr_p(long T);
-  void log_state() const;
-  bool operator==(const BlueprintTrainer& other);
+  bool operator==(const BlueprintTrainer& other) const;
   inline const RegretStorage& get_regrets() const { return _regrets; }
   inline RegretStorage& get_regrets() { return _regrets; }
   inline const PreflopMap& get_phi() const { return _phi; }
-  inline const ActionProfile& get_action_profile() const { return _action_profile; }
-  inline int get_n_players() const { return _n_players; }
-  inline int get_n_chips() const { return _n_chips; }
-  inline int get_ante() const { return _ante; }
+  inline const BlueprintTrainerConfig& get_config() const { return _config; }
   inline void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_regrets, _phi, _action_profile, _t, _strategy_interval, _preflop_threshold_m, _snapshot_interval_m, _prune_thresh_m, _lcfr_thresh_m, _discount_interval_m,
-       _log_interval_m, _it_per_min, _profiling_thresh, _prune_cutoff, _regret_floor, _n_players, _n_chips, _ante);
+    ar(_regrets, _phi, _config, _t, _it_per_min);
   }
 
 private:
@@ -60,26 +80,12 @@ private:
                                  const omp::HandEvaluator& eval);
   friend void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
 #endif
-
   RegretStorage _regrets;
   PreflopMap _phi;
-  ActionProfile _action_profile;
+  BlueprintTrainerConfig _config;
   std::filesystem::path _snapshot_dir;
   long _t;
-  long _strategy_interval;
-  long _preflop_threshold_m;
-  long _snapshot_interval_m;
-  long _prune_thresh_m;
-  long _lcfr_thresh_m;
-  long _discount_interval_m;
-  long _log_interval_m;
   long _it_per_min;
-  long _profiling_thresh;
-  int _prune_cutoff;
-  int _regret_floor;
-  int _n_players;
-  int _n_chips;
-  int _ante;
 };
 
 }

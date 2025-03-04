@@ -159,7 +159,7 @@ TEST_CASE("Simulate hands", "[poker]") {
   for(int i = 0; i < 9; ++i) rng_agents.push_back(RandomAgent{BlueprintActionProfile{}});
   std::vector<Agent*> agents;
   for(int i = 0; i < 9; ++i) agents.push_back(&rng_agents[i]);
-  auto results = simulate(agents, 10'000, 0, 100'000);
+  auto results = simulate(agents, PokerConfig{9, 10'000, 0}, 100'000);
   long net = 0l;
   for(long result : results) {
     net += result;
@@ -177,7 +177,7 @@ TEST_CASE("Split pot", "[poker]") {
     Action::CHECK_CALL, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL
   };
-  auto result = simulate_round(board, hands, actions, 10'000, 0);
+  auto result = simulate_round(board, hands, actions, PokerConfig{static_cast<int>(hands.size()), 10'000, 0});
   REQUIRE(result[0] == -50);
   REQUIRE(result[1] == 25);
   REQUIRE(result[2] == 25);
@@ -209,7 +209,7 @@ TEST_CASE("Serialize InformationSet", "[serialize]") {
     Action::CHECK_CALL, Action{0.33f}, Action{1.00f}, Action::CHECK_CALL,
     Action::CHECK_CALL
   };
-  InformationSet info_set{actions, board, hand, 2, 3, 10'000, 0};
+  InformationSet info_set{actions, board, hand, 2, PokerConfig{3, 10'000, 0}};
 
   std::string fn = "test_info_set.bin";
   cereal_save(info_set, fn);
@@ -219,7 +219,9 @@ TEST_CASE("Serialize InformationSet", "[serialize]") {
 }
 
 TEST_CASE("Serialize RegretStorage, BlueprintTrainer", "[serialize]") {
-  BlueprintTrainer trainer{2, 10'000, 0};
+  BlueprintTrainerConfig config{};
+  config.profiling_thresh = 1'000'000;
+  BlueprintTrainer trainer{config};
   trainer.mccfr_p(1);
 
   std::string regrets_fn = "test_regrets.bin";

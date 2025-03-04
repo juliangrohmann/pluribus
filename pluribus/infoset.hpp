@@ -30,8 +30,8 @@ private:
 
 class InformationSet {
 public:
-  InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round, int n_players, int n_chips, int ante);
-  InformationSet(const ActionHistory& history, uint16_t cluster, int n_players, int n_chips, int ante);
+  InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round, const PokerConfig& config);
+  InformationSet(const ActionHistory& history, uint16_t cluster, const PokerConfig& config);
   InformationSet() = default;
   bool operator==(const InformationSet& other) const;
   int get_history_idx() const { return _history_idx; }

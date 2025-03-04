@@ -75,9 +75,25 @@ private:
   bool _folded = false;
 };
 
+struct PokerConfig {
+  std::string to_string() const;
+
+  bool operator==(const PokerConfig&) const = default;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(n_players, n_chips, ante);
+  }
+
+  int n_players = 2;
+  int n_chips = 10'000;
+  int ante = 0;
+};
+
 class PokerState {
 public:
   PokerState(int n_players, int chips, int ante);
+  PokerState(const PokerConfig& config);
   PokerState(const PokerState&) = default;
   PokerState(PokerState&&) = default;
   PokerState& operator=(const PokerState&) = default;

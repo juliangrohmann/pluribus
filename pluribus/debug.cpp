@@ -66,8 +66,8 @@ std::string strategy_str(const BlueprintTrainer& trainer, const PokerState& stat
   for(uint8_t i = 0; i < 52; ++i) {
     for(uint8_t j = i + 1; j < 52; ++j) {
       Hand hand{j, i};
-      InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante()};
-      auto actions = valid_actions(state, trainer.get_action_profile());
+      InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), trainer.get_config().poker};
+      auto actions = valid_actions(state, trainer.get_config().action_profile);
       auto freq = calculate_strategy(trainer.get_regrets()[info_set], actions.size());
       int a_idx = std::distance(actions.begin(), std::find(actions.begin(), actions.end(), action));
       oss << std::fixed << std::setprecision(1) << "[" << freq[a_idx] << "]" << cards_to_str(hand.cards().data(), 2) << "[/" << freq[a_idx] << "],";
@@ -87,12 +87,12 @@ std::vector<T> shift(const std::vector<T>& data, int n) {
   return shifted;
 }
 
-void evaluate_agents(const std::vector<Agent*>& agents, long n_iter) {
+void evaluate_agents(const std::vector<Agent*>& agents, const PokerConfig& config, long n_iter) {
   long iter_per_pos = n_iter / agents.size();
   std::vector<double> winrates(6, 0.0);
   for(int i = 0; i < agents.size(); ++i) {
     auto shifted_agents = shift(agents, i);
-    auto shifted_results = simulate(shifted_agents, 10'000, 0, iter_per_pos);
+    auto shifted_results = simulate(shifted_agents, config, iter_per_pos);
     auto results = shift(shifted_results, -i);
     for(int j = 0; j < agents.size(); ++j) {
       winrates[j] += results[j] / static_cast<double>(iter_per_pos);
@@ -108,16 +108,16 @@ void evaluate_strategies(const std::vector<BlueprintTrainer*>& trainer_ps, long 
   for(const auto& p : trainer_ps) agents.push_back(BlueprintAgent{p});
   std::vector<Agent*> agent_ps;
   for(auto& agent : agents) agent_ps.push_back(&agent);
-  evaluate_agents(agent_ps, n_iter);
+  evaluate_agents(agent_ps, trainer_ps[0]->get_config().poker, n_iter);
 }
 
 void evaluate_vs_random(const BlueprintTrainer* trainer_p, long n_iter) {
   BlueprintAgent bp_agent{trainer_p};
   std::vector<RandomAgent> rng_agents;
-  for(int i = 0; i < trainer_p->get_n_players() - 1; ++i) rng_agents.push_back(RandomAgent(trainer_p->get_action_profile()));
+  for(int i = 0; i < trainer_p->get_config().poker.n_players - 1; ++i) rng_agents.push_back(RandomAgent(trainer_p->get_config().action_profile));
   std::vector<Agent*> agents_p{&bp_agent};
   for(auto& agent : rng_agents) agents_p.push_back(&agent);
-  evaluate_agents(agents_p, n_iter);
+  evaluate_agents(agents_p, trainer_p->get_config().poker, n_iter);
 }
 
 }

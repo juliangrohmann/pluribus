@@ -7,28 +7,28 @@
 
 namespace pluribus {
 
-Action RandomAgent::act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) {
+Action RandomAgent::act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) {
   std::vector<Action> actions = valid_actions(state, _action_profile);
   assert(actions.size() > 0 && "No valid actions available.");
   std::uniform_int_distribution<int> dist(0, actions.size() - 1);
   return actions[dist(GlobalRNG::instance())];
 }
 
-Action BlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) {
-  InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), n_players, n_chips, ante};
-  auto actions = valid_actions(state, _trainer_p->get_action_profile());
+Action BlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) {
+  InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), config};
+  auto actions = valid_actions(state, _trainer_p->get_config().action_profile);
   auto freq = calculate_strategy(_trainer_p->get_regrets()[info_set], actions.size());
   return actions[sample_action_idx(freq)];
 }
 
 SampledBlueprintAgent::SampledBlueprintAgent(const BlueprintTrainer& trainer) : 
-    _strategy{trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante(), trainer.get_regrets().get_n_clusters()}, _action_profile{trainer.get_action_profile()} {
+    _strategy{trainer.get_config().poker, trainer.get_regrets().get_n_clusters()}, _action_profile{trainer.get_config().action_profile} {
   std::cout << "Populating sampled blueprint...\n";
-  populate(PokerState{trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante()}, trainer);
+  populate(PokerState{trainer.get_config().poker}, trainer);
 }
 
-Action SampledBlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) {
-  InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), n_players, n_chips, ante};
+Action SampledBlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) {
+  InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), config};
   return _strategy[info_set];
 }
 
@@ -58,7 +58,7 @@ void SampledBlueprintAgent::populate(const PokerState& state, const BlueprintTra
 
   int n_clusters = state.get_round() == 0 ? 169 : 200;
   for(uint16_t c = 0; c < n_clusters; ++c) {
-    InformationSet info_set{state.get_action_history(), c, trainer.get_n_players(), trainer.get_n_chips(), trainer.get_ante()};
+    InformationSet info_set{state.get_action_history(), c, trainer.get_config().poker};
     auto actions = valid_actions(state, _action_profile);
     std::vector<float> freq;
     if(state.get_round() == 0) {

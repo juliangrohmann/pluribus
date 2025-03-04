@@ -54,7 +54,7 @@ void unmap_memory(T* data, size_t sz, const std::string& filename, int fd) {
 
 class RegretStorage {
 public:
-  RegretStorage(int n_players = 2, int n_chips = 10'000, int ante = 0, int n_clusters = 200, int n_actions = 5);
+  RegretStorage(const PokerConfig& config = PokerConfig{}, int n_clusters = 200, int n_actions = 5);
   ~RegretStorage();
   std::atomic<int>* operator[](const InformationSet& info_set);
   const std::atomic<int>* operator[](const InformationSet& info_set) const;
@@ -89,7 +89,7 @@ private:
 
 class ActionStorage {
 public:
-  ActionStorage(int n_players = 2, int n_chips = 10'000, int ante = 0, int n_clusters = 200);
+  ActionStorage(const PokerConfig& config = PokerConfig{}, int n_clusters = 200);
   ~ActionStorage();
   Action& operator[](const InformationSet& info_set);
   const Action& operator[](const InformationSet& info_set) const;

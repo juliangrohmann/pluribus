@@ -10,9 +10,9 @@ using HistoryMap = std::unordered_map<ActionHistory, int>;
 
 class HistoryIndexer {
 public:
-  void initialize(int n_players, int n_chips, int ante);
-  int index(const ActionHistory& history, int n_players, int n_chips, int ante);
-  size_t size(int n_players, int n_chips, int ante);
+  void initialize(const PokerConfig& config);
+  int index(const ActionHistory& history, const PokerConfig& config);
+  size_t size(const PokerConfig& config);
 
   static HistoryIndexer* get_instance() {
     if(!_instance) {
@@ -31,7 +31,7 @@ private:
   static std::unique_ptr<HistoryIndexer> _instance;
 };
 
-std::string history_map_filename(int n_players, int n_chips, int ante);
+std::string history_map_filename(const PokerConfig& config);
 HistoryMap build_history_map(const PokerState& state, const ActionProfile& action_profile);
 
 }

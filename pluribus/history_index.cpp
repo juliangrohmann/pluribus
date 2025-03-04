@@ -4,27 +4,28 @@ namespace pluribus {
 
 std::unique_ptr<HistoryIndexer> HistoryIndexer::_instance = nullptr;
 
-void HistoryIndexer::initialize(int n_players, int n_chips, int ante) {
-  std::string fn = history_map_filename(n_players, n_chips, ante);
+void HistoryIndexer::initialize(const PokerConfig& config) {
+  std::string fn = history_map_filename(config);
   if(_history_map.find(fn) == _history_map.end()) {
-    std::cout << "Initializing history map (n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante << ")... " << std::flush;
+    std::cout << "Initializing history map (n_players=" << config.n_players << ", n_chips=" << config.n_chips << ", ante=" << config.ante 
+              << ")... " << std::flush;
     _history_map[fn] = cereal_load<HistoryMap>(fn);
     std::cout << "Success.\n";
   }
 }
 
-int HistoryIndexer::index(const ActionHistory& history, int n_players, int n_chips, int ante) {
-  std::string fn = history_map_filename(n_players, n_chips, ante);
+int HistoryIndexer::index(const ActionHistory& history, const PokerConfig& config) {
+  std::string fn = history_map_filename(config);
   auto it = _history_map.find(fn);
   if(it == _history_map.end()) {
-    initialize(n_players, n_chips, ante);
+    initialize(config);
     return _history_map.at(fn).at(history);
   }
   return it->second.at(history);
 }
 
-size_t HistoryIndexer::size(int n_players, int n_chips, int ante) {
-  std::string fn = history_map_filename(n_players, n_chips, ante);
+size_t HistoryIndexer::size(const PokerConfig& config) {
+  std::string fn = history_map_filename(config);
   auto it = _history_map.find(fn);
   if(it != _history_map.end()) {
     return it->second.size();
@@ -42,8 +43,9 @@ void collect_histories(const PokerState& state, std::vector<ActionHistory>& hist
   }
 }
 
-std::string history_map_filename(int n_players, int n_chips, int ante) {
-  return "history_index_p" + std::to_string(n_players) + "_" + std::to_string(n_chips / 100) + "bb_" + std::to_string(ante) + "ante.bin";
+std::string history_map_filename(const PokerConfig& config) {
+  return "history_index_p" + std::to_string(config.n_players) + "_" + std::to_string(config.n_chips / 100) + "bb_" + 
+         std::to_string(config.ante) + "ante.bin";
 }
 
 HistoryMap build_history_map(const PokerState& state, const ActionProfile& action_profile) {

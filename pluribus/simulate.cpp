@@ -34,7 +34,7 @@ std::vector<long> get_payoffs(const Board& board, const std::vector<Hand>& hands
   return payoffs;
 }
 
-std::vector<long> simulate(std::vector<Agent*> agents, int n_chips, int ante, long n_iter) {
+std::vector<long> simulate(const std::vector<Agent*>& agents, const PokerConfig& config, long n_iter) {
   std::vector<std::vector<long>> thread_results{agents.size()};
   int ntid = omp_get_max_threads();
   long log_interval = n_iter / ntid / 100;
@@ -48,7 +48,7 @@ std::vector<long> simulate(std::vector<Agent*> agents, int n_chips, int ante, lo
     thread_local std::vector<Hand> hands{agents.size()};
     int tid = omp_get_thread_num();
     if(tid == 0 && t % log_interval == 0) std::cout << "Sim: " << std::setprecision(1) << std::fixed << t / static_cast<double>(log_interval) << "%\n";
-    PokerState state(hands.size(), n_chips, ante);
+    PokerState state(config);
     deck.shuffle();
     board.deal(deck);
     for(Hand& hand : hands) hand.deal(deck);
@@ -60,13 +60,13 @@ std::vector<long> simulate(std::vector<Agent*> agents, int n_chips, int ante, lo
     }
 
     while(state.get_round() <= 3 && state.get_winner() == -1) {
-      state = state.apply(agents[state.get_active()]->act(state, board, hands[state.get_active()], agents.size(), n_chips, ante));
+      state = state.apply(agents[state.get_active()]->act(state, board, hands[state.get_active()], config));
     }
 
     std::vector<long> payoffs = get_payoffs(board, hands, state, eval);
     long net_round = 0l;
     for(int i = 0; i < hands.size(); ++i) {
-      int winnings = state.get_players()[i].get_chips() - n_chips + payoffs[i];
+      int winnings = state.get_players()[i].get_chips() - config.n_chips + payoffs[i];
       if(verbose) {
         std::cout << std::setprecision(2) << std::fixed << "Player: " << static_cast<int>(i) << ": " 
                   << std::setw(8) << std::showpos << (winnings / 100.0) << " bb\n" << std::noshowpos;
@@ -89,9 +89,9 @@ std::vector<long> simulate(std::vector<Agent*> agents, int n_chips, int ante, lo
   return results;
 }
 
-std::vector<long> simulate_round(Board board, std::vector<Hand> hands, ActionHistory actions, int n_chips, int ante) {
+std::vector<long> simulate_round(const Board& board, const std::vector<Hand>& hands, const ActionHistory& actions, const PokerConfig& config) {
   omp::HandEvaluator eval;
-  PokerState state(hands.size(), n_chips, ante);
+  PokerState state(config);
   if(verbose) {
     for(int i = 0; i < hands.size(); ++i) {
       std::cout << "Player " << i << ": " << cards_to_str(hands[i].cards().data(), 2) << "\n";
@@ -110,7 +110,7 @@ std::vector<long> simulate_round(Board board, std::vector<Hand> hands, ActionHis
     std::vector<long> results = get_payoffs(board, hands, state, eval);
     int net_winnings = 0;
     for(int i = 0; i < hands.size(); ++i) {
-      results[i] += state.get_players()[i].get_chips() - n_chips;
+      results[i] += state.get_players()[i].get_chips() - config.n_chips;
       if(verbose) {
         std::cout << std::setprecision(2) << std::fixed << "Player: " << static_cast<int>(i) << ": " 
                   << std::setw(8) << std::showpos << (results[i] / 100.0) << " bb\n" << std::noshowpos;

@@ -10,13 +10,13 @@ namespace pluribus {
 
 class Agent { 
 public:
-  virtual Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) = 0;
+  virtual Action act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) = 0;
 };
 
 class RandomAgent : public Agent {
 public:
   RandomAgent(const ActionProfile& action_profile) : _action_profile{action_profile} {};
-  Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) override;
+  Action act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) override;
 private:
   ActionProfile _action_profile;
 };
@@ -24,7 +24,7 @@ private:
 class BlueprintAgent : public Agent {
 public:
   BlueprintAgent(const BlueprintTrainer* trainer_p) : _trainer_p{trainer_p} {};
-  Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) override;
+  Action act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) override;
 private:
   const BlueprintTrainer* _trainer_p;
 };
@@ -32,7 +32,7 @@ private:
 class SampledBlueprintAgent : public Agent {
 public:
   SampledBlueprintAgent(const BlueprintTrainer& trainer);
-  Action act(const PokerState& state, const Board& board, const Hand& hand, int n_players, int n_chips, int ante) override;
+  Action act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) override;
 private:
   void populate(const PokerState& state, const BlueprintTrainer& trainer);
 
