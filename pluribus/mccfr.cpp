@@ -109,8 +109,8 @@ void BlueprintTrainer::mccfr_p(long T) {
       auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(interval_end - interval_start).count();
       long it_per_sec = ((_config.profiling_thresh - init_t) / (ms / 1000.0));
       _it_per_min = 60 * it_per_sec;
-      next_discount = _config.discount_interval_m * _it_per_min;
-      next_snapshot = _config.preflop_threshold_m * _it_per_min;
+      next_discount = std::max(_config.discount_interval_m * _it_per_min, _config.profiling_thresh + 1);
+      next_snapshot = std::max(_config.preflop_threshold_m * _it_per_min, _config.profiling_thresh + 1);
       limit = T * _it_per_min;
       std::cout << "============== Profiling ==============\n";
       std::cout << "It/sec: " << it_per_sec << "\n";
