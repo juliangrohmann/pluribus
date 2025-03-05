@@ -14,6 +14,7 @@
 #include <omp/EquityCalculator.h>
 #include <omp/CardRange.h>
 #include <pluribus/util.hpp>
+#include <pluribus/infoset.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 
@@ -169,6 +170,15 @@ std::unique_ptr<FlatClusterMap> FlatClusterMap::_instance = nullptr;
 
 FlatClusterMap::FlatClusterMap() {
   _cluster_map = init_flat_cluster_map(200);
+}
+
+uint16_t FlatClusterMap::cluster(int round, const Board& board, const Hand& hand) const {
+  int card_sum = round == 0 ? 2 : 4 + round;
+  std::vector<uint8_t> cards(card_sum);
+  std::copy(hand.cards().begin(), hand.cards().end(), cards.data());
+  if(round > 0) std::copy(board.cards().begin(), board.cards().begin() + card_sum - 2, cards.data() + 2);
+  uint64_t idx = HandIndexer::get_instance()->index(cards.data(), round);
+  return cluster(round, idx);
 }
 
 }

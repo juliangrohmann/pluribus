@@ -10,15 +10,17 @@
 #include <cereal/cereal.hpp>
 #include <tbb/concurrent_vector.h>
 #include <tbb/concurrent_unordered_map.h>
+#include <pluribus/cereal_ext.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/infoset.hpp>
 #include <pluribus/storage.hpp>
+
 
 namespace pluribus {
 
 using PreflopMap = tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_vector<float>>;
 
-std::vector<float> calculate_strategy(const std::atomic<int>* regret_p, int n_actions);
+std::vector<float> calculate_strategy(const RegretStorage& data, size_t base_idx, int n_actions);
 int sample_action_idx(const std::vector<float>& freq);
 void lcfr_discount(RegretStorage& strategy, double d);
 void lcfr_discount(PreflopMap& strategy, double d);
@@ -87,61 +89,5 @@ private:
   long _t;
   long _it_per_min;
 };
-
-}
-
-namespace cereal {
-
-template<class Archive>
-void serialize(Archive& archive, std::atomic<int>& atomic_int) {
-    int value = atomic_int.load(std::memory_order_relaxed);
-    archive(value);
-    if(Archive::is_loading::value) {
-      atomic_int.store(value, std::memory_order_relaxed);
-    }
-}
-
-template<class Archive, class T>
-void save(Archive& ar, const tbb::concurrent_vector<T>& vec) {
-  size_t size = vec.size();
-  ar(size);
-  for(size_t i = 0; i < size; ++i) {
-    ar(vec[i]);
-  }
-}
-
-template<class Archive, class T>
-void load(Archive& ar, tbb::concurrent_vector<T>& vec) {
-  size_t size;
-  ar(size);
-  vec.clear();
-  auto it = vec.grow_by(size);
-  for(size_t i = 0; i < size; ++i) {
-    ar(*it);
-    ++it;
-  }
-}
-
-template<class Archive, class Key, class T>
-void save(Archive& ar, const tbb::concurrent_unordered_map<Key, T>& map) {
-  size_t size = map.size();
-  ar(size);
-  for(const auto& pair : map) {
-    ar(pair.first, pair.second);
-  }
-}
-
-template<class Archive, class Key, class T>
-void load(Archive& ar, tbb::concurrent_unordered_map<Key, T>& map) {
-  size_t size;
-  ar(size);
-  map.clear();
-  for(size_t i = 0; i < size; ++i) {
-    Key key;
-    T value;
-    ar(key, value);
-    map[key] = value;
-  }
-}
 
 }

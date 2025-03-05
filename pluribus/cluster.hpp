@@ -7,6 +7,7 @@
 #include <omp/EquityCalculator.h>
 #include <omp/Hand.h>
 #include <hand_isomorphism/hand_index.h>
+#include <pluribus/poker.hpp>
 
 namespace pluribus {
 
@@ -21,6 +22,7 @@ const std::array<std::string, 8> ochs_categories = {
   "88,99,TT,JJ,QQ,KK,AA"
 };
 
+
 void assign_features(const std::string& hand, const std::string& board, float* data);
 double equity(const omp::Hand& hero, const omp::CardRange villain, const omp::Hand& board);
 void build_ochs_features(int round);
@@ -29,7 +31,8 @@ std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(int n_clusters);
 
 class FlatClusterMap {
 public:
-  uint16_t cluster(int round, uint64_t index) { return _cluster_map[round][index]; }
+  uint16_t cluster(int round, uint64_t index) const { return _cluster_map[round][index]; }
+  uint16_t cluster(int round, const Board& board, const Hand& hand) const;
 
   static FlatClusterMap* get_instance() {
     if(!_instance) {

@@ -3,6 +3,7 @@
 #include <pluribus/poker.hpp>
 #include <pluribus/infoset.hpp>
 #include <pluribus/mccfr.hpp>
+#include <pluribus/cluster.hpp>
 #include <pluribus/agent.hpp>
 
 namespace pluribus {
@@ -17,7 +18,9 @@ Action RandomAgent::act(const PokerState& state, const Board& board, const Hand&
 Action BlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) {
   InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), config};
   auto actions = valid_actions(state, _trainer_p->get_config().action_profile);
-  auto freq = calculate_strategy(_trainer_p->get_regrets()[info_set], actions.size());
+  int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
+  size_t base_idx = _trainer_p->get_regrets().index(state, cluster);
+  auto freq = calculate_strategy(_trainer_p->get_regrets(), base_idx, actions.size());
   return actions[sample_action_idx(freq)];
 }
 
@@ -65,7 +68,8 @@ void SampledBlueprintAgent::populate(const PokerState& state, const BlueprintTra
       freq = calculate_strategy(trainer.get_phi().at(info_set), actions.size());
     }
     else {
-      freq = calculate_strategy(trainer.get_regrets()[info_set], actions.size());
+      size_t base_idx = trainer.get_regrets().index(state, c);
+      freq = calculate_strategy(trainer.get_regrets(), base_idx, actions.size());
     }
     int a_idx = sample_action_idx(freq);
     _strategy[info_set] = actions[a_idx];

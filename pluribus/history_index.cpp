@@ -1,4 +1,5 @@
 #include <pluribus/history_index.hpp>
+#include <pluribus/cereal_ext.hpp>
 
 namespace pluribus {
 

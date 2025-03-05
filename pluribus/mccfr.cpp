@@ -22,17 +22,17 @@
 
 namespace pluribus {
 
-std::vector<float> calculate_strategy(const std::atomic<int>* regret_p, int n_actions) {
+std::vector<float> calculate_strategy(const RegretStorage& data, size_t base_idx, int n_actions) {
   int sum = 0;
   for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-    sum += std::max((regret_p + a_idx)->load(), 0);
+    sum += std::max(data[base_idx + a_idx].load(), 0);
   }
 
   std::vector<float> freq;
   freq.reserve(n_actions);
   if(sum > 0) {
     for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-      freq.push_back(std::max((regret_p + a_idx)->load(), 0) / static_cast<double>(sum));
+      freq.push_back(std::max(data[base_idx + a_idx].load(), 0) / static_cast<double>(sum));
     }
   }
   else {
@@ -49,8 +49,8 @@ int sample_action_idx(const std::vector<float>& freq) {
 }
 
 void lcfr_discount(RegretStorage& data, double d) {
-  for(auto it = data.data(); it != data.data() + data.size(); ++it) {
-    it->store(it->load() * d);
+  for(auto& e : data.data()) {
+    e.store(e.load() * d);
   }
 }
 
@@ -81,7 +81,7 @@ std::string BlueprintTrainerConfig::to_string() const {
 }
 
 BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const std::string& snapshot_dir) 
-    : _regrets{config.poker, 200, config.action_profile.max_actions()}, _phi{}, _config{config}, _snapshot_dir{snapshot_dir}, 
+    : _regrets{config.action_profile, 200}, _phi{}, _config{config}, _snapshot_dir{snapshot_dir}, 
       _t{1}, _it_per_min{50'000} {
   std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
@@ -186,21 +186,29 @@ void BlueprintTrainer::mccfr_p(long T) {
   cereal_save(*this, oss.str());
 }
 
+std::vector<float> get_freq(const PokerState& state, const Board& board, const Hand& hand, 
+                            int n_actions, RegretStorage& regrets) {
+  int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
+  size_t base_idx = regrets.index(state, cluster);
+  return calculate_strategy(regrets, base_idx, n_actions);
+}
+
 int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
                                        const omp::HandEvaluator& eval) {
   if(state.is_terminal()) {
     return utility(state, i, board, hands, eval);
   }
   else if(state.get_active() == i) {
-    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _config.poker};
     auto actions = valid_actions(state, _config.action_profile);
-    auto action_regret_p = _regrets[info_set];
-    auto freq = calculate_strategy(action_regret_p, actions.size());
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
+    size_t base_idx = _regrets.index(state, cluster);
+    auto freq = calculate_strategy(_regrets, base_idx, actions.size());
+
     std::unordered_map<Action, int> values;
     int v = 0;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
-      if((action_regret_p + a_idx)->load() > _config.prune_cutoff) {
+      if(_regrets[base_idx + a_idx].load() > _config.prune_cutoff) {
         int v_a = traverse_mccfr_p(state.apply(a), i, board, hands, eval);
         values[a] = v_a;
         v += freq[a_idx] * v_a;
@@ -209,16 +217,15 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       if(values.find(a) != values.end()) {
-        int next_r = (action_regret_p + a_idx)->load() + values[a] - v;
-        (action_regret_p + a_idx)->store(std::max(next_r, _config.regret_floor));
+        int next_r = _regrets[base_idx + a_idx].load() + values[a] - v;
+        _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       }
     }
     return v;
   }
   else {
-    InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round(), _config.poker};
     auto actions = valid_actions(state, _config.action_profile);
-    auto freq = calculate_strategy(_regrets[info_set], actions.size());
+    auto freq = get_freq(state, board, hands[i], actions.size(), _regrets);
     Action a = actions[sample_action_idx(freq)];
     return traverse_mccfr_p(state.apply(a), i, board, hands, eval);
   }
@@ -234,9 +241,11 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
     return u;
   }
   else if(state.get_active() == i) {
-    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _config.poker};
     auto actions = valid_actions(state, _config.action_profile);
-    auto freq = calculate_strategy(_regrets[info_set], actions.size());
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
+    size_t base_idx = _regrets.index(state, cluster);
+    auto freq = calculate_strategy(_regrets, base_idx, actions.size());
+
     std::unordered_map<Action, int> values;
     int v = 0;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
@@ -253,22 +262,20 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
       std::cout << state.get_action_history().to_string() << "\n";
       std::cout << "\t u(sigma) = " << v << "\n";
     }
-    auto action_regret_p = _regrets[info_set];
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       int dR = values[actions[a_idx]] - v;
-      int next_r = (action_regret_p + a_idx)->load() + dR;
-      (action_regret_p + a_idx)->store(std::max(next_r, _config.regret_floor));
+      int next_r = _regrets[base_idx + a_idx].load() + dR;
+      _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       if(verbose) {
         std::cout << "\t R(" << actions[a_idx].to_string() << ") = " << dR << "\n";
-        std::cout << "\t cum R(" << actions[a_idx].to_string() << ") = " << (action_regret_p + a_idx)->load() << "\n";
+        std::cout << "\t cum R(" << actions[a_idx].to_string() << ") = " << _regrets[base_idx + a_idx].load() << "\n";
       }
     }
     return v;
   }
   else {
-    InformationSet info_set{state.get_action_history(), board, hands[state.get_active()], state.get_round(), _config.poker};
     auto actions = valid_actions(state, _config.action_profile);
-    auto freq = calculate_strategy(_regrets[info_set], actions.size());
+    auto freq = get_freq(state, board, hands[i], actions.size(), _regrets);
     Action a = actions[sample_action_idx(freq)];
     return traverse_mccfr(state.apply(a), i, board, hands, eval);
   }
@@ -279,16 +286,19 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
     return;
   }
   else if(state.get_active() == i) {
-    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _config.poker};
     auto actions = valid_actions(state, _config.action_profile);
-    auto freq = calculate_strategy(_regrets[info_set], actions.size());
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
+    size_t regret_base_idx = _regrets.index(state, cluster);
+    auto freq = calculate_strategy(_regrets, regret_base_idx, actions.size());
     int a_idx = sample_action_idx(freq);
-    auto& phi_regrets = _phi[info_set];
-    if(phi_regrets.size() == 0) {
-      phi_regrets.grow_by(actions.size());
+
+    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _config.poker};
+    auto& phi_vals = _phi[info_set];
+    if(phi_vals.size() == 0) {
+      phi_vals.grow_by(actions.size());
     }
     #pragma omp critical
-    phi_regrets[a_idx] += 1.0f;
+    phi_vals[a_idx] += 1.0f;
     update_strategy(state.apply(actions[a_idx]), i, board, hands);
   }
   else {

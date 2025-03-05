@@ -66,9 +66,10 @@ std::string strategy_str(const BlueprintTrainer& trainer, const PokerState& stat
   for(uint8_t i = 0; i < 52; ++i) {
     for(uint8_t j = i + 1; j < 52; ++j) {
       Hand hand{j, i};
-      InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), trainer.get_config().poker};
       auto actions = valid_actions(state, trainer.get_config().action_profile);
-      auto freq = calculate_strategy(trainer.get_regrets()[info_set], actions.size());
+      int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
+      int base_idx = trainer.get_regrets().index(state, cluster);
+      auto freq = calculate_strategy(trainer.get_regrets(), base_idx, actions.size());
       int a_idx = std::distance(actions.begin(), std::find(actions.begin(), actions.end(), action));
       oss << std::fixed << std::setprecision(1) << "[" << freq[a_idx] << "]" << cards_to_str(hand.cards().data(), 2) << "[/" << freq[a_idx] << "],";
     }
