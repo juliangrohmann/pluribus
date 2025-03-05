@@ -26,7 +26,8 @@ public:
   inline const tbb::concurrent_vector<std::atomic<T>>& data() const { return _data; }
   inline tbb::concurrent_vector<std::atomic<T>>& data() { return _data; }
   inline const tbb::concurrent_unordered_map<ActionHistory, int> history_map() const { return _history_map; }
-  inline T get_n_clusters() const { return _n_clusters; }
+  inline const ActionProfile& action_profile() const { return _history_map; }
+  inline int n_clusters() const { return _n_clusters; }
 
   std::atomic<T>& operator[](size_t idx) { return _data[idx]; }
   const std::atomic<T>& operator[](size_t idx) const { return _data[idx]; }
