@@ -90,6 +90,14 @@ PokerState PokerState::apply(Action action) const {
   return state;
 }
 
+PokerState PokerState::apply(const ActionHistory& action_history) const {
+  PokerState state = *this;
+  for(int i = 0; i < action_history.size(); ++i) {
+    state = state.apply(action_history.get(i));
+  }
+  return state;
+}
+
 int8_t find_winner(const PokerState& state) {
   int8_t winner = -1;
   const std::vector<Player>& players = state.get_players();

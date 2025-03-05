@@ -25,7 +25,7 @@ Action BlueprintAgent::act(const PokerState& state, const Board& board, const Ha
 }
 
 // SampledBlueprintAgent::SampledBlueprintAgent(const BlueprintTrainer& trainer) : 
-//     _strategy{trainer.get_config().poker, trainer.get_regrets().get_n_clusters()}, _action_profile{trainer.get_config().action_profile} {
+//     _strategy{trainer.get_config().poker, trainer.get_regrets().n_clusters()}, _action_profile{trainer.get_config().action_profile} {
 //   std::cout << "Populating sampled blueprint...\n";
 //   populate(PokerState{trainer.get_config().poker}, trainer);
 // }

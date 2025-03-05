@@ -4,10 +4,21 @@
 #include <string>
 #include <ctime>
 #include <sstream>
+#include <sys/sysinfo.h>
 #include <omp/Hand.h>
 #include <hand_isomorphism/hand_index.h>
 
 namespace pluribus {
+
+long long get_free_ram() {
+  struct sysinfo info;
+  if(sysinfo(&info) != 0) {
+    std::cerr << "getFreeRAM --- sysinfo failed" << std::endl;
+    return -1; // Error
+  }
+  // freeram is in bytes, adjusted by mem_unit
+  return static_cast<long long>(info.freeram) * info.mem_unit;
+}
 
 std::string date_time_str() {
     std::time_t t = std::time(nullptr);

@@ -11,6 +11,7 @@
 
 namespace pluribus {
 
+long long get_free_ram();
 std::string date_time_str();
 uint8_t card_to_idx(const std::string& card);
 std::string idx_to_card(int idx);

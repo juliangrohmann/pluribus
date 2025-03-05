@@ -8,6 +8,7 @@ add_library(
   history_index.cpp
   infoset.cpp
   mccfr.cpp
+  blueprint.cpp
   util.cpp
   debug.cpp
 )

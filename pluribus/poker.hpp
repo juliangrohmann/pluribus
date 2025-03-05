@@ -108,6 +108,7 @@ public:
   inline int8_t get_winner() const { return _winner; }
   inline bool is_terminal() const { return get_winner() != -1 || get_round() >= 4; };
   PokerState apply(Action action) const;
+  PokerState apply(const ActionHistory& action_history) const;
   
 private:
   std::vector<Player> _players;
