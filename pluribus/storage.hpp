@@ -23,10 +23,24 @@ public:
   StrategyStorage(const ActionProfile& action_profile = BlueprintActionProfile{}, int n_clusters = 200) : 
                _action_profile{action_profile}, _n_clusters{n_clusters} {};
 
+  StrategyStorage(const StrategyStorage& other) 
+      : _data(other._data), 
+        _history_map(other._history_map), 
+        _action_profile(other._action_profile), 
+        _n_clusters(other._n_clusters) {
+  }
+
+  StrategyStorage(StrategyStorage&& other) noexcept 
+      : _data(std::move(other._data)), 
+        _history_map(std::move(other._history_map)), 
+        _action_profile(std::move(other._action_profile)), 
+        _n_clusters(other._n_clusters) {
+  }
+
   inline const tbb::concurrent_vector<std::atomic<T>>& data() const { return _data; }
   inline tbb::concurrent_vector<std::atomic<T>>& data() { return _data; }
   inline const tbb::concurrent_unordered_map<ActionHistory, int> history_map() const { return _history_map; }
-  inline const ActionProfile& action_profile() const { return _history_map; }
+  inline const ActionProfile& action_profile() const { return _action_profile; }
   inline int n_clusters() const { return _n_clusters; }
 
   std::atomic<T>& operator[](size_t idx) { return _data[idx]; }

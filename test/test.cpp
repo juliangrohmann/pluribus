@@ -21,7 +21,9 @@
 #include <pluribus/simulate.hpp>
 #include <pluribus/actions.hpp>
 #include <pluribus/infoset.hpp>
+#include <pluribus/storage.hpp>
 #include <pluribus/mccfr.hpp>
+#include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
 
 using namespace pluribus;
@@ -224,17 +226,17 @@ TEST_CASE("Serialize StrategyStorage, BlueprintTrainer", "[serialize][blueprint]
   BlueprintTrainer trainer{config};
   trainer.mccfr_p(1);
 
-  // std::string regrets_fn = "test_regrets.bin";
-  // cereal_save(trainer.get_regrets(), regrets_fn);
-  // StrategyStorage loaded_regrets = cereal_load<StrategyStorage>(regrets_fn);
-  // REQUIRE(loaded_regrets == trainer.get_regrets());
-  // unlink(regrets_fn.c_str());
+  std::string regrets_fn = "test_regrets.bin";
+  cereal_save(trainer.get_regrets(), regrets_fn);
+  StrategyStorage<int> loaded_regrets = cereal_load<StrategyStorage<int>>(regrets_fn);
+  REQUIRE(loaded_regrets == trainer.get_regrets());
+  unlink(regrets_fn.c_str());
 
-  // std::string bp_fn = "test_bp_trainer.bin";
-  // cereal_save(trainer, bp_fn);
-  // BlueprintTrainer loaded_bp = cereal_load<BlueprintTrainer>(bp_fn);
-  // REQUIRE(loaded_bp == trainer);
-  // unlink(bp_fn.c_str());
+  std::string bp_fn = "test_bp_trainer.bin";
+  cereal_save(trainer, bp_fn);
+  BlueprintTrainer loaded_bp = cereal_load<BlueprintTrainer>(bp_fn);
+  REQUIRE(loaded_bp == trainer);
+  unlink(bp_fn.c_str());
 }
 
 #endif
