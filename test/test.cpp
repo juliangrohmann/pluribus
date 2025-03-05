@@ -218,7 +218,7 @@ TEST_CASE("Serialize InformationSet", "[serialize]") {
   unlink(fn.c_str());
 }
 
-TEST_CASE("Serialize RegretStorage, BlueprintTrainer", "[serialize][blueprint]") {
+TEST_CASE("Serialize StrategyStorage, BlueprintTrainer", "[serialize][blueprint]") {
   BlueprintTrainerConfig config{};
   config.profiling_thresh = 1'000'000;
   BlueprintTrainer trainer{config};
@@ -226,7 +226,7 @@ TEST_CASE("Serialize RegretStorage, BlueprintTrainer", "[serialize][blueprint]")
 
   // std::string regrets_fn = "test_regrets.bin";
   // cereal_save(trainer.get_regrets(), regrets_fn);
-  // RegretStorage loaded_regrets = cereal_load<RegretStorage>(regrets_fn);
+  // StrategyStorage loaded_regrets = cereal_load<StrategyStorage>(regrets_fn);
   // REQUIRE(loaded_regrets == trainer.get_regrets());
   // unlink(regrets_fn.c_str());
 

@@ -20,10 +20,36 @@ namespace pluribus {
 
 using PreflopMap = tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_vector<float>>;
 
-std::vector<float> calculate_strategy(const RegretStorage& data, size_t base_idx, int n_actions);
+template <class T>
+std::vector<float> calculate_strategy(const StrategyStorage<T>& data, size_t base_idx, int n_actions) {
+  T sum = 0;
+  for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
+    sum += std::max(data[base_idx + a_idx].load(), 0);
+  }
+
+  std::vector<float> freq;
+  freq.reserve(n_actions);
+  if(sum > 0) {
+    for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
+      freq.push_back(std::max(data[base_idx + a_idx].load(), 0) / static_cast<double>(sum));
+    }
+  }
+  else {
+    for(int i = 0; i < n_actions; ++i) {
+      freq.push_back(1.0 / n_actions);
+    }
+  }
+  return freq;
+}
+
+template <class T>
+void lcfr_discount(StrategyStorage<T>& regrets, double d) {
+  for(auto& e : regrets.data()) {
+    e.store(e.load() * d);
+  }
+}
+
 int sample_action_idx(const std::vector<float>& freq);
-void lcfr_discount(RegretStorage& strategy, double d);
-void lcfr_discount(PreflopMap& strategy, double d);
 
 struct BlueprintTrainerConfig {
   BlueprintTrainerConfig(int n_players = 2, int n_chips = 10'000, int ante = 0) : poker{n_players, n_chips, ante} {}
@@ -58,9 +84,9 @@ public:
   BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, const std::string& snapshot_dir = "");
   void mccfr_p(long T);
   bool operator==(const BlueprintTrainer& other) const;
-  inline const RegretStorage& get_regrets() const { return _regrets; }
-  inline RegretStorage& get_regrets() { return _regrets; }
-  inline const PreflopMap& get_phi() const { return _phi; }
+  inline const StrategyStorage<int>& get_regrets() const { return _regrets; }
+  inline StrategyStorage<int>& get_regrets() { return _regrets; }
+  inline const StrategyStorage<float>& get_phi() const { return _phi; }
   inline const BlueprintTrainerConfig& get_config() const { return _config; }
   inline void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
   
@@ -82,8 +108,8 @@ private:
                                  const omp::HandEvaluator& eval);
   friend void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
 #endif
-  RegretStorage _regrets;
-  PreflopMap _phi;
+  StrategyStorage<int> _regrets;
+  StrategyStorage<float> _phi;
   BlueprintTrainerConfig _config;
   std::filesystem::path _snapshot_dir;
   long _t;

@@ -29,13 +29,13 @@ T cereal_load(const std::string& fn) {
 
 namespace cereal {
 
-template<class Archive>
-void serialize(Archive& archive, std::atomic<int>& atomic_int) {
-    int value = atomic_int.load(std::memory_order_relaxed);
-    archive(value);
-    if(Archive::is_loading::value) {
-      atomic_int.store(value, std::memory_order_relaxed);
-    }
+template<class Archive, class T>
+void serialize(Archive& ar, std::atomic<T>& atomic) {
+  T value = Archive::is_loading::value ? T{} : atomic.load();
+  ar(value);
+  if (Archive::is_loading::value) {
+    atomic.store(value);
+  }
 }
 
 template<class Archive, class T>

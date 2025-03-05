@@ -8,7 +8,6 @@ add_library(
   history_index.cpp
   infoset.cpp
   mccfr.cpp
-  storage.cpp
   util.cpp
   debug.cpp
 )

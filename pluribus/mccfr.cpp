@@ -22,44 +22,9 @@
 
 namespace pluribus {
 
-std::vector<float> calculate_strategy(const RegretStorage& data, size_t base_idx, int n_actions) {
-  int sum = 0;
-  for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-    sum += std::max(data[base_idx + a_idx].load(), 0);
-  }
-
-  std::vector<float> freq;
-  freq.reserve(n_actions);
-  if(sum > 0) {
-    for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-      freq.push_back(std::max(data[base_idx + a_idx].load(), 0) / static_cast<double>(sum));
-    }
-  }
-  else {
-    for(int i = 0; i < n_actions; ++i) {
-      freq.push_back(1.0 / n_actions);
-    }
-  }
-  return freq;
-}
-
 int sample_action_idx(const std::vector<float>& freq) {
   std::discrete_distribution<> dist(freq.begin(), freq.end());
   return dist(GlobalRNG::instance());
-}
-
-void lcfr_discount(RegretStorage& data, double d) {
-  for(auto& e : data.data()) {
-    e.store(e.load() * d);
-  }
-}
-
-void lcfr_discount(PreflopMap& data, double d) {
-  for(auto& entry : data) {
-    for(int i = 0; i < entry.second.size(); ++i) {
-      entry.second[i] *= d;
-    }
-  }
 }
 
 std::string BlueprintTrainerConfig::to_string() const {
@@ -187,7 +152,7 @@ void BlueprintTrainer::mccfr_p(long T) {
 }
 
 std::vector<float> get_freq(const PokerState& state, const Board& board, const Hand& hand, 
-                            int n_actions, RegretStorage& regrets) {
+                            int n_actions, StrategyStorage<int>& regrets) {
   int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
   size_t base_idx = regrets.index(state, cluster);
   return calculate_strategy(regrets, base_idx, n_actions);
@@ -292,13 +257,9 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
     auto freq = calculate_strategy(_regrets, regret_base_idx, actions.size());
     int a_idx = sample_action_idx(freq);
 
-    InformationSet info_set{state.get_action_history(), board, hands[i], state.get_round(), _config.poker};
-    auto& phi_vals = _phi[info_set];
-    if(phi_vals.size() == 0) {
-      phi_vals.grow_by(actions.size());
-    }
     #pragma omp critical
-    phi_vals[a_idx] += 1.0f;
+    _phi[_phi.index(state, cluster, a_idx)] += 1.0f;
+    
     update_strategy(state.apply(actions[a_idx]), i, board, hands);
   }
   else {

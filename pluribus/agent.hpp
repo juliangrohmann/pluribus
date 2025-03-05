@@ -29,15 +29,15 @@ private:
   const BlueprintTrainer* _trainer_p;
 };
 
-class SampledBlueprintAgent : public Agent {
-public:
-  SampledBlueprintAgent(const BlueprintTrainer& trainer);
-  Action act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) override;
-private:
-  void populate(const PokerState& state, const BlueprintTrainer& trainer);
+// class SampledBlueprintAgent : public Agent {
+// public:
+//   SampledBlueprintAgent(const BlueprintTrainer& trainer);
+//   Action act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) override;
+// private:
+//   void populate(const PokerState& state, const BlueprintTrainer& trainer);
 
-  ActionStorage _strategy;
-  ActionProfile _action_profile;
-};
+//   ActionStorage _strategy;
+//   ActionProfile _action_profile;
+// };
 
 }
