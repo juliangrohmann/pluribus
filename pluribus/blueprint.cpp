@@ -12,7 +12,7 @@ namespace pluribus {
 void Blueprint::build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir) {
   std::filesystem::path buffer_dir = buf_dir;
   size_t max_regrets = 0;
-  tbb::concurrent_unordered_map<ActionHistory, int> history_map;
+  tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map;
   BlueprintTrainerConfig config;
   int n_clusters;
 
@@ -76,7 +76,7 @@ void Blueprint::build(const std::string& preflop_fn, const std::vector<std::stri
     auto actions = valid_actions(state, config.action_profile);
 
     for(int c = 0; c < n_clusters; ++c) {
-      int regret_idx = entry.second + c * actions.size();
+      int regret_idx = entry.second.idx + c * actions.size();
       auto curr_freq = calculate_strategy(cum_strategy, regret_idx, actions.size());
       size_t freq_idx = _freq->index(state, c);
       for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
