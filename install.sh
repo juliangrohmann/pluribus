@@ -1,9 +1,10 @@
 apt update
 apt upgrade
+apt install g++ cmake libsdl2-dev
 apt-get install libboost-all-dev
 apt-get install libtbb-dev
-apt install g++
-apt install cmake
+apt-get install libsdl2-ttf-dev
+
 
 git clone https://github.com/catchorg/Catch2.git
 cd Catch2

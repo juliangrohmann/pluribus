@@ -33,9 +33,13 @@ public:
   CardSet() = default;
   CardSet(std::initializer_list<uint8_t> cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
   CardSet(std::string card_str) { str_to_cards(card_str, cards().data()); }
+
   void deal(Deck& deck) { for(int i = 0; i < N; ++i) _cards[i] = deck.draw(); }
   std::array<uint8_t, N>& cards() { return _cards; }
   const std::array<uint8_t, N>& cards() const { return _cards; }
+
+  bool operator==(const CardSet<N>&) const = default;
+
 private:
   std::array<uint8_t, N> _cards;
 };
@@ -45,6 +49,7 @@ public:
   Board() = default;
   Board(std::initializer_list<uint8_t> cards) : CardSet<5>{cards} {}
   Board(std::string card_str) : CardSet<5>{card_str} {};
+  bool operator==(const Board&) const = default;
 };
 
 class Hand : public CardSet<2> {
@@ -52,7 +57,12 @@ public:
   Hand() = default;
   Hand(std::initializer_list<uint8_t> cards) : CardSet<2>{cards} {}
   Hand(std::string card_str) : CardSet<2>{card_str} {};
+  bool operator==(const Hand&) const = default;
 };
+
+inline Hand canonicalize(const Hand& hand) {
+  return hand.cards()[0] > hand.cards()[1] ? hand : Hand{hand.cards()[1], hand.cards()[0]};
+}
 
 class Player {
 public:
@@ -136,4 +146,17 @@ std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& 
 std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board board_cards, const omp::HandEvaluator& eval);
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands);
 void deal_board(Deck& deck, std::array<uint8_t, 5>& board);
+}
+
+namespace std {
+  template <>
+  struct hash<pluribus::Hand> {
+    size_t operator()(const pluribus::Hand& hand) const noexcept {
+      size_t hash_value = 0;
+      for (const auto& card : hand.cards()) {
+        hash_value = hash_value * 31 + static_cast<size_t>(card);
+      }
+      return hash_value;
+    }
+  };
 }
