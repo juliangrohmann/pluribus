@@ -59,11 +59,13 @@ std::unordered_map<Action, Color> map_colors(const std::vector<Action>& actions)
   return color_map;
 }
 
-RenderableRange::RenderableRange(const PokerRange& range, const Color& color, bool relative) 
-    : _range{range}, _color{color.sdl_color}, _relative{relative} {
+RenderableRange::RenderableRange(const PokerRange& range, const std::string& label, const Color& color, bool relative) 
+    : _range{range}, _label{label}, _color{color.sdl_color}, _relative{relative} {
   int row_idx, col_idx, combos;
-  for(const auto& combo : _range.range()) {
-    if(combo.first.cards()[0] % 4 == combo.first.cards()[1] % 4) {
+  const auto& weights = _range.weights();
+  for(int idx = 0; idx < weights.size(); ++idx) {
+    Hand hand = HoleCardIndexer::get_instance()->hand(idx);
+    if(hand.cards()[0] % 4 == hand.cards()[1] % 4) {
       row_idx = 0;
       col_idx = 1;
       combos = 4;
@@ -71,11 +73,11 @@ RenderableRange::RenderableRange(const PokerRange& range, const Color& color, bo
     else {
       row_idx = 1;
       col_idx = 0;
-      combos = combo.first.cards()[0] / 4 == combo.first.cards()[1] / 4 ? 6 : 12;
+      combos = hand.cards()[0] / 4 == hand.cards()[1] / 4 ? 6 : 12;
     }
-    int row = _matrix.size() - combo.first.cards()[row_idx] / 4 - 1;
-    int col = _matrix.size() - combo.first.cards()[col_idx] / 4 - 1;
-    _matrix[row][col] += combo.second / combos;
+    int row = _matrix.size() - hand.cards()[row_idx] / 4 - 1;
+    int col = _matrix.size() - hand.cards()[col_idx] / 4 - 1;
+    _matrix[row][col] += weights[idx] / combos;
   }
 }
 
@@ -117,11 +119,21 @@ void RangeViewer::render_ranges(const std::vector<RenderableRange>& ranges) {
   render_background();
   RangeMatrix<int> cum_matrix;
   for(const auto& rng : ranges) render_range(&rng, &rng != base_rng ? base_rng : nullptr, cum_matrix);
+  render_legend(ranges);
   render_overlay();
 }
 
 void set_color(SDL_Renderer* renderer, const SDL_Color& color) {
   SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
+}
+
+void RangeViewer::render_text(const std::string& label, int x, int y) {
+  SDL_Surface* text_surface = TTF_RenderText_Solid(_font, label.c_str(), _text_color);
+  SDL_Texture* text_texture = SDL_CreateTextureFromSurface(get_renderer(), text_surface);
+  SDL_Rect text_rect = {x, y, text_surface->w, text_surface->h};
+  SDL_RenderCopy(get_renderer(), text_texture, nullptr, &text_rect);
+  SDL_FreeSurface(text_surface);
+  SDL_DestroyTexture(text_texture);
 }
 
 SDL_Rect RangeViewer::make_rect(int row, int col, float freq, float rel_freq, int offset) const {
@@ -160,6 +172,27 @@ void RangeViewer::render_range(const RenderableRange* range, const RenderableRan
       float rel_freq = !base_range ? 1.0f : range->get_matrix()[row][col] / base_range->get_matrix()[row][col];
       render_hand(range->get_color(), row, col, freq, rel_freq, offset_matrix[row][col]);
       if(base_range) offset_matrix[row][col] += static_cast<int>(round(_field_sz * rel_freq));
+      
+      if(row == 0 && col == 2 && base_range) {
+        std::cout << "action=" << range->get_label() << ", freq=" << freq << ", rel_freq=" << rel_freq << ", matrix=" << range->get_matrix()[row][col] << ", base_matrix=" << base_range->get_matrix()[row][col] << "\n";
+      }
+    }
+  }
+}
+
+void RangeViewer::render_legend(const std::vector<RenderableRange>& ranges) {
+  int n_rel_ranges = 0;
+  for(const auto& range : ranges) if(range.is_relative()) ++n_rel_ranges;
+  int w = _window_width / n_rel_ranges;
+  int h = 100;
+  int x = 0;
+  for(const auto& range : ranges) {
+    if(range.is_relative()) {
+      SDL_Rect rect = {x, _window_height - h, w, h};
+      set_color(get_renderer(), range.get_color());
+      SDL_RenderFillRect(get_renderer(), &rect);
+      x += w;
+      render_text(range.get_label(), rect.x + 5, rect.y + 3);
     }
   }
 }
@@ -175,12 +208,7 @@ void RangeViewer::render_overlay() {
       int minor = col < row ? row : col;
       std::string suit = row == col ? "" : (row > col ? "o" : "s");
       std::string label = std::string(1, omp::RANKS[omp::RANKS.size() - major - 1]) + omp::RANKS[omp::RANKS.size() - minor - 1] + suit;
-      SDL_Surface* text_surface = TTF_RenderText_Solid(_font, label.c_str(), _text_color);
-      SDL_Texture* text_texture = SDL_CreateTextureFromSurface(get_renderer(), text_surface);
-      SDL_Rect text_rect = {border_rect.x + 5, border_rect.y + 3, text_surface->w, text_surface->h};
-      SDL_RenderCopy(get_renderer(), text_texture, nullptr, &text_rect);
-      SDL_FreeSurface(text_surface);
-      SDL_DestroyTexture(text_texture);
+      render_text(label, border_rect.x + 5, border_rect.y + 3);
     }
   } 
 }

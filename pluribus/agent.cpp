@@ -16,7 +16,6 @@ Action RandomAgent::act(const PokerState& state, const Board& board, const Hand&
 }
 
 Action BlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) {
-  InformationSet info_set{state.get_action_history(), board, hand, state.get_round(), config};
   auto actions = valid_actions(state, _trainer_p->get_config().action_profile);
   int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
   size_t base_idx = _trainer_p->get_regrets().index(state, cluster);

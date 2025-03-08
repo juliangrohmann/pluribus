@@ -10,6 +10,7 @@
 #include <cereal/cereal.hpp>
 #include <tbb/concurrent_vector.h>
 #include <tbb/concurrent_unordered_map.h>
+#include <pluribus/range.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/infoset.hpp>
@@ -18,7 +19,7 @@
 
 namespace pluribus {
 
-using PreflopMap = tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_vector<float>>;
+// using PreflopMap = tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_vector<float>>;
 
 template <class T>
 std::vector<float> calculate_strategy(const StrategyStorage<T>& data, size_t base_idx, int n_actions) {
@@ -52,8 +53,8 @@ void lcfr_discount(StrategyStorage<T>& regrets, double d) {
 int sample_action_idx(const std::vector<float>& freq);
 
 struct BlueprintTrainerConfig {
-  BlueprintTrainerConfig(int n_players = 2, int n_chips = 10'000, int ante = 0) : poker{n_players, n_chips, ante} {}
-  BlueprintTrainerConfig(const PokerConfig& poker_) : poker{poker_} {}
+  BlueprintTrainerConfig(int n_players = 2, int n_chips = 10'000, int ante = 0);
+  BlueprintTrainerConfig(const PokerConfig& poker_);
 
   std::string to_string() const;
 
@@ -61,12 +62,15 @@ struct BlueprintTrainerConfig {
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(poker, action_profile, strategy_interval, preflop_threshold_m, snapshot_interval_m, prune_thresh_m, lcfr_thresh_m, discount_interval_m,
-       log_interval_m, profiling_thresh, prune_cutoff, regret_floor);
+    ar(poker, action_profile, init_ranges, init_board, init_state, strategy_interval, preflop_threshold_m, snapshot_interval_m, 
+       prune_thresh_m, lcfr_thresh_m, discount_interval_m, log_interval_m, profiling_thresh, prune_cutoff, regret_floor);
   }
 
   PokerConfig poker;
   ActionProfile action_profile = BlueprintActionProfile{};
+  std::vector<PokerRange> init_ranges;
+  std::vector<uint8_t> init_board;
+  PokerState init_state;
   long strategy_interval = 10'000;
   long preflop_threshold_m = 800;
   long snapshot_interval_m = 200;
@@ -84,12 +88,13 @@ public:
   BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, const std::string& snapshot_dir = "");
   void mccfr_p(long T);
   bool operator==(const BlueprintTrainer& other) const;
-  inline const StrategyStorage<int>& get_regrets() const { return _regrets; }
-  inline StrategyStorage<int>& get_regrets() { return _regrets; }
-  inline const StrategyStorage<float>& get_phi() const { return _phi; }
-  inline const BlueprintTrainerConfig& get_config() const { return _config; }
-  inline void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
-  
+  const StrategyStorage<int>& get_regrets() const { return _regrets; }
+  StrategyStorage<int>& get_regrets() { return _regrets; }
+  const StrategyStorage<float>& get_phi() const { return _phi; }
+  const BlueprintTrainerConfig& get_config() const { return _config; }
+  void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
+  void set_verbose(bool verbose) { _verbose = verbose; }
+
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_regrets, _phi, _config, _t, _it_per_min);
@@ -114,6 +119,7 @@ private:
   std::filesystem::path _snapshot_dir;
   long _t;
   long _it_per_min;
+  bool _verbose = false;
 };
 
 }

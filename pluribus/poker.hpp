@@ -3,13 +3,14 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <random>
 #include <algorithm>
 #include <initializer_list>
 #include <hand_isomorphism/hand_index.h>
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
-#include <boost/dynamic_bitset.hpp>
+#include <cereal/types/array.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/actions.hpp>
 
@@ -18,35 +19,46 @@ namespace pluribus {
 class Deck {
 public:
   Deck() { reset(); }
-  inline int draw() { return _cards[_current++]; }
+  int draw();
+  void add_dead_card(uint8_t card) { _dead_cards.insert(card); }
   void reset();
   void shuffle();
 
 private:
     std::array<uint8_t, 52> _cards;
+    std::unordered_set<uint8_t> _dead_cards;
     uint8_t _current = 0;
 };
 
 template<int N>
 class CardSet {
 public:
-  CardSet() = default;
+  CardSet() { _cards.fill(0); }
+  CardSet(std::array<uint8_t, N> cards) : _cards{cards} {}
+  CardSet(std::vector<uint8_t> cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
   CardSet(std::initializer_list<uint8_t> cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
   CardSet(std::string card_str) { str_to_cards(card_str, cards().data()); }
 
-  void deal(Deck& deck) { for(int i = 0; i < N; ++i) _cards[i] = deck.draw(); }
+  void deal(Deck& deck, std::vector<uint8_t> init_cards = {}) { 
+    for(int i = 0; i < init_cards.size(); ++i) _cards[i] = init_cards[i];
+    for(int i = init_cards.size(); i < N; ++i) _cards[i] = deck.draw(); 
+  }
+
   std::array<uint8_t, N>& cards() { return _cards; }
   const std::array<uint8_t, N>& cards() const { return _cards; }
+  std::string to_string() const { return cards_to_str(_cards.data(), N); }
 
   bool operator==(const CardSet<N>&) const = default;
 
-private:
+protected:
   std::array<uint8_t, N> _cards;
 };
 
 class Board : public CardSet<5> {
 public:
-  Board() = default;
+  Board() : CardSet<5>{} {}
+  Board(std::array<uint8_t, 5> cards) : CardSet<5>{cards} {}
+  Board(std::vector<uint8_t> cards) : CardSet<5>{cards} {}
   Board(std::initializer_list<uint8_t> cards) : CardSet<5>{cards} {}
   Board(std::string card_str) : CardSet<5>{card_str} {};
   bool operator==(const Board&) const = default;
@@ -54,10 +66,17 @@ public:
 
 class Hand : public CardSet<2> {
 public:
-  Hand() = default;
+  Hand() : CardSet<2>{} {}
+  Hand(std::array<uint8_t, 2> cards) : CardSet<2>{cards} {}
+  Hand(std::vector<uint8_t> cards) : CardSet<2>{cards} {}
   Hand(std::initializer_list<uint8_t> cards) : CardSet<2>{cards} {}
   Hand(std::string card_str) : CardSet<2>{card_str} {};
   bool operator==(const Hand&) const = default;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_cards);
+  }
 };
 
 inline Hand canonicalize(const Hand& hand) {
@@ -66,11 +85,14 @@ inline Hand canonicalize(const Hand& hand) {
 
 class Player {
 public:
-  Player(int chips) : _chips{chips} {};
+  Player(int chips = 10'000) : _chips{chips} {};
   Player(const Player&) = default;
   Player(Player&&) = default;
+
   Player& operator=(const Player&) = default;
   Player& operator=(Player&&) = default;
+  bool operator==(const Player& other) const = default;
+
   inline int get_chips() const { return _chips; }
   inline int get_betsize() const { return _betsize; }
   inline bool has_folded() const { return _folded; }
@@ -78,6 +100,11 @@ public:
   void next_round();
   void fold();
   void reset(int chips);
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_chips, _betsize, _folded);
+  }
 
 private:
   int _chips;
@@ -102,12 +129,15 @@ struct PokerConfig {
 
 class PokerState {
 public:
-  PokerState(int n_players, int chips, int ante);
+  PokerState(int n_players = 2, int chips = 10'000, int ante = 0);
   PokerState(const PokerConfig& config);
   PokerState(const PokerState&) = default;
   PokerState(PokerState&&) = default;
+
   PokerState& operator=(const PokerState&) = default;
   PokerState& operator=(PokerState&&) = default;
+  bool operator==(const PokerState& other) const = default;
+
   inline const std::vector<Player>& get_players() const { return _players; }
   inline const ActionHistory& get_action_history() const { return _actions; }
   inline int get_pot() const { return _pot; }
@@ -121,12 +151,16 @@ public:
   PokerState apply(const ActionHistory& action_history) const;
   std::string to_string() const;
   
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_players, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner);
+  }
+
 private:
   std::vector<Player> _players;
   ActionHistory _actions;
   int _pot;
   int _max_bet;
-  short _action_counter;
   uint8_t _active;
   uint8_t _round;
   uint8_t _bet_level;
@@ -154,7 +188,7 @@ namespace std {
   struct hash<pluribus::Hand> {
     size_t operator()(const pluribus::Hand& hand) const noexcept {
       size_t hash_value = 0;
-      for (const auto& card : hand.cards()) {
+      for(const auto& card : hand.cards()) {
         hash_value = hash_value * 31 + static_cast<size_t>(card);
       }
       return hash_value;

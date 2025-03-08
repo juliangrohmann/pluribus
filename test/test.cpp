@@ -20,11 +20,11 @@
 #include <pluribus/agent.hpp>
 #include <pluribus/simulate.hpp>
 #include <pluribus/actions.hpp>
-#include <pluribus/infoset.hpp>
 #include <pluribus/storage.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
+#include <pluribus/rng.hpp>
 
 using namespace pluribus;
 using std::string;
@@ -81,6 +81,16 @@ std::vector<omp::Hand> board_hand_sample(int round, int amount) {
     sample.push_back(hand);
   }
   return sample;
+}
+
+template <class T>
+bool test_serialization(const T& obj) {
+  std::string fn = "test_serialization.bin";
+  cereal_save(obj, fn);
+  auto loaded_obj = cereal_load<T>(fn);
+  bool match = (obj == loaded_obj);
+  unlink(fn.c_str());
+  return match;
 }
 
 TEST_CASE("Card encode/decode", "[card]") {
@@ -185,6 +195,64 @@ TEST_CASE("Split pot", "[poker]") {
   REQUIRE(result[2] == 25);
 }
 
+TEST_CASE("Sample PokerRange", "[range]") {
+  std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+  PokerRange range;
+  for(uint8_t i = 0; i < 52; ++i) {
+    for(uint8_t j = i + 1; j < 52; ++j) {
+      range.add_hand(Hand{j, i}, dist(GlobalRNG::instance()));
+    }
+  }
+
+  int n_combos = range.n_combos();
+  int n_samples = 2'000'000;
+  std::unordered_map<Hand, float> sampled;
+  for(int i = 0; i < n_samples; ++i) sampled[range.sample()] += 1.0f;
+  for(auto& entry : sampled) {
+    float rel_freq = entry.second * n_combos / n_samples;
+    REQUIRE(abs(rel_freq - range.frequency(entry.first)) < 0.06);
+  }
+}
+
+TEST_CASE("Sample PokerRange with dead_cards", "[range]") {
+  std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+  PokerRange range;
+  uint8_t dead_card = card_to_idx("Ad");
+  range.add_hand(Hand{dead_card, card_to_idx("Jd")});
+  range.add_hand(Hand{card_to_idx("9h"), dead_card});
+  range.add_hand(Hand{"AdAh"});
+  range.add_hand(Hand{"AcAd"});
+  range.add_hand(Hand{"AcTh"});
+  range.add_hand(Hand{"8s8h"});
+
+  std::unordered_map<Hand, float> sampled;
+  for(int i = 0; i < 10'000; ++i) {
+    Hand hand = range.sample({dead_card});
+    REQUIRE(hand.cards()[0] != dead_card);
+    REQUIRE(hand.cards()[1] != dead_card);
+  }
+}
+
+TEST_CASE("Serialize Hand", "[serialize]") {
+  REQUIRE(test_serialization(Hand{"Ac2s"}));
+  REQUIRE(test_serialization(Hand{"3h5h"}));
+  REQUIRE(test_serialization(Hand{"3c3s"}));
+  REQUIRE(test_serialization(Hand{4, 1}));
+  REQUIRE(test_serialization(Hand{50, 22}));
+  REQUIRE(test_serialization(Hand{21, 32}));
+}
+
+TEST_CASE("Serialize PokerState", "[serialize]") {
+  ActionHistory actions = {
+    Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
+    Action::CHECK_CALL, Action{0.33f}, Action{1.00f}, Action::CHECK_CALL,
+  };
+  PokerState state{3};
+  state = state.apply(actions);
+
+  REQUIRE(test_serialization(state));
+}
+
 TEST_CASE("Serialize ActionHistory", "[serialize]") {
   ActionHistory actions = {
     Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
@@ -192,32 +260,7 @@ TEST_CASE("Serialize ActionHistory", "[serialize]") {
     Action::CHECK_CALL, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL
   };
-  
-  std::string fn = "test_actions.bin";
-  cereal_save(actions, fn);
-  auto loaded_actions = cereal_load<ActionHistory>(fn);
-  REQUIRE(loaded_actions.size() == actions.size());
-  for(int i = 0; i < loaded_actions.size(); ++i) {
-    REQUIRE(loaded_actions.get(i) == actions.get(i));
-  }
-  unlink(fn.c_str());
-}
-
-TEST_CASE("Serialize InformationSet", "[serialize]") {
-  Hand hand{"KsTc"};
-  Board board{"AdKh9s9h5c"};
-  ActionHistory actions = {
-    Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
-    Action::CHECK_CALL, Action{0.33f}, Action{1.00f}, Action::CHECK_CALL,
-    Action::CHECK_CALL
-  };
-  InformationSet info_set{actions, board, hand, 2, PokerConfig{3, 10'000, 0}};
-
-  std::string fn = "test_info_set.bin";
-  cereal_save(info_set, fn);
-  InformationSet loaded_info_set = cereal_load<InformationSet>(fn);
-  REQUIRE(loaded_info_set == info_set);
-  unlink(fn.c_str());
+  REQUIRE(test_serialization(actions));
 }
 
 TEST_CASE("Serialize StrategyStorage, BlueprintTrainer", "[serialize][blueprint]") {
@@ -226,17 +269,8 @@ TEST_CASE("Serialize StrategyStorage, BlueprintTrainer", "[serialize][blueprint]
   BlueprintTrainer trainer{config};
   trainer.mccfr_p(1);
 
-  std::string regrets_fn = "test_regrets.bin";
-  cereal_save(trainer.get_regrets(), regrets_fn);
-  StrategyStorage<int> loaded_regrets = cereal_load<StrategyStorage<int>>(regrets_fn);
-  REQUIRE(loaded_regrets == trainer.get_regrets());
-  unlink(regrets_fn.c_str());
-
-  std::string bp_fn = "test_bp_trainer.bin";
-  cereal_save(trainer, bp_fn);
-  BlueprintTrainer loaded_bp = cereal_load<BlueprintTrainer>(bp_fn);
-  REQUIRE(loaded_bp == trainer);
-  unlink(bp_fn.c_str());
+  REQUIRE(test_serialization(trainer.get_regrets()));
+  REQUIRE(test_serialization(trainer));
 }
 
 #endif

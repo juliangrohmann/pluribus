@@ -16,6 +16,14 @@
 
 namespace pluribus {
 
+int Deck::draw() {
+  uint8_t card;
+  do {
+    card = _cards[_current++];
+  } while(_dead_cards.find(card) != _dead_cards.end());
+  return card;
+}
+
 void Deck::reset() {
   for(uint8_t i = 0; i < _cards.size(); ++i) {
     _cards[i] = i;
@@ -48,7 +56,7 @@ void Player::reset(int chips) {
   _betsize = 0;
 }
 
-PokerState::PokerState(int n_players, int chips, int ante) : _pot{150}, _max_bet{100}, _bet_level{1}, _action_counter{0}, _round{0}, _winner{-1} {
+PokerState::PokerState(int n_players, int chips, int ante) : _pot{150}, _max_bet{100}, _bet_level{1}, _round{0}, _winner{-1} {
   _players.reserve(n_players);
   for(int i = 0; i < n_players; ++i) {
     _players.push_back(Player{chips});
@@ -254,9 +262,6 @@ int total_bet_size(const PokerState& state, Action action) {
 
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile) {
   const std::vector<Action>& actions = profile.get_actions(state.get_round(), state.get_bet_level());
-  // std::cout << "all: ";
-  // for(Action a : actions) std::cout << a.to_string() << ", ";
-  // std::cout << "\n";
   std::vector<Action> valid;
   const Player& player = state.get_players()[state.get_active()];
   for(Action a : actions) {

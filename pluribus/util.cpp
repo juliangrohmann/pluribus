@@ -56,6 +56,10 @@ std::string cards_to_str(const uint8_t cards[], int n) {
   return str;
 }
 
+int n_board_cards(int round) {
+  return round == 0 ? 0 : 2 + round;
+}
+
 int init_indexer(hand_indexer_t& indexer, int round) {
   uint8_t n_cards[round + 1];
   uint8_t all_rounds[] = {2, 3, 1, 1};

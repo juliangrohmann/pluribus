@@ -173,7 +173,7 @@ FlatClusterMap::FlatClusterMap() {
 }
 
 uint16_t FlatClusterMap::cluster(int round, const Board& board, const Hand& hand) const {
-  int card_sum = round == 0 ? 2 : 4 + round;
+  int card_sum = 2 + n_board_cards(round);
   std::vector<uint8_t> cards(card_sum);
   std::copy(hand.cards().begin(), hand.cards().end(), cards.data());
   if(round > 0) std::copy(board.cards().begin(), board.cards().begin() + card_sum - 2, cards.data() + 2);

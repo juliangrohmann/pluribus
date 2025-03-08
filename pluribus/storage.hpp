@@ -95,10 +95,9 @@ public:
       // Fully allocate memory for this history.
       _data.grow_by(_n_clusters * n_actions);
   
-      // Mark as ready and notify waiting threads.
+      // Mark as ready and notify waiting threads.188
       inserted_it->second.ready.store(true, std::memory_order_release);
       _grow_cv.notify_all();
-  
       return history_idx + cluster * n_actions + action;
     } else {
       // Another thread is handling allocation; wait until it's done.

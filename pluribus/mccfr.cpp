@@ -17,7 +17,6 @@
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/actions.hpp>
-#include <pluribus/history_index.hpp>
 #include <pluribus/mccfr.hpp>
 
 namespace pluribus {
@@ -25,6 +24,13 @@ namespace pluribus {
 int sample_action_idx(const std::vector<float>& freq) {
   std::discrete_distribution<> dist(freq.begin(), freq.end());
   return dist(GlobalRNG::instance());
+}
+
+BlueprintTrainerConfig::BlueprintTrainerConfig(int n_players, int n_chips, int ante) 
+    : BlueprintTrainerConfig{PokerConfig{n_players, n_chips, ante}} {}
+
+BlueprintTrainerConfig::BlueprintTrainerConfig(const PokerConfig& poker_) : poker{poker_}, init_state{poker_} {
+  for(int i = 0; i < poker_.n_players; ++i) init_ranges.push_back(PokerRange::full());
 }
 
 std::string BlueprintTrainerConfig::to_string() const {
@@ -48,14 +54,14 @@ std::string BlueprintTrainerConfig::to_string() const {
 BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const std::string& snapshot_dir) 
     : _regrets{config.action_profile, 200}, _phi{}, _config{config}, _snapshot_dir{snapshot_dir}, 
       _t{1}, _it_per_min{50'000} {
+  if(_config.init_state.get_players().size() != config.poker.n_players) throw std::runtime_error("Player number mismatch");
   std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
-  HistoryIndexer::get_instance()->initialize(_config.poker);
   std::cout << _config.to_string() << "\n";
 }
 
 void BlueprintTrainer::mccfr_p(long T) {
-  if(verbose) omp_set_num_threads(1);
+  if(_verbose) omp_set_num_threads(1);
   long limit = std::numeric_limits<long>::max();
   long next_discount = limit;
   long next_snapshot = limit;
@@ -72,34 +78,39 @@ void BlueprintTrainer::mccfr_p(long T) {
       thread_local Deck deck;
       thread_local Board board;
       thread_local std::vector<Hand> hands{static_cast<size_t>(_config.poker.n_players)};
-      thread_local PokerState root{_config.poker};
-      if(verbose) std::cout << "============== t = " << t << " ==============\n";
+      if(_verbose) std::cout << "============== t = " << t << " ==============\n";
       if(t % (_config.log_interval_m * _it_per_min) == 0) log_metrics(t);
       for(int i = 0; i < _config.poker.n_players; ++i) {
-        if(verbose) std::cout << "============== i = " << i << " ==============\n";
+        if(_verbose) std::cout << "============== i = " << i << " ==============\n";
         deck.shuffle();
-        board.deal(deck);
-        for(Hand& hand : hands) hand.deal(deck);
+        board.deal(deck, _config.init_board);
+        std::unordered_set<uint8_t> dead_cards;
+        std::copy(board.cards().begin(), board.cards().end(), std::inserter(dead_cards, dead_cards.end()));
+        for(int p_idx = 0; p_idx < _config.poker.n_players; ++p_idx) {
+          hands[p_idx] = _config.init_ranges[p_idx].sample(dead_cards);
+          dead_cards.insert(hands[p_idx].cards()[0]);
+          dead_cards.insert(hands[p_idx].cards()[1]);
+        }
 
         if(t <= _config.preflop_threshold_m * _it_per_min && t % _config.strategy_interval == 0) {
-          if(verbose) std::cout << "============== Updating strategy ==============\n";
-          update_strategy(root, i, board, hands);
+          if(_verbose) std::cout << "============== Updating strategy ==============\n";
+          update_strategy(_config.init_state, i, board, hands);
         }
         if(t > _config.prune_thresh_m * _it_per_min) {
           std::uniform_real_distribution<float> dist(0.0f, 1.0f);
           float q = dist(GlobalRNG::instance());
           if(q < 0.05f) {
-            if(verbose) std::cout << "============== Traverse MCCFR ==============\n";
-            traverse_mccfr(root, i, board, hands, eval);
+            if(_verbose) std::cout << "============== Traverse MCCFR ==============\n";
+            traverse_mccfr(_config.init_state, i, board, hands, eval);
           }
           else {
-            if(verbose) std::cout << "============== Traverse MCCFR-P ==============\n";
-            traverse_mccfr_p(root, i, board, hands, eval);
+            if(_verbose) std::cout << "============== Traverse MCCFR-P ==============\n";
+            traverse_mccfr_p(_config.init_state, i, board, hands, eval);
           }
         }
         else {
-          if(verbose) std::cout << "============== Traverse MCCFR ==============\n";
-          traverse_mccfr(root, i, board, hands, eval);
+          if(_verbose) std::cout << "============== Traverse MCCFR ==============\n";
+          traverse_mccfr(_config.init_state, i, board, hands, eval);
         }
       }
     }
@@ -190,17 +201,26 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
   }
   else {
     auto actions = valid_actions(state, _config.action_profile);
-    auto freq = get_freq(state, board, hands[i], actions.size(), _regrets);
+    auto freq = get_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
     Action a = actions[sample_action_idx(freq)];
     return traverse_mccfr_p(state.apply(a), i, board, hands, eval);
   }
 }
 
+std::string relative_history_str(const PokerState& state, const BlueprintTrainerConfig& config) {
+  return state.get_action_history().slice(config.init_state.get_action_history().size()).to_string();
+}
+
 int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
   if(state.is_terminal()) {
     int u = utility(state, i, board, hands, eval);
-    if(verbose) {
-      std::cout << state.get_action_history().to_string() << "\n";
+    if(_verbose) {
+      std::cout << "Terminal: " << relative_history_str(state, _config) << "\n";
+      std::cout << "\tHands: ";
+      for(int p_idx = 0; p_idx < state.get_players().size(); ++p_idx) {
+        std::cout << hands[p_idx].to_string() << " ";
+      }
+      std::cout << "\n";
       std::cout << "\tu(z) = " << u << "\n";
     }
     return u;
@@ -208,6 +228,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
   else if(state.get_active() == i) {
     auto actions = valid_actions(state, _config.action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
+    if(_verbose) std::cout << "Cluster " << state.get_active() << ": " << cluster << "\n";
     size_t base_idx = _regrets.index(state, cluster);
     auto freq = calculate_strategy(_regrets, base_idx, actions.size());
 
@@ -218,30 +239,38 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
       int v_a = traverse_mccfr(state.apply(a), i, board, hands, eval);
       values[a] = v_a;
       v += freq[a_idx] * v_a;
-      if(verbose) {
-        std::cout << state.get_action_history().to_string() << "\n";
-        std::cout << "\t u(" << a.to_string() << ") @ " << freq[a_idx] << " = " << v_a << "\n";
+      if(_verbose) {
+        std::cout << "Action EV: " << relative_history_str(state, _config) << "\n";
+        std::cout << "\tu(" << a.to_string() << ") @ " << std::setprecision(2) << std::fixed << freq[a_idx] << " = " << v_a << "\n";
       }
     }
-    if(verbose) {
-      std::cout << state.get_action_history().to_string() << "\n";
-      std::cout << "\t u(sigma) = " << v << "\n";
+    if(_verbose) {
+      std::cout << "Net EV: " << relative_history_str(state, _config) << "\n";
+      std::cout << "\tu(sigma) = " << v << "\n";
     }
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       int dR = values[actions[a_idx]] - v;
       int next_r = _regrets[base_idx + a_idx].load() + dR;
       _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
-      if(verbose) {
-        std::cout << "\t R(" << actions[a_idx].to_string() << ") = " << dR << "\n";
-        std::cout << "\t cum R(" << actions[a_idx].to_string() << ") = " << _regrets[base_idx + a_idx].load() << "\n";
+      if(_verbose) {
+        std::cout << "\tR(" << actions[a_idx].to_string() << ") = " << dR << "\n";
+        std::cout << "\tcum R(" << actions[a_idx].to_string() << ") = " << _regrets[base_idx + a_idx].load() << "\n";
       }
     }
     return v;
   }
   else {
     auto actions = valid_actions(state, _config.action_profile);
-    auto freq = get_freq(state, board, hands[i], actions.size(), _regrets);
+    auto freq = get_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
+    if(_verbose) {
+      std::cout << "Sampling: " << relative_history_str(state, _config) << "\n\t";
+      for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
+        std::cout << std::setprecision(2) << std::fixed << actions[a_idx].to_string() << "=" << freq[a_idx] << " ";
+      }
+      std::cout << "\n";
+    }
     Action a = actions[sample_action_idx(freq)];
+    if(_verbose) std::cout << "\tSampled: " << a.to_string() << "\n";
     return traverse_mccfr(state.apply(a), i, board, hands, eval);
   }
 }

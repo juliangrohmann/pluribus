@@ -40,6 +40,7 @@ private:
 class ActionHistory {
 public:
   ActionHistory() = default;
+  ActionHistory(std::vector<Action> actions) : _history{actions} {}
   ActionHistory(std::initializer_list<Action> actions) : _history{actions} {}
 
   const std::vector<Action> get_history() const { return _history; }
@@ -47,6 +48,7 @@ public:
   const Action& get(int i) const { return _history[i]; }
   size_t size() const { return _history.size(); }
   std::string to_string() const;
+  ActionHistory slice(int start, int end = -1) const; 
 
   bool operator==(const ActionHistory& other) const = default;
 

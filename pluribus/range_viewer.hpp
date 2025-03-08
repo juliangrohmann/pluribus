@@ -45,15 +45,17 @@ private:
 
 class RenderableRange {
 public:
-  RenderableRange(const PokerRange& range, const Color& color, bool relative = false);
+  RenderableRange(const PokerRange& range, const std::string& label, const Color& color, bool relative = false);
 
   const PokerRange& get_range() const { return _range; }
+  const std::string& get_label() const { return _label; }
   const SDL_Color& get_color() const { return _color; }
   bool is_relative() const { return _relative; }
   const RangeMatrix<float>& get_matrix() const { return _matrix; }
 
 private:
   PokerRange _range;
+  std::string _label;
   SDL_Color _color;
   bool _relative = false;
   RangeMatrix<float> _matrix;
@@ -61,7 +63,7 @@ private:
 
 class RangeViewer {
 public:
-  RangeViewer(const std::string& title, int width = 1300, int height = 1300);
+  RangeViewer(const std::string& title, int width, int height);
   ~RangeViewer();
 
   void render(const RenderableRange& range) { render({range}); }
@@ -70,9 +72,11 @@ public:
 protected:
   void render_ranges(const std::vector<RenderableRange>& ranges);
   SDL_Rect make_rect(int row, int col, float freq, float rel_freq, int offset) const;
+  void render_text(const std::string& label, int x, int y);
   void render_hand(const SDL_Color& color, int row, int col, float freq, float rel_freq = 1.0f, int offset = 0);
   void render_background();
   void render_range(const RenderableRange* range, const RenderableRange* base_range, RangeMatrix<int>& offset_matrix);
+  void render_legend(const std::vector<RenderableRange>& ranges);
   void render_overlay();
   virtual SDL_Renderer* get_renderer() = 0;
 
@@ -90,7 +94,7 @@ protected:
 
 class WindowRangeViewer : public RangeViewer {
 public:
-  WindowRangeViewer(const std::string& title, int width = 1300, int height = 1300);
+  WindowRangeViewer(const std::string& title, int width = 1300, int height = 4300);
   ~WindowRangeViewer();
 
   void render(const std::vector<RenderableRange>& ranges) override;
@@ -104,7 +108,7 @@ private:
 
 class PngRangeViewer : public RangeViewer {
 public:
-  PngRangeViewer(const std::string& fn, int width = 1300, int height = 1300);
+  PngRangeViewer(const std::string& fn, int width = 1300, int height = 1400);
   ~PngRangeViewer();
 
   void render(const std::vector<RenderableRange>& ranges) override;

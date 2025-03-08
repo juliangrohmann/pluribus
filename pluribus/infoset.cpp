@@ -22,26 +22,26 @@ HandIndexer::HandIndexer() {
   _indexers = init_indexer_vec();
 }
 
-InformationSet::InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round, const PokerConfig& config) : 
-    _history_idx{HistoryIndexer::get_instance()->index(history, config)} {
-  int card_sum = round == 0 ? 2 : 4 + round;
-  std::vector<uint8_t> cards(card_sum);
-  std::copy(hand.cards().begin(), hand.cards().end(), cards.data());
-  if(round > 0) std::copy(board.cards().begin(), board.cards().begin() + card_sum - 2, cards.data() + 2);
-  uint64_t idx = HandIndexer::get_instance()->index(cards.data(), round);
-  _cluster = FlatClusterMap::get_instance()->cluster(round, idx);
-}
+// InformationSet::InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round, const PokerConfig& config) : 
+//     _history_idx{HistoryIndexer::get_instance()->index(history, config)} {
+//   int card_sum = round == 0 ? 2 : 4 + round;
+//   std::vector<uint8_t> cards(card_sum);
+//   std::copy(hand.cards().begin(), hand.cards().end(), cards.data());
+//   if(round > 0) std::copy(board.cards().begin(), board.cards().begin() + card_sum - 2, cards.data() + 2);
+//   uint64_t idx = HandIndexer::get_instance()->index(cards.data(), round);
+//   _cluster = FlatClusterMap::get_instance()->cluster(round, idx);
+// }
 
-InformationSet::InformationSet(const ActionHistory& history, uint16_t cluster, const PokerConfig& config) : 
-    _history_idx{HistoryIndexer::get_instance()->index(history, config)}, _cluster{cluster} {}
+// InformationSet::InformationSet(const ActionHistory& history, uint16_t cluster, const PokerConfig& config) : 
+//     _history_idx{HistoryIndexer::get_instance()->index(history, config)}, _cluster{cluster} {}
 
-bool InformationSet::operator==(const InformationSet& other) const {
-  return _cluster == other._cluster && _history_idx == other._history_idx;
-}
+// bool InformationSet::operator==(const InformationSet& other) const {
+//   return _cluster == other._cluster && _history_idx == other._history_idx;
+// }
 
-std::string InformationSet::to_string() const {
-  return "Cluster: " + std::to_string(_cluster) + ", History index: " + std::to_string(_history_idx);
-}
+// std::string InformationSet::to_string() const {
+//   return "Cluster: " + std::to_string(_cluster) + ", History index: " + std::to_string(_history_idx);
+// }
 
 long count(const PokerState& state, const ActionProfile& action_profile, int max_round, bool infosets) {
   if(state.is_terminal() || state.get_round() > max_round) {
@@ -54,13 +54,6 @@ long count(const PokerState& state, const ActionProfile& action_profile, int max
   else {
     c = 1;
   }
-  // auto actions = valid_actions(state, action_profile);
-  // std::cout << "---------------------------------\n";
-  // std::cout << state.get_action_history().to_string() << "\n";
-  // std::cout << actions.size() << ": ";
-  // for(Action a : actions) std::cout << a.to_string() << ", ";
-  // std::cout << "\n";
-  // std::cout << "---------------------------------\n";
   for(Action a : valid_actions(state, action_profile)) {
     c += count(state.apply(a), action_profile, max_round, infosets);
   }

@@ -25,6 +25,10 @@ Action Action::ALL_IN{-2.0f};
 Action Action::FOLD{-1.0f};
 Action Action::CHECK_CALL{0.0f};
 
+ActionHistory ActionHistory::slice(int start, int end) const { 
+  return ActionHistory{std::vector<Action>{_history.begin() + start, end != -1 ? _history.begin() + end : _history.end()}}; 
+}
+
 std::string ActionHistory::to_string() const {
   std::string str = "";
   for(int i = 0; i < _history.size(); ++i) {

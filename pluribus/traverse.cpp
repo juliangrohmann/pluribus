@@ -19,6 +19,9 @@ Action str_to_action(const std::string& str) {
   else if(str.starts_with("fold")) {
     return Action::FOLD;
   }
+  else if(str.starts_with("all-in")) {
+    return Action::ALL_IN;
+  }
   else if(str.starts_with("bet")) {
     return Action(std::stoi(str.substr(4)) / 100.0);
   }
@@ -28,7 +31,7 @@ Action str_to_action(const std::string& str) {
 }
 
 std::unordered_map<Action, RenderableRange> trainer_ranges(const BlueprintTrainer& bp, const PokerState& state, 
-                                                           const Board& board, const PokerRange& base_range) {
+                                                           const Board& board, PokerRange& base_range) {
   std::unordered_map<Action, RenderableRange> ranges;
   auto actions = valid_actions(state, bp.get_config().action_profile);
   auto color_map = map_colors(actions);
@@ -37,6 +40,12 @@ std::unordered_map<Action, RenderableRange> trainer_ranges(const BlueprintTraine
     for(uint8_t i = 0; i < 52; ++i) {
       for(uint8_t j = i + 1; j < 52; ++j) {
         Hand hand{j, i};
+        for(int card_idx = 0; card_idx < n_board_cards(state.get_round()); ++card_idx) {
+          if(i == board.cards()[card_idx] || j == board.cards()[card_idx]) {
+            base_range.set_frequency(hand, 0.0f);
+          }
+        }
+        
         int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
         int base_idx = bp.get_regrets().index(state, cluster);
         std::vector<float> freq;
@@ -50,13 +59,13 @@ std::unordered_map<Action, RenderableRange> trainer_ranges(const BlueprintTraine
         action_range.add_hand(hand, freq[a_idx]);
       }
     }
-    ranges.insert({a, RenderableRange{base_range * action_range, color_map[a], true}});
+    ranges.insert({a, RenderableRange{base_range * action_range, a.to_string(), color_map[a], true}});
   }
   return ranges;
 }
 
 void render_ranges(RangeViewer* viewer_p, const PokerRange& base_range, const std::unordered_map<Action, RenderableRange>& action_ranges) {
-  std::vector<RenderableRange> ranges{RenderableRange{base_range, Color{255, 255, 255, 255}}};
+  std::vector<RenderableRange> ranges{RenderableRange{base_range, "Base Range", Color{255, 255, 255, 255}}};
   for(auto& entry : action_ranges) ranges.push_back(entry.second);
   viewer_p->render(ranges);
 }
@@ -67,12 +76,22 @@ void traverse(RangeViewer* viewer_p, const std::string& bp_fn) {
   std::cout << "Success.\n";
 
   std::string input;
-  std::cout << "Board: ";
-  std::getline(std::cin, input);
-  Board board(input);
+  std::cout << "Board cards: ";
+  auto board_cards = bp.get_config().init_board;
+  for(uint8_t card : board_cards) std::cout << idx_to_card(card);
+  if(board_cards.size() < 5) {
+    std::getline(std::cin, input);
+    uint8_t missing_cards[5];
+    str_to_cards(input, missing_cards);
+    for(int i = 0; i < 5 - bp.get_config().init_board.size(); ++i) {
+      board_cards.push_back(missing_cards[i]);
+    }
+  }
+  Board board(board_cards);
+  std::cout << "Board: " << board.to_string() << "\n";
 
-  PokerState state{bp.get_config().poker};
-  std::vector<PokerRange> ranges;
+  PokerState state = bp.get_config().init_state;
+  std::vector<PokerRange> ranges = bp.get_config().init_ranges;
   for(int i = 0; i < bp.get_config().poker.n_players; ++i) ranges.push_back(PokerRange::full());
   auto action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()]);
   render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
@@ -86,8 +105,8 @@ void traverse(RangeViewer* viewer_p, const std::string& bp_fn) {
     }
     else if(input == "reset") {
       std::cout << "Resetting...\n\n";
-      for(int i = 0; i < ranges.size(); ++i) ranges[i] = PokerRange::full();
-      state = PokerState{bp.get_config().poker};
+      ranges = bp.get_config().init_ranges;
+      state = bp.get_config().init_state;
     }
     else {
       Action action = str_to_action(input);
@@ -97,14 +116,12 @@ void traverse(RangeViewer* viewer_p, const std::string& bp_fn) {
     }
     
     if(state.is_terminal()) {
-      for(int i = 0; i < ranges.size(); ++i) ranges[i] = PokerRange::full();
-      state = PokerState{bp.get_config().poker};
-    }
-    else {
-      action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()]);
-      render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
+      ranges = bp.get_config().init_ranges;
+      state = bp.get_config().init_state;
     }
 
+    action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()]);
+    render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
     std::cout << state.to_string();
     std::cout << "\nAction: ";
   }
