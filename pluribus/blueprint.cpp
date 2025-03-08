@@ -5,6 +5,7 @@
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/mccfr.hpp>
+#include <pluribus/range_viewer.hpp>
 #include <pluribus/blueprint.hpp>
 
 namespace pluribus {

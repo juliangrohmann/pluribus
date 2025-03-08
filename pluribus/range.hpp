@@ -32,8 +32,16 @@ private:
 class PokerRange {
 public:
   void add_hand(const Hand& hand, float freq = 1.0f) { _range[canonicalize(hand)] += freq; }
+  void multiply_hand(const Hand& hand, float freq) { _range[canonicalize(hand)] *= freq; }
   float frequency(const Hand& hand) const { return _range.at(canonicalize(hand)); }
   const std::unordered_map<Hand, float>& range() const { return _range; }
+
+  PokerRange& operator+=(const PokerRange& other);
+  PokerRange& operator*=(const PokerRange& other);
+  PokerRange operator+(const PokerRange& other) const;
+  PokerRange operator*(const PokerRange& other) const;
+  
+  static PokerRange full();
 private:
   std::unordered_map<Hand, float> _range;
 };

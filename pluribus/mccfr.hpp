@@ -24,14 +24,14 @@ template <class T>
 std::vector<float> calculate_strategy(const StrategyStorage<T>& data, size_t base_idx, int n_actions) {
   T sum = 0;
   for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-    sum += std::max(data[base_idx + a_idx].load(), 0);
+    sum += std::max(data[base_idx + a_idx].load(), static_cast<T>(0));
   }
 
   std::vector<float> freq;
   freq.reserve(n_actions);
   if(sum > 0) {
     for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-      freq.push_back(std::max(data[base_idx + a_idx].load(), 0) / static_cast<double>(sum));
+      freq.push_back(std::max(data[base_idx + a_idx].load(), static_cast<T>(0)) / static_cast<double>(sum));
     }
   }
   else {

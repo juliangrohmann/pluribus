@@ -98,6 +98,24 @@ PokerState PokerState::apply(const ActionHistory& action_history) const {
   return state;
 }
 
+std::string PokerState::to_string() const {
+  std::ostringstream oss;
+  oss << "============== " << round_to_str(_round) << ": " << std::setprecision(2) << std::fixed << _pot / 100.0 << " bb ==============\n";
+  for(int i = 0; i < _players.size(); ++i) {
+    oss << "Player " << i << "(" << _players[i].get_chips() / 100.0 << " bb): ";
+    if(i == _active) {
+      oss << "Active\n";
+    }
+    else if(_players[i].has_folded()) {
+      oss << "Folded\n";
+    }
+    else {
+      oss << _players[i].get_betsize() / 100.0 << " bb\n";
+    }
+  }
+  return oss.str();
+}
+
 int8_t find_winner(const PokerState& state) {
   int8_t winner = -1;
   const std::vector<Player>& players = state.get_players();
