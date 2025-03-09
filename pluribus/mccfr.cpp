@@ -60,11 +60,21 @@ BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const s
   std::cout << _config.to_string() << "\n";
 }
 
+bool are_full_ranges(const std::vector<PokerRange>& ranges) {
+  PokerRange full_range = PokerRange::full();
+  for(const auto& r : ranges) {
+    if(r != full_range) return false;
+  }
+  return true;
+}
+
 void BlueprintTrainer::mccfr_p(long T) {
   if(_verbose) omp_set_num_threads(1);
   long limit = std::numeric_limits<long>::max();
   long next_discount = limit;
   long next_snapshot = limit;
+  bool full_ranges = are_full_ranges(_config.init_ranges);
+  std::cout << "Full ranges: " << full_ranges << "\n";
   std::cout << "Training blueprint from " << _t << " to " << (_t < _config.profiling_thresh ? "TBD" : std::to_string(limit)) 
             << " (" << T << " min)\n";
   while(_t < limit) {
@@ -75,7 +85,7 @@ void BlueprintTrainer::mccfr_p(long T) {
     #pragma omp parallel for schedule(dynamic, 1)
     for(long t = init_t; t < _t; ++t) {
       thread_local omp::HandEvaluator eval;
-      thread_local Deck deck;
+      thread_local Deck deck{_config.init_board};
       thread_local Board board;
       thread_local std::vector<Hand> hands{static_cast<size_t>(_config.poker.n_players)};
       if(_verbose) std::cout << "============== t = " << t << " ==============\n";
@@ -84,12 +94,17 @@ void BlueprintTrainer::mccfr_p(long T) {
         if(_verbose) std::cout << "============== i = " << i << " ==============\n";
         deck.shuffle();
         board.deal(deck, _config.init_board);
-        std::unordered_set<uint8_t> dead_cards;
-        std::copy(board.cards().begin(), board.cards().end(), std::inserter(dead_cards, dead_cards.end()));
-        for(int p_idx = 0; p_idx < _config.poker.n_players; ++p_idx) {
-          hands[p_idx] = _config.init_ranges[p_idx].sample(dead_cards);
-          dead_cards.insert(hands[p_idx].cards()[0]);
-          dead_cards.insert(hands[p_idx].cards()[1]);
+        if(full_ranges) {
+          for(auto& hand : hands) hand.deal(deck);
+        }
+        else {
+          std::unordered_set<uint8_t> dead_cards;
+          std::copy(board.cards().begin(), board.cards().end(), std::inserter(dead_cards, dead_cards.end()));
+          for(int p_idx = 0; p_idx < _config.poker.n_players; ++p_idx) {
+            hands[p_idx] = _config.init_ranges[p_idx].sample(dead_cards);
+            dead_cards.insert(hands[p_idx].cards()[0]);
+            dead_cards.insert(hands[p_idx].cards()[1]);
+          }
         }
 
         if(t <= _config.preflop_threshold_m * _it_per_min && t % _config.strategy_interval == 0) {
