@@ -25,6 +25,11 @@ std::string round_to_str(int round) {
   }
 }
 
+const std::vector<std::string> positions{"BTN", "CO", "HJ", "LJ", "UTG+2", "UTG+1", "UTG", "BB", "SB"};
+std::string pos_to_str(int pos, int n_players) {
+  return positions[n_players - pos];
+}
+
 std::string cluster_file(int round, int n_clusters) {
   return "clusters_r" + std::to_string(round) + "_c" + std::to_string(n_clusters) + ".npy";
 }

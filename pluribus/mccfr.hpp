@@ -3,11 +3,13 @@
 #include <array>
 #include <vector>
 #include <atomic>
+#include <memory>
 #include <filesystem>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <cereal/cereal.hpp>
+#include <libwandb_cpp.h>
 #include <tbb/concurrent_vector.h>
 #include <tbb/concurrent_unordered_map.h>
 #include <pluribus/range.hpp>
@@ -107,7 +109,7 @@ private:
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, PokerRange& update_range);
   int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
   int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
-  void log_metrics(long t) const;
+  void log_metrics(long t);
 
 #ifdef UNIT_TEST
   friend int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
@@ -118,6 +120,8 @@ private:
   StrategyStorage<float> _phi;
   BlueprintTrainerConfig _config;
   std::filesystem::path _snapshot_dir;
+  std::unique_ptr<wandb::Session> _wb;
+  wandb::Run _wb_run;
   long _t;
   long _it_per_min;
   bool _verbose = false;

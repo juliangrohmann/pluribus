@@ -31,6 +31,12 @@ include_directories(${SDL2_INCLUDE_DIRS})
 include_directories(${SDL2_TTF_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libwandb/include)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/libwandb/lib)
+link_libraries(wandb_cpp wandb_core)
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath,${CMAKE_SOURCE_DIR}/libwandb/lib")
+
+
 add_compile_definitions(PROJECT_ROOT_DIR="${CMAKE_SOURCE_DIR}")
 
 add_subdirectory(hand_isomorphism/)

@@ -18,6 +18,7 @@
 #include <pluribus/cluster.hpp>
 #include <pluribus/actions.hpp>
 #include <pluribus/traverse.hpp>
+#include <pluribus/debug.hpp>
 #include <pluribus/mccfr.hpp>
 
 namespace pluribus {
@@ -64,6 +65,20 @@ BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const s
   std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << _config.to_string() << "\n";
+
+  _wb = std::unique_ptr<wandb::Session>{new wandb::Session()};
+  wandb::Config wb_config = {
+    {"param1", 4},
+    {"param2", 4.2},
+    {"param3", "hello"},
+  };
+  std::ostringstream run_name;
+  run_name << _config.poker.n_players << "p_" << _config.poker.n_chips / 100 << "bb_" << _config.poker.ante << "ante_" << date_time_str();
+  _wb_run = _wb->initRun({
+      wandb::run::WithConfig(wb_config), wandb::run::WithProject("Pluribus"),
+      wandb::run::WithRunName(run_name.str()),
+      // wandb::run::WithRunID("myrunid"),
+  });
 }
 
 bool are_full_ranges(const std::vector<PokerRange>& ranges) {
@@ -363,7 +378,7 @@ int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Boar
   return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
 }
 
-void print_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets) {
+void log_preflop_strategy(wandb::History& wb_data, const BlueprintTrainer& trainer, bool force_regrets) {
   PokerState state = trainer.get_config().init_state;
   Board board("2c2d2h3c3h");
   auto actions = valid_actions(state, trainer.get_config().action_profile);
@@ -372,23 +387,32 @@ void print_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets)
     auto ranges = trainer_ranges(trainer, state, board, range_copy, force_regrets);
     std::cout << "Player " << p << ":\n";
     for(Action a : actions) {
-      std::cout << "\t" << a.to_string() << ": " << std::setprecision(2) << std::fixed << ranges.at(a).get_range().n_combos() / 1326.0 << "\n";
+      double freq = ranges.at(a).get_range().n_combos() / 1326.0;
+      std::cout << "\t" << a.to_string() << ": " << std::setprecision(2) << std::fixed << freq << "\n";
+      wb_data[pos_to_str(p, trainer.get_config().poker.n_players) + " " + a.to_string() + (force_regrets ? " (regrets)" : " (phi)")] = freq;
     }
     state = state.apply(Action::FOLD);
   }
   std::cout << "\n";
 }
 
-void BlueprintTrainer::log_metrics(long t) const {
-  long cum_regret = 0;
-  for(auto& r : _regrets.data()) cum_regret += std::max(r.load(), 0);
+void BlueprintTrainer::log_metrics(long t) {
+  long avg_regret = 0;
+  for(auto& r : _regrets.data()) avg_regret += std::max(r.load(), 0);
+  avg_regret /= t;
+  wandb::History wb_data = {
+    {"avg_regret", static_cast<int>(avg_regret)},
+    {"t (M)", static_cast<int>(t / 1'000'000.0)}
+  };
   std::cout << "==================================================================\n";
   std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    ";
-  std::cout << "cum_regret=" << cum_regret / t << "\n";
+  std::cout << "avg_regret=" << avg_regret << "\n";
   std::cout << "Preflop regret strategy:\n";
-  print_preflop_strategy(*this, true);
+  log_preflop_strategy(wb_data, *this, true);
   std::cout << "Preflop avg strategy:\n";
-  print_preflop_strategy(*this, false);
+  log_preflop_strategy(wb_data, *this, false);
+
+  _wb_run.log(wb_data);
 }
 
 bool BlueprintTrainer::operator==(const BlueprintTrainer& other) const {
