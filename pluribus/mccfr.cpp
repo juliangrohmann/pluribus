@@ -132,7 +132,7 @@ void BlueprintTrainer::mccfr_p(long T) {
           }
         }
 
-        if(t <= _config.preflop_threshold_m * _it_per_min && t % _config.strategy_interval == 0) {
+        if(t % _config.strategy_interval == 0) {
           if(_verbose) std::cout << "============== Updating strategy ==============\n";
           update_strategy(_config.init_state, i, board, hands, update_range);
         }
