@@ -131,7 +131,8 @@ namespace pluribus {
 
 void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, 
                           const std::vector<Hand>& hands) {
-  trainer.update_strategy(state, i, board, hands);
+  PokerRange range;
+  trainer.update_strategy(state, i, board, hands, range);
 }
 
 int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, 

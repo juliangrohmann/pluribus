@@ -31,7 +31,7 @@ Action str_to_action(const std::string& str) {
 }
 
 std::unordered_map<Action, RenderableRange> trainer_ranges(const BlueprintTrainer& bp, const PokerState& state, 
-                                                           const Board& board, PokerRange& base_range) {
+                                                           const Board& board, PokerRange& base_range, bool force_regrets) {
   std::unordered_map<Action, RenderableRange> ranges;
   auto actions = valid_actions(state, bp.get_config().action_profile);
   auto color_map = map_colors(actions);
@@ -49,8 +49,15 @@ std::unordered_map<Action, RenderableRange> trainer_ranges(const BlueprintTraine
         int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
         int base_idx = bp.get_regrets().index(state, cluster);
         std::vector<float> freq;
-        if(state.get_round() == 0) {
+        if(state.get_round() == 0 && !force_regrets) {
           freq = calculate_strategy(bp.get_phi(), base_idx, actions.size());
+          // if(a == actions[0]) {
+          //   std::cout << hand.to_string() << ":\n";
+          //   for(int a_idx = 0; a_idx < actions.size(); ++a_idx) { 
+          //     std::cout << "\t" << actions[a_idx].to_string() << ": " << std::setprecision(2) << std::fixed << freq[a_idx] 
+          //               << "(" << bp.get_phi()[base_idx + a_idx] << ")\n";
+          //   }
+          // }
         }
         else {
           freq = calculate_strategy(bp.get_regrets(), base_idx, actions.size());
@@ -93,7 +100,7 @@ void traverse(RangeViewer* viewer_p, const std::string& bp_fn) {
   PokerState state = bp.get_config().init_state;
   std::vector<PokerRange> ranges = bp.get_config().init_ranges;
   for(int i = 0; i < bp.get_config().poker.n_players; ++i) ranges.push_back(PokerRange::full());
-  auto action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()]);
+  auto action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()], false);
   render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
 
   std::cout << state.to_string();
@@ -120,7 +127,7 @@ void traverse(RangeViewer* viewer_p, const std::string& bp_fn) {
       state = bp.get_config().init_state;
     }
 
-    action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()]);
+    action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()], false);
     render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
     std::cout << state.to_string();
     std::cout << "\nAction: ";

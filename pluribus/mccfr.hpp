@@ -94,6 +94,7 @@ public:
   const BlueprintTrainerConfig& get_config() const { return _config; }
   void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
   void set_verbose(bool verbose) { _verbose = verbose; }
+  void set_verbose_update(bool verbose_update) { _verbose_update = verbose_update; }
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -103,7 +104,7 @@ public:
 private:
   int traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
   int traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
-  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
+  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, PokerRange& update_range);
   int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
   int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
   void log_metrics(long t) const;
@@ -120,6 +121,7 @@ private:
   long _t;
   long _it_per_min;
   bool _verbose = false;
+  bool _verbose_update = false;
 };
 
 }

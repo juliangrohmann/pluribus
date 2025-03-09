@@ -40,8 +40,7 @@ public:
   void add_hand(const Hand& hand, float freq = 1.0f) { 
     int idx = HoleCardIndexer::get_instance()->index(hand);
     if(idx >= _weights.size()) {
-      std::cout << "out of bounds!!! " << idx << " < " << _weights.size() << "\n";
-      throw std::runtime_error{":()"};
+      throw std::runtime_error{"PokerRange writing out of bounds!" + std::to_string(idx) + " < " + std::to_string(_weights.size())};
     }
     _weights[idx] += freq; 
   }

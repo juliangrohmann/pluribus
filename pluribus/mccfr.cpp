@@ -17,6 +17,7 @@
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/traverse.hpp>
 #include <pluribus/mccfr.hpp>
 
 namespace pluribus {
@@ -47,12 +48,17 @@ std::string BlueprintTrainerConfig::to_string() const {
   oss << "Profiling threshold: " << profiling_thresh << "\n";
   oss << "Prune cutoff: " << prune_cutoff << "\n";
   oss << "Regret floor: " << regret_floor << "\n";
+  oss << "Initial board: " << cards_to_str(init_board.data(), init_board.size()) << "\n";
+  oss << "Initial state:\n" << init_state.to_string() << "\n";
+  oss << "Initial ranges:\n";
+  for(int i = 0; i < init_ranges.size(); ++ i) std::cout << "Player " << i << ": " << init_ranges[i].n_combos() << " combos\n";
+  oss << "Action profile:\n" << action_profile.to_string();
   oss << "----------------------------------------------------------\n";
   return oss.str();
 }
 
 BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const std::string& snapshot_dir) 
-    : _regrets{config.action_profile, 200}, _phi{}, _config{config}, _snapshot_dir{snapshot_dir}, 
+    : _regrets{config.action_profile, 200}, _phi{config.action_profile, 169}, _config{config}, _snapshot_dir{snapshot_dir}, 
       _t{1}, _it_per_min{50'000} {
   if(_config.init_state.get_players().size() != config.poker.n_players) throw std::runtime_error("Player number mismatch");
   std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
@@ -69,7 +75,10 @@ bool are_full_ranges(const std::vector<PokerRange>& ranges) {
 }
 
 void BlueprintTrainer::mccfr_p(long T) {
-  if(_verbose) omp_set_num_threads(1);
+  if(_verbose || _verbose_update) {
+    std::cout << "Launched in verbose single threaded mode.\n";
+    omp_set_num_threads(1);
+  }
   long limit = std::numeric_limits<long>::max();
   long next_discount = limit;
   long next_snapshot = limit;
@@ -77,6 +86,7 @@ void BlueprintTrainer::mccfr_p(long T) {
   std::cout << "Full ranges: " << full_ranges << "\n";
   std::cout << "Training blueprint from " << _t << " to " << (_t < _config.profiling_thresh ? "TBD" : std::to_string(limit)) 
             << " (" << T << " min)\n";
+  PokerRange update_range;
   while(_t < limit) {
     long init_t = _t;
     _t = _t < _config.profiling_thresh ? _config.profiling_thresh : std::min(std::min(next_discount, next_snapshot), limit);
@@ -109,7 +119,7 @@ void BlueprintTrainer::mccfr_p(long T) {
 
         if(t <= _config.preflop_threshold_m * _it_per_min && t % _config.strategy_interval == 0) {
           if(_verbose) std::cout << "============== Updating strategy ==============\n";
-          update_strategy(_config.init_state, i, board, hands);
+          update_strategy(_config.init_state, i, board, hands, update_range);
         }
         if(t > _config.prune_thresh_m * _it_per_min) {
           std::uniform_real_distribution<float> dist(0.0f, 1.0f);
@@ -165,6 +175,8 @@ void BlueprintTrainer::mccfr_p(long T) {
           fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
         }
         cereal_save(*this, (_snapshot_dir / fn_stream.str()).string());
+        std::string fn_update_range = date_time_str() + "_update_range.bin";
+        cereal_save(update_range, (_snapshot_dir / fn_update_range).string());
         next_snapshot += _config.snapshot_interval_m * _it_per_min;
       }
     }
@@ -186,7 +198,7 @@ std::vector<float> get_freq(const PokerState& state, const Board& board, const H
 
 int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
                                        const omp::HandEvaluator& eval) {
-  if(state.is_terminal()) {
+  if(state.is_terminal() || state.get_players()[i].has_folded()) {
     return utility(state, i, board, hands, eval);
   }
   else if(state.get_active() == i) {
@@ -209,6 +221,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
       Action a = actions[a_idx];
       if(values.find(a) != values.end()) {
         int next_r = _regrets[base_idx + a_idx].load() + values[a] - v;
+        if(next_r > 2'000'000'000) throw std::runtime_error("Regret overflowing!");
         _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       }
     }
@@ -227,7 +240,7 @@ std::string relative_history_str(const PokerState& state, const BlueprintTrainer
 }
 
 int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
-  if(state.is_terminal()) {
+  if(state.is_terminal() || state.get_players()[i].has_folded()) {
     int u = utility(state, i, board, hands, eval);
     if(_verbose) {
       std::cout << "Terminal: " << relative_history_str(state, _config) << "\n";
@@ -266,6 +279,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       int dR = values[actions[a_idx]] - v;
       int next_r = _regrets[base_idx + a_idx].load() + dR;
+      if(next_r > 2'000'000'000) throw std::runtime_error("Regret overflowing!");
       _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       if(_verbose) {
         std::cout << "\tR(" << actions[a_idx].to_string() << ") = " << dR << "\n";
@@ -290,31 +304,49 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
   }
 }
 
-void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands) {
+void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, PokerRange& update_range) {
   if(state.get_winner() != -1 || state.get_round() > 0 || state.get_players()[i].has_folded()) {
     return;
   }
   else if(state.get_active() == i) {
     auto actions = valid_actions(state, _config.action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
+    if(hands[i].cards()[0] % 4 == hands[i].cards()[1] % 4 && cluster < 91) {
+      throw std::runtime_error("Bad cluster for suited hand: " + hands[i].to_string());
+    }
     size_t regret_base_idx = _regrets.index(state, cluster);
     auto freq = calculate_strategy(_regrets, regret_base_idx, actions.size());
     int a_idx = sample_action_idx(freq);
+    if(_verbose_update && state.get_pot() == 150) {
+      std::cout << "Update strategy: " << relative_history_str(state, _config) << "\n";
+      std::cout << hands[i].to_string() << ": (cluster=" << cluster << ")\n\t";
+      for(int ai = 0; ai < actions.size(); ++ai) {
+        std::cout << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << freq[ai] << "  ";
+      }
+      std::cout << "\n";
+    }
 
+    size_t phi_idx = _phi.index(state, cluster, a_idx);
     #pragma omp critical
-    _phi[_phi.index(state, cluster, a_idx)] += 1.0f;
-    
-    update_strategy(state.apply(actions[a_idx]), i, board, hands);
+    {
+      _phi[phi_idx] += 1.0f;
+      update_range.add_hand(hands[i]);
+    }
+    if(_verbose_update && state.get_pot() == 150) std::cout << "\tSampled: " << actions[a_idx].to_string() << ", phi=" << _phi[phi_idx] << "\n";
+    update_strategy(state.apply(actions[a_idx]), i, board, hands, update_range);
   }
   else {
     for(Action action : valid_actions(state, _config.action_profile)) {
-      update_strategy(state.apply(action), i, board, hands);
+      update_strategy(state.apply(action), i, board, hands, update_range);
     }
   }
 }
 
 int BlueprintTrainer::utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const {
-  if(state.get_winner() != -1) {
+  if(state.get_players()[i].has_folded()) {
+    return state.get_players()[i].get_chips() - _config.poker.n_chips;
+  }
+  else if(state.get_winner() != -1) {
     return state.get_players()[i].get_chips() - _config.poker.n_chips + (state.get_winner() == i ? state.get_pot() : 0);
   }
   else if(state.get_round() >= 4) {
@@ -331,8 +363,32 @@ int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Boar
   return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
 }
 
+void print_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets) {
+  PokerState state = trainer.get_config().init_state;
+  Board board("2c2d2h3c3h");
+  auto actions = valid_actions(state, trainer.get_config().action_profile);
+  for(int p = 0; p < trainer.get_config().poker.n_players - 1; ++p) {
+    PokerRange range_copy = trainer.get_config().init_ranges[state.get_active()];
+    auto ranges = trainer_ranges(trainer, state, board, range_copy, force_regrets);
+    std::cout << "Player " << p << ":\n";
+    for(Action a : actions) {
+      std::cout << "\t" << a.to_string() << ": " << std::setprecision(2) << std::fixed << ranges.at(a).get_range().n_combos() / 1326.0 << "\n";
+    }
+    state = state.apply(Action::FOLD);
+  }
+  std::cout << "\n";
+}
+
 void BlueprintTrainer::log_metrics(long t) const {
-  std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M\n";
+  long cum_regret = 0;
+  for(auto& r : _regrets.data()) cum_regret += std::max(r.load(), 0);
+  std::cout << "==================================================================\n";
+  std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    ";
+  std::cout << "cum_regret=" << cum_regret / t << "\n";
+  std::cout << "Preflop regret strategy:\n";
+  print_preflop_strategy(*this, true);
+  std::cout << "Preflop avg strategy:\n";
+  print_preflop_strategy(*this, false);
 }
 
 bool BlueprintTrainer::operator==(const BlueprintTrainer& other) const {
