@@ -66,6 +66,7 @@ public:
   void set_actions(const std::vector<Action>& actions, int round, int bet_level);
   const std::vector<Action>& get_actions(int round, int bet_level) const;
   void add_action(const Action& action, int round, int bet_level);
+  int n_bet_levels(int round) const { return _profile[round].size(); }
   int max_actions() const;
   std::string to_string() const;
 

@@ -69,10 +69,35 @@ BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const s
   if(enable_wandb) {
     _wb = std::unique_ptr<wandb::Session>{new wandb::Session()};
     wandb::Config wb_config = {
-      {"param1", 4},
-      {"param2", 4.2},
-      {"param3", "hello"},
+      {"n_players", _config.poker.n_players},
+      {"n_chips", _config.poker.n_chips},
+      {"ante", _config.poker.ante},
+      {"strategy_interval", static_cast<int>(_config.strategy_interval)},
+      {"preflop_threshold (M)", static_cast<int>(_config.preflop_threshold / 1'000'000)},
+      {"snapshot_interval (M)", static_cast<int>(_config.snapshot_interval / 1'000'000)},
+      {"prune_thresh (M)", static_cast<int>(_config.prune_thresh / 1'000'000)},
+      {"lcfr_thresh (M)", static_cast<int>(_config.lcfr_thresh / 1'000'000)},
+      {"discount_interval (M)", static_cast<int>(_config.discount_interval / 1'000'000)},
+      {"log_interval (M)", static_cast<int>(_config.log_interval / 1'000'000)},
+      {"prune_cutoff", _config.prune_cutoff},
+      {"regret_floor", _config.regret_floor},
+      {"init_board", cards_to_str(_config.init_board.data(), _config.init_board.size())},
+      {"init_state_round", _config.init_state.get_round()},
+      {"init_state_pot", _config.init_state.get_pot()},
+      {"init_state_active", _config.init_state.get_active()}
     };
+    for(int r = 0; r < 4; ++r) {
+      for(int b = 0; b < _config.action_profile.n_bet_levels(r); ++b) {
+        std::string prof_str;
+        for(Action a : _config.action_profile.get_actions(r, b)) {
+          prof_str += a.to_string() + ", ";
+        }
+        wb_config["action_profile_r" + std::to_string(r) + "_b" + std::to_string(b)] = prof_str;
+      }
+    }
+    for(int p = 0; p < _config.poker.n_players; ++p) {
+      wb_config["init_range_combos_p" + std::to_string(p)] = _config.init_ranges[p].n_combos();
+    }
     std::ostringstream run_name;
     run_name << _config.poker.n_players << "p_" << _config.poker.n_chips / 100 << "bb_" << _config.poker.ante << "ante_" << date_time_str();
     _wb_run = _wb->initRun({
