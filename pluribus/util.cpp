@@ -4,6 +4,8 @@
 #include <string>
 #include <ctime>
 #include <sstream>
+#include <fstream>
+#include <filesystem>
 #include <sys/sysinfo.h>
 #include <omp/Hand.h>
 #include <hand_isomorphism/hand_index.h>
@@ -18,6 +20,26 @@ long long get_free_ram() {
   }
   // freeram is in bytes, adjusted by mem_unit
   return static_cast<long long>(info.freeram) * info.mem_unit;
+}
+
+bool create_dir(const std::filesystem::path& path) {
+  try {
+    if(std::filesystem::exists(path)) {
+        return true;
+    }
+    return std::filesystem::create_directory(path);
+  }
+  catch(const std::exception& e) {
+    std::cerr << "Error creating directory: " << e.what() << std::endl;
+    return false;
+  }
+}
+
+void write_to_file(const std::filesystem::path& file_path, const std::string& content) {
+  std::ofstream out_file(file_path, std::ios::out | std::ios::trunc);
+  if(!out_file.is_open()) throw std::runtime_error("Failed to open or create file: " + file_path.string());
+  out_file << content;
+  out_file.close();
 }
 
 std::string date_time_str() {

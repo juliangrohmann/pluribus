@@ -104,7 +104,7 @@ struct BlueprintTrainerConfig {
 
 class BlueprintTrainer {
 public:
-  BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, const std::string& snapshot_dir = "", bool enable_wandb = false);
+  BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, bool enable_wandb = false, const std::string& snapshot_dir = "snapshots", const std::string& metrics_dir = "metrics");
   void mccfr_p(long T);
   bool operator==(const BlueprintTrainer& other) const;
   const StrategyStorage<int>& get_regrets() const { return _regrets; }
@@ -112,6 +112,7 @@ public:
   const StrategyStorage<float>& get_phi() const { return _phi; }
   const BlueprintTrainerConfig& get_config() const { return _config; }
   void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
+  void set_metrics_dir(std::string metrics_dir) { _metrics_dir = metrics_dir; }
   void set_verbose(bool verbose) { _verbose = verbose; }
   void set_verbose_update(bool verbose_update) { _verbose_update = verbose_update; }
 
@@ -137,6 +138,7 @@ private:
   StrategyStorage<float> _phi;
   BlueprintTrainerConfig _config;
   std::filesystem::path _snapshot_dir;
+  std::filesystem::path _metrics_dir;
   std::unique_ptr<wandb::Session> _wb;
   wandb::Run _wb_run;
   long _t;

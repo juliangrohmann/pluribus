@@ -51,13 +51,6 @@ std::unordered_map<Action, RenderableRange> trainer_ranges(const BlueprintTraine
         if(state.get_round() == 0 && !force_regrets) {
           int base_idx = bp.get_phi().index(state, cluster);
           freq = calculate_strategy(bp.get_phi(), base_idx, actions.size());
-          // if(a == actions[0]) {
-          //   std::cout << hand.to_string() << ":\n";
-          //   for(int a_idx = 0; a_idx < actions.size(); ++a_idx) { 
-          //     std::cout << "\t" << actions[a_idx].to_string() << ": " << std::setprecision(2) << std::fixed << freq[a_idx] 
-          //               << "(" << bp.get_phi()[base_idx + a_idx] << ")\n";
-          //   }
-          // }
         }
         else {
           int base_idx = bp.get_regrets().index(state, cluster);

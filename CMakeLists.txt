@@ -22,6 +22,7 @@ find_package(TBB REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
 
+
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf)
 

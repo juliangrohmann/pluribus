@@ -9,6 +9,7 @@
 #include <limits>
 #include <omp.h>
 #include <tqdm/tqdm.hpp>
+#include <json/json.hpp>
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/unordered_map.hpp>
 #include <pluribus/util.hpp>
@@ -58,13 +59,15 @@ std::string BlueprintTrainerConfig::to_string() const {
   return oss.str();
 }
 
-BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const std::string& snapshot_dir, bool enable_wandb) 
+BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, bool enable_wandb, const std::string& snapshot_dir, const std::string& metrics_dir) 
     : _regrets{config.action_profile, 200}, _phi{config.action_profile, 169}, _config{config}, _snapshot_dir{snapshot_dir}, 
-      _t{1} {
+      _metrics_dir{metrics_dir}, _t{1} {
   if(_config.init_state.get_players().size() != config.poker.n_players) throw std::runtime_error("Player number mismatch");
   std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << _config.to_string() << "\n";
+  if(!create_dir(snapshot_dir)) throw std::runtime_error("Failed to create snapshot dir: " + snapshot_dir);
+  if(!create_dir(metrics_dir)) throw std::runtime_error("Failed to create metrics dir: " + metrics_dir);
 
   if(enable_wandb) {
     _wb = std::unique_ptr<wandb::Session>{new wandb::Session()};
@@ -382,7 +385,7 @@ int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Boar
   return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
 }
 
-void log_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets, wandb::History* wb_data) {
+void log_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets, nlohmann::json& metrics) {
   PokerState state = trainer.get_config().init_state;
   Board board("2c2d2h3c3h");
   auto actions = valid_actions(state, trainer.get_config().action_profile);
@@ -392,7 +395,7 @@ void log_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets, w
     for(Action a : actions) {
       double freq = ranges.at(a).get_range().n_combos() / 1326.0;
       std::string data_label = pos_to_str(state.get_active(), trainer.get_config().poker.n_players) + " " + a.to_string() + (force_regrets ? " (regrets)" : " (phi)");
-      wb_data->operator[](data_label) = freq;
+      metrics[data_label] = freq;
     }
     state = state.apply(Action::FOLD);
   }
@@ -404,15 +407,25 @@ void BlueprintTrainer::log_metrics(long t) {
   avg_regret /= t;
   std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    " << "avg_regret=" << avg_regret << "\n";
 
+  nlohmann::json metrics = {
+    {"avg_regret", static_cast<int>(avg_regret)},
+    {"t (M)", static_cast<float>(t / 1'000'000.0)}
+  };
+  log_preflop_strategy(*this, true, metrics);
+  log_preflop_strategy(*this, false, metrics);
+  std::ostringstream metrics_fn;
+  metrics_fn << std::setprecision(1) << std::fixed << t / 1'000'000.0 << ".json";
+  write_to_file(_metrics_dir / metrics_fn.str(), metrics.dump());
+
   if(_wb) {
-    wandb::History wb_data = {
-      {"avg_regret", static_cast<int>(avg_regret)},
-      {"t (M)", static_cast<int>(t / 1'000'000.0)}
-    };
-    log_preflop_strategy(*this, true, &wb_data);
-    log_preflop_strategy(*this, false, &wb_data);
+    wandb::History wb_data;
+    for(const auto& el : metrics.items()) {
+      if(el.value().is_number_integer()) wb_data[el.key()] = el.value().get<int>();
+      else if(el.value().is_number_float()) wb_data[el.key()] = el.value().get<float>();
+      else if(el.value().is_string()) wb_data[el.key()] = el.value().get<std::string>();
+    }
     _wb_run.log(wb_data);
-  } 
+  }
 }
 
 bool BlueprintTrainer::operator==(const BlueprintTrainer& other) const {

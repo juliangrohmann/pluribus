@@ -2,6 +2,8 @@
 
 #include <string>
 #include <fstream>
+#include <filesystem>
+#include <json/json.hpp>
 #include <cereal/cereal.hpp>
 #include <cereal/types/unordered_map.hpp>
 #include <cereal/types/vector.hpp>
@@ -12,6 +14,8 @@
 namespace pluribus {
 
 long long get_free_ram();
+bool create_dir(const std::filesystem::path& path);
+void write_to_file(const std::filesystem::path& file_path, const std::string& content);
 std::string date_time_str();
 uint8_t card_to_idx(const std::string& card);
 std::string idx_to_card(int idx);
