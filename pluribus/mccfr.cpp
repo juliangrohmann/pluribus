@@ -343,7 +343,8 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
     size_t regret_base_idx = _regrets.index(state, cluster);
     auto freq = calculate_strategy(_regrets, regret_base_idx, actions.size());
     int a_idx = sample_action_idx(freq);
-    if(_verbose_update && state.get_pot() == 150) {
+    bool should_log = _verbose_update && state.get_pot() == 150 && i == 5;
+    if(should_log) {
       std::cout << "Update strategy: " << relative_history_str(state, _config) << "\n";
       std::cout << hands[i].to_string() << ": (cluster=" << cluster << ")\n\t";
       for(int ai = 0; ai < actions.size(); ++ai) {
@@ -353,12 +354,26 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
     }
 
     size_t phi_idx = _phi.index(state, cluster, a_idx);
+    if(should_log) std::cout << "Init phi=" << _phi[phi_idx];
     #pragma omp critical
     {
       _phi[phi_idx] += 1.0f;
       update_range.add_hand(hands[i]);
     }
-    if(_verbose_update && state.get_pot() == 150) std::cout << "\tSampled: " << actions[a_idx].to_string() << ", phi=" << _phi[phi_idx] << "\n";
+    if(should_log) {
+      std::cout << "\tSampled: " << actions[a_idx].to_string() << ", phi=" << _phi[phi_idx] << ", phi_idx=" << phi_idx << "\n";
+      float total_a = 0.0f;
+      float total = 0.0f;
+      for(int ai = 0; ai < actions.size(); ++ai) { 
+        total_a += _phi[_phi.index(state, cluster, ai)];
+      }
+      for(int c = 0; c < 169; ++c) {
+        for(int ai = 0; ai < actions.size(); ++ai) { 
+          total += _phi[_phi.index(state, cluster, ai)];
+        }
+      }
+      std::cout << "Total action phi: " << total_a << ",   total phi: " << total << "\n";
+    }
     update_strategy(state.apply(actions[a_idx]), i, board, hands, update_range);
   }
   else {
