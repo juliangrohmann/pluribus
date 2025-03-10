@@ -400,7 +400,7 @@ void log_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets, w
     for(Action a : actions) {
       double freq = ranges.at(a).get_range().n_combos() / 1326.0;
       // std::cout << "\t" << a.to_string() << ": " << std::setprecision(2) << std::fixed << freq << "\n";
-      std::string data_label = pos_to_str(p, trainer.get_config().poker.n_players) + " " + a.to_string() + (force_regrets ? " (regrets)" : " (phi)");
+      std::string data_label = pos_to_str(state.get_active(), trainer.get_config().poker.n_players) + " " + a.to_string() + (force_regrets ? " (regrets)" : " (phi)");
       wb_data->operator[](data_label) = freq;
     }
     state = state.apply(Action::FOLD);
