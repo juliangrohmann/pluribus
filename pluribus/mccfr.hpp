@@ -123,7 +123,7 @@ public:
 private:
   int traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
   int traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
-  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, PokerRange& update_range);
+  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
   int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
   int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
   void log_metrics(long t);

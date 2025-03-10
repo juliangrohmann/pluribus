@@ -47,9 +47,9 @@ std::unordered_map<Action, RenderableRange> trainer_ranges(const BlueprintTraine
         }
         
         int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
-        int base_idx = bp.get_regrets().index(state, cluster);
         std::vector<float> freq;
         if(state.get_round() == 0 && !force_regrets) {
+          int base_idx = bp.get_phi().index(state, cluster);
           freq = calculate_strategy(bp.get_phi(), base_idx, actions.size());
           // if(a == actions[0]) {
           //   std::cout << hand.to_string() << ":\n";
@@ -60,6 +60,7 @@ std::unordered_map<Action, RenderableRange> trainer_ranges(const BlueprintTraine
           // }
         }
         else {
+          int base_idx = bp.get_regrets().index(state, cluster);
           freq = calculate_strategy(bp.get_regrets(), base_idx, actions.size());
         }
         int a_idx = std::distance(actions.begin(), std::find(actions.begin(), actions.end(), a));

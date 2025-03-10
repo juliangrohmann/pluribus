@@ -126,7 +126,6 @@ void BlueprintTrainer::mccfr_p(long T) {
   bool full_ranges = are_full_ranges(_config.init_ranges);
   std::cout << "Full ranges: " << full_ranges << "\n";
   std::cout << "Training blueprint from " << _t << " to " << std::to_string(T) << "\n";
-  PokerRange update_range;
   while(_t < T) {
     long init_t = _t;
     _t = std::min(std::min(next_discount, next_snapshot), T);
@@ -159,7 +158,7 @@ void BlueprintTrainer::mccfr_p(long T) {
 
         if(t % _config.strategy_interval == 0) {
           if(_verbose) std::cout << "============== Updating strategy ==============\n";
-          update_strategy(_config.init_state, i, board, hands, update_range);
+          update_strategy(_config.init_state, i, board, hands);
         }
         if(t > _config.prune_thresh) {
           std::uniform_real_distribution<float> dist(0.0f, 1.0f);
@@ -202,8 +201,6 @@ void BlueprintTrainer::mccfr_p(long T) {
         fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
       }
       cereal_save(*this, (_snapshot_dir / fn_stream.str()).string());
-      std::string fn_update_range = date_time_str() + "_update_range.bin";
-      cereal_save(update_range, (_snapshot_dir / fn_update_range).string());
       next_snapshot += _config.snapshot_interval;
     }
   }
@@ -330,7 +327,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
   }
 }
 
-void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, PokerRange& update_range) {
+void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands) {
   if(state.get_winner() != -1 || state.get_round() > 0 || state.get_players()[i].has_folded()) {
     return;
   }
@@ -343,42 +340,23 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
     size_t regret_base_idx = _regrets.index(state, cluster);
     auto freq = calculate_strategy(_regrets, regret_base_idx, actions.size());
     int a_idx = sample_action_idx(freq);
-    bool should_log = _verbose_update && state.get_pot() == 150 && i == 5;
-    if(should_log) {
+    if(_verbose_update) {
       std::cout << "Update strategy: " << relative_history_str(state, _config) << "\n";
-      std::cout << hands[i].to_string() << ": (cluster=" << cluster << ")\n\t";
+      std::cout << "\t" << hands[i].to_string() << ": (cluster=" << cluster << ")\n\t";
       for(int ai = 0; ai < actions.size(); ++ai) {
         std::cout << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << freq[ai] << "  ";
       }
       std::cout << "\n";
     }
 
-    size_t phi_idx = _phi.index(state, cluster, a_idx);
-    if(should_log) std::cout << "Init phi=" << _phi[phi_idx];
     #pragma omp critical
-    {
-      _phi[phi_idx] += 1.0f;
-      update_range.add_hand(hands[i]);
-    }
-    if(should_log) {
-      std::cout << "\tSampled: " << actions[a_idx].to_string() << ", phi=" << _phi[phi_idx] << ", phi_idx=" << phi_idx << "\n";
-      float total_a = 0.0f;
-      float total = 0.0f;
-      for(int ai = 0; ai < actions.size(); ++ai) { 
-        total_a += _phi[_phi.index(state, cluster, ai)];
-      }
-      for(int c = 0; c < 169; ++c) {
-        for(int ai = 0; ai < actions.size(); ++ai) { 
-          total += _phi[_phi.index(state, cluster, ai)];
-        }
-      }
-      std::cout << "Total action phi: " << total_a << ",   total phi: " << total << "\n";
-    }
-    update_strategy(state.apply(actions[a_idx]), i, board, hands, update_range);
+    _phi[_phi.index(state, cluster, a_idx)] += 1.0f;
+
+    update_strategy(state.apply(actions[a_idx]), i, board, hands);
   }
   else {
     for(Action action : valid_actions(state, _config.action_profile)) {
-      update_strategy(state.apply(action), i, board, hands, update_range);
+      update_strategy(state.apply(action), i, board, hands);
     }
   }
 }
@@ -411,34 +389,30 @@ void log_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets, w
   for(int p = 0; p < trainer.get_config().poker.n_players - 1; ++p) {
     PokerRange range_copy = trainer.get_config().init_ranges[state.get_active()];
     auto ranges = trainer_ranges(trainer, state, board, range_copy, force_regrets);
-    // std::cout << "Player " << p << ":\n";
     for(Action a : actions) {
       double freq = ranges.at(a).get_range().n_combos() / 1326.0;
-      // std::cout << "\t" << a.to_string() << ": " << std::setprecision(2) << std::fixed << freq << "\n";
       std::string data_label = pos_to_str(state.get_active(), trainer.get_config().poker.n_players) + " " + a.to_string() + (force_regrets ? " (regrets)" : " (phi)");
       wb_data->operator[](data_label) = freq;
     }
     state = state.apply(Action::FOLD);
   }
-  // std::cout << "\n";
 }
 
 void BlueprintTrainer::log_metrics(long t) {
   long avg_regret = 0;
   for(auto& r : _regrets.data()) avg_regret += std::max(r.load(), 0);
   avg_regret /= t;
-  wandb::History wb_data = {
-    {"avg_regret", static_cast<int>(avg_regret)},
-    {"t (M)", static_cast<int>(t / 1'000'000.0)}
-  };
-  std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    "
-            << "avg_regret=" << avg_regret << "\n";
-  // std::cout << "Preflop regret strategy:\n";
-  log_preflop_strategy(*this, true, &wb_data);
-  // std::cout << "Preflop avg strategy:\n";
-  log_preflop_strategy(*this, false, &wb_data);
+  std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    " << "avg_regret=" << avg_regret << "\n";
 
-  if(_wb) _wb_run.log(wb_data);
+  if(_wb) {
+    wandb::History wb_data = {
+      {"avg_regret", static_cast<int>(avg_regret)},
+      {"t (M)", static_cast<int>(t / 1'000'000.0)}
+    };
+    log_preflop_strategy(*this, true, &wb_data);
+    log_preflop_strategy(*this, false, &wb_data);
+    _wb_run.log(wb_data);
+  } 
 }
 
 bool BlueprintTrainer::operator==(const BlueprintTrainer& other) const {
