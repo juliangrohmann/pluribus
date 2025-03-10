@@ -116,7 +116,7 @@ void BlueprintTrainer::mccfr_p(long T) {
       thread_local Board board;
       thread_local std::vector<Hand> hands{static_cast<size_t>(_config.poker.n_players)};
       if(_verbose) std::cout << "============== t = " << t << " ==============\n";
-      if(t % (_config.log_interval_m * _it_per_min) == 0) log_metrics(t);
+      if(t > _config.profiling_thresh && t % (_config.log_interval_m * _it_per_min) == 0) log_metrics(t);
       for(int i = 0; i < _config.poker.n_players; ++i) {
         if(_verbose) std::cout << "============== i = " << i << " ==============\n";
         deck.shuffle();
@@ -387,10 +387,10 @@ void log_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets, w
   for(int p = 0; p < trainer.get_config().poker.n_players - 1; ++p) {
     PokerRange range_copy = trainer.get_config().init_ranges[state.get_active()];
     auto ranges = trainer_ranges(trainer, state, board, range_copy, force_regrets);
-    std::cout << "Player " << p << ":\n";
+    // std::cout << "Player " << p << ":\n";
     for(Action a : actions) {
       double freq = ranges.at(a).get_range().n_combos() / 1326.0;
-      std::cout << "\t" << a.to_string() << ": " << std::setprecision(2) << std::fixed << freq << "\n";
+      // std::cout << "\t" << a.to_string() << ": " << std::setprecision(2) << std::fixed << freq << "\n";
       std::string data_label = pos_to_str(p, trainer.get_config().poker.n_players) + " " + a.to_string() + (force_regrets ? " (regrets)" : " (phi)");
       wb_data->operator[](data_label) = freq;
     }
@@ -410,9 +410,9 @@ void BlueprintTrainer::log_metrics(long t) {
   std::cout << "==================================================================\n";
   std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    ";
   std::cout << "avg_regret=" << avg_regret << "\n";
-  std::cout << "Preflop regret strategy:\n";
+  // std::cout << "Preflop regret strategy:\n";
   log_preflop_strategy(*this, true, &wb_data);
-  std::cout << "Preflop avg strategy:\n";
+  // std::cout << "Preflop avg strategy:\n";
   log_preflop_strategy(*this, false, &wb_data);
 
   if(_wb) _wb_run.log(wb_data);
