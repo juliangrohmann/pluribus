@@ -26,8 +26,10 @@ std::string round_to_str(int round) {
 }
 
 const std::vector<std::string> positions{"BTN", "CO", "HJ", "LJ", "UTG+2", "UTG+1", "UTG", "BB", "SB"};
-std::string pos_to_str(int pos, int n_players) {
-  return positions[n_players - pos];
+std::string pos_to_str(int idx, int n_players) {
+  if(idx == 0) return "SB";
+  if(idx == 1) return "BB";
+  return positions[n_players - idx - 1];
 }
 
 std::string cluster_file(int round, int n_clusters) {
