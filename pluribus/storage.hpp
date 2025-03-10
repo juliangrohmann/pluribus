@@ -68,8 +68,14 @@ public:
   inline const ActionProfile& action_profile() const { return _action_profile; }
   inline int n_clusters() const { return _n_clusters; }
 
-  std::atomic<T>& operator[](size_t idx) { return _data[idx]; }
-  const std::atomic<T>& operator[](size_t idx) const { return _data[idx]; }
+  std::atomic<T>& operator[](size_t idx) { 
+    if(idx >= _data.size()) throw std::runtime_error("Storage access out of bounds.");
+    return _data[idx]; 
+  }
+  const std::atomic<T>& operator[](size_t idx) const { 
+    if(idx >= _data.size()) throw std::runtime_error("Constant storage access out of bounds.");
+    return _data[idx]; 
+  }
 
   size_t index(const PokerState& state, int cluster, int action = 0) {
     auto actions = valid_actions(state, _action_profile);
