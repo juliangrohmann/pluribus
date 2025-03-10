@@ -87,7 +87,7 @@ struct BlueprintTrainerConfig {
 
 class BlueprintTrainer {
 public:
-  BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, const std::string& snapshot_dir = "");
+  BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, const std::string& snapshot_dir = "", bool enable_wandb = false);
   void mccfr_p(long T);
   bool operator==(const BlueprintTrainer& other) const;
   const StrategyStorage<int>& get_regrets() const { return _regrets; }

@@ -58,7 +58,7 @@ std::string BlueprintTrainerConfig::to_string() const {
   return oss.str();
 }
 
-BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const std::string& snapshot_dir) 
+BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const std::string& snapshot_dir, bool enable_wandb) 
     : _regrets{config.action_profile, 200}, _phi{config.action_profile, 169}, _config{config}, _snapshot_dir{snapshot_dir}, 
       _t{1}, _it_per_min{50'000} {
   if(_config.init_state.get_players().size() != config.poker.n_players) throw std::runtime_error("Player number mismatch");
@@ -66,19 +66,21 @@ BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const s
   std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << _config.to_string() << "\n";
 
-  _wb = std::unique_ptr<wandb::Session>{new wandb::Session()};
-  wandb::Config wb_config = {
-    {"param1", 4},
-    {"param2", 4.2},
-    {"param3", "hello"},
-  };
-  std::ostringstream run_name;
-  run_name << _config.poker.n_players << "p_" << _config.poker.n_chips / 100 << "bb_" << _config.poker.ante << "ante_" << date_time_str();
-  _wb_run = _wb->initRun({
-      wandb::run::WithConfig(wb_config), wandb::run::WithProject("Pluribus"),
-      wandb::run::WithRunName(run_name.str()),
-      // wandb::run::WithRunID("myrunid"),
-  });
+  if(enable_wandb) {
+    _wb = std::unique_ptr<wandb::Session>{new wandb::Session()};
+    wandb::Config wb_config = {
+      {"param1", 4},
+      {"param2", 4.2},
+      {"param3", "hello"},
+    };
+    std::ostringstream run_name;
+    run_name << _config.poker.n_players << "p_" << _config.poker.n_chips / 100 << "bb_" << _config.poker.ante << "ante_" << date_time_str();
+    _wb_run = _wb->initRun({
+        wandb::run::WithConfig(wb_config), wandb::run::WithProject("Pluribus"),
+        wandb::run::WithRunName(run_name.str()),
+        // wandb::run::WithRunID("myrunid"),
+    });
+  }
 }
 
 bool are_full_ranges(const std::vector<PokerRange>& ranges) {
@@ -378,7 +380,7 @@ int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Boar
   return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
 }
 
-void log_preflop_strategy(wandb::History& wb_data, const BlueprintTrainer& trainer, bool force_regrets) {
+void log_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets, wandb::History* wb_data) {
   PokerState state = trainer.get_config().init_state;
   Board board("2c2d2h3c3h");
   auto actions = valid_actions(state, trainer.get_config().action_profile);
@@ -389,7 +391,8 @@ void log_preflop_strategy(wandb::History& wb_data, const BlueprintTrainer& train
     for(Action a : actions) {
       double freq = ranges.at(a).get_range().n_combos() / 1326.0;
       std::cout << "\t" << a.to_string() << ": " << std::setprecision(2) << std::fixed << freq << "\n";
-      wb_data[pos_to_str(p, trainer.get_config().poker.n_players) + " " + a.to_string() + (force_regrets ? " (regrets)" : " (phi)")] = freq;
+      std::string data_label = pos_to_str(p, trainer.get_config().poker.n_players) + " " + a.to_string() + (force_regrets ? " (regrets)" : " (phi)");
+      wb_data->operator[](data_label) = freq;
     }
     state = state.apply(Action::FOLD);
   }
@@ -408,11 +411,11 @@ void BlueprintTrainer::log_metrics(long t) {
   std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    ";
   std::cout << "avg_regret=" << avg_regret << "\n";
   std::cout << "Preflop regret strategy:\n";
-  log_preflop_strategy(wb_data, *this, true);
+  log_preflop_strategy(*this, true, &wb_data);
   std::cout << "Preflop avg strategy:\n";
-  log_preflop_strategy(wb_data, *this, false);
+  log_preflop_strategy(*this, false, &wb_data);
 
-  _wb_run.log(wb_data);
+  if(_wb) _wb_run.log(wb_data);
 }
 
 bool BlueprintTrainer::operator==(const BlueprintTrainer& other) const {
