@@ -396,7 +396,7 @@ void log_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets, w
     }
     state = state.apply(Action::FOLD);
   }
-  std::cout << "\n";
+  // std::cout << "\n";
 }
 
 void BlueprintTrainer::log_metrics(long t) {
@@ -407,9 +407,8 @@ void BlueprintTrainer::log_metrics(long t) {
     {"avg_regret", static_cast<int>(avg_regret)},
     {"t (M)", static_cast<int>(t / 1'000'000.0)}
   };
-  std::cout << "==================================================================\n";
-  std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    ";
-  std::cout << "avg_regret=" << avg_regret << "\n";
+  std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    "
+            << "avg_regret=" << avg_regret << "\n";
   // std::cout << "Preflop regret strategy:\n";
   log_preflop_strategy(*this, true, &wb_data);
   // std::cout << "Preflop avg strategy:\n";
