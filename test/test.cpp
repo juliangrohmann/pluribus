@@ -265,9 +265,8 @@ TEST_CASE("Serialize ActionHistory", "[serialize]") {
 
 TEST_CASE("Serialize StrategyStorage, BlueprintTrainer", "[serialize][blueprint]") {
   BlueprintTrainerConfig config{};
-  config.profiling_thresh = 1'000'000;
   BlueprintTrainer trainer{config};
-  trainer.mccfr_p(1);
+  trainer.mccfr_p(100'000);
 
   REQUIRE(test_serialization(trainer.get_regrets()));
   REQUIRE(test_serialization(trainer));

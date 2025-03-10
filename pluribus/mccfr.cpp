@@ -33,6 +33,7 @@ BlueprintTrainerConfig::BlueprintTrainerConfig(int n_players, int n_chips, int a
 
 BlueprintTrainerConfig::BlueprintTrainerConfig(const PokerConfig& poker_) : poker{poker_}, init_state{poker_} {
   for(int i = 0; i < poker_.n_players; ++i) init_ranges.push_back(PokerRange::full());
+  set_iterations(BlueprintTimingConfig{}, 10'000'000);
 }
 
 std::string BlueprintTrainerConfig::to_string() const {
@@ -40,13 +41,12 @@ std::string BlueprintTrainerConfig::to_string() const {
   oss << "================ Blueprint Trainer Config ================\n";
   oss << "Poker config: " << poker.to_string() << "\n";
   oss << "Strategy interval: " << strategy_interval << "\n";
-  oss << "Preflop threshold: " << preflop_threshold_m << " m\n";
-  oss << "Snapshot interval: " << snapshot_interval_m << " m\n";
-  oss << "Prune threshold: " << prune_thresh_m << " m\n";
-  oss << "LCFR threshold: " << lcfr_thresh_m << " m\n";
-  oss << "Discount interval: " << discount_interval_m << " m\n";
-  oss << "Log interval: " << log_interval_m << " m\n";
-  oss << "Profiling threshold: " << profiling_thresh << "\n";
+  oss << "Preflop threshold: " << preflop_threshold << "\n";
+  oss << "Snapshot interval: " << snapshot_interval << "\n";
+  oss << "Prune threshold: " << prune_thresh << "\n";
+  oss << "LCFR threshold: " << lcfr_thresh << "\n";
+  oss << "Discount interval: " << discount_interval << "\n";
+  oss << "Log interval: " << log_interval << "\n";
   oss << "Prune cutoff: " << prune_cutoff << "\n";
   oss << "Regret floor: " << regret_floor << "\n";
   oss << "Initial board: " << cards_to_str(init_board.data(), init_board.size()) << "\n";
@@ -60,7 +60,7 @@ std::string BlueprintTrainerConfig::to_string() const {
 
 BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, const std::string& snapshot_dir, bool enable_wandb) 
     : _regrets{config.action_profile, 200}, _phi{config.action_profile, 169}, _config{config}, _snapshot_dir{snapshot_dir}, 
-      _t{1}, _it_per_min{50'000} {
+      _t{1} {
   if(_config.init_state.get_players().size() != config.poker.n_players) throw std::runtime_error("Player number mismatch");
   std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
@@ -96,17 +96,15 @@ void BlueprintTrainer::mccfr_p(long T) {
     std::cout << "Launched in verbose single threaded mode.\n";
     omp_set_num_threads(1);
   }
-  long limit = std::numeric_limits<long>::max();
-  long next_discount = limit;
-  long next_snapshot = limit;
+  long next_discount = _config.discount_interval;
+  long next_snapshot = _config.preflop_threshold;
   bool full_ranges = are_full_ranges(_config.init_ranges);
   std::cout << "Full ranges: " << full_ranges << "\n";
-  std::cout << "Training blueprint from " << _t << " to " << (_t < _config.profiling_thresh ? "TBD" : std::to_string(limit)) 
-            << " (" << T << " min)\n";
+  std::cout << "Training blueprint from " << _t << " to " << std::to_string(T) << "\n";
   PokerRange update_range;
-  while(_t < limit) {
+  while(_t < T) {
     long init_t = _t;
-    _t = _t < _config.profiling_thresh ? _config.profiling_thresh : std::min(std::min(next_discount, next_snapshot), limit);
+    _t = std::min(std::min(next_discount, next_snapshot), T);
     auto interval_start = std::chrono::high_resolution_clock::now();
     std::cout << std::setprecision(1) << std::fixed << "Next step: " << _t / 1'000'000.0 << "M\n";
     #pragma omp parallel for schedule(dynamic, 1)
@@ -116,7 +114,7 @@ void BlueprintTrainer::mccfr_p(long T) {
       thread_local Board board;
       thread_local std::vector<Hand> hands{static_cast<size_t>(_config.poker.n_players)};
       if(_verbose) std::cout << "============== t = " << t << " ==============\n";
-      if(t > _config.profiling_thresh && t % (_config.log_interval_m * _it_per_min) == 0) log_metrics(t);
+      if(t % (_config.log_interval) == 0) log_metrics(t);
       for(int i = 0; i < _config.poker.n_players; ++i) {
         if(_verbose) std::cout << "============== i = " << i << " ==============\n";
         deck.shuffle();
@@ -138,7 +136,7 @@ void BlueprintTrainer::mccfr_p(long T) {
           if(_verbose) std::cout << "============== Updating strategy ==============\n";
           update_strategy(_config.init_state, i, board, hands, update_range);
         }
-        if(t > _config.prune_thresh_m * _it_per_min) {
+        if(t > _config.prune_thresh) {
           std::uniform_real_distribution<float> dist(0.0f, 1.0f);
           float q = dist(GlobalRNG::instance());
           if(q < 0.05f) {
@@ -156,53 +154,39 @@ void BlueprintTrainer::mccfr_p(long T) {
         }
       }
     }
+    
     auto interval_end = std::chrono::high_resolution_clock::now();
-
-    if(_t == _config.profiling_thresh) {
-      auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(interval_end - interval_start).count();
-      long it_per_sec = ((_config.profiling_thresh - init_t) / (ms / 1000.0));
-      _it_per_min = 60 * it_per_sec;
-      next_discount = std::max(_config.discount_interval_m * _it_per_min, _config.profiling_thresh + 1);
-      next_snapshot = std::max(_config.preflop_threshold_m * _it_per_min, _config.profiling_thresh + 1);
-      limit = T * _it_per_min;
-      std::cout << "============== Profiling ==============\n";
-      std::cout << "It/sec: " << it_per_sec << "\n";
-      std::cout << std::setprecision(1) << std::fixed << "It/min: " << _it_per_min / 1'000'000.0 << "M\n"
-                << "Limit: " << limit / 1'000'000'000.0 << "B\n";
+    std::cout << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
+    if(_t == next_discount) {
+      std::cout << "============== Discounting ==============\n";
+      long discount_interval = _config.discount_interval;
+      double d = static_cast<double>(_t / discount_interval) / (_t / discount_interval + 1);
+      std::cout << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
+      lcfr_discount(_regrets, d);
+      lcfr_discount(_phi, d);
+      next_discount = next_discount + discount_interval < _config.lcfr_thresh ? next_discount + discount_interval : T + 1;
     }
-    else {
-      std::cout << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
-      if(_t == next_discount) {
-        std::cout << "============== Discounting ==============\n";
-        long discount_interval = _config.discount_interval_m * _it_per_min;
-        double d = static_cast<double>(_t / discount_interval) / (_t / discount_interval + 1);
-        std::cout << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
-        lcfr_discount(_regrets, d);
-        lcfr_discount(_phi, d);
-        next_discount = next_discount + discount_interval < _config.lcfr_thresh_m * _it_per_min ? next_discount + discount_interval : limit + 1;
+    if(_t == next_snapshot) {
+      std::ostringstream fn_stream;
+      if(_t == _config.preflop_threshold) {
+        std::cout << "============== Saving & freezing preflop strategy ==============\n";
+        fn_stream << date_time_str() << "_preflop.bin";
       }
-      if(_t == next_snapshot) {
-        std::ostringstream fn_stream;
-        if(_t == _config.preflop_threshold_m * _it_per_min) {
-          std::cout << "============== Saving & freezing preflop strategy ==============\n";
-          fn_stream << date_time_str() << "_preflop.bin";
-        }
-        else {
-          std::cout << "============== Saving snapshot ==============\n";
-          fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
-        }
-        cereal_save(*this, (_snapshot_dir / fn_stream.str()).string());
-        std::string fn_update_range = date_time_str() + "_update_range.bin";
-        cereal_save(update_range, (_snapshot_dir / fn_update_range).string());
-        next_snapshot += _config.snapshot_interval_m * _it_per_min;
+      else {
+        std::cout << "============== Saving snapshot ==============\n";
+        fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
       }
+      cereal_save(*this, (_snapshot_dir / fn_stream.str()).string());
+      std::string fn_update_range = date_time_str() + "_update_range.bin";
+      cereal_save(update_range, (_snapshot_dir / fn_update_range).string());
+      next_snapshot += _config.snapshot_interval;
     }
   }
 
   std::cout << "============== Blueprint training complete ==============\n";
   std::ostringstream oss;
   oss << date_time_str() << _config.poker.n_players << "p_" << _config.poker.n_chips / 100 << "bb_" << _config.poker.ante << "ante_"
-      << std::setprecision(1) << std::fixed << limit / 1'000'000'000.0 << "B.bin";
+      << std::setprecision(1) << std::fixed << T / 1'000'000'000.0 << "B.bin";
   cereal_save(*this, oss.str());
 }
 
@@ -421,8 +405,7 @@ bool BlueprintTrainer::operator==(const BlueprintTrainer& other) const {
   return _regrets == other._regrets &&
          _phi == other._phi &&
          _config == other._config &&
-         _t == other._t &&
-         _it_per_min == other._it_per_min;
+         _t == other._t;
 }
 
 }

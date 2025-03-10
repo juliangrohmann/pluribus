@@ -54,6 +54,15 @@ void lcfr_discount(StrategyStorage<T>& regrets, double d) {
 
 int sample_action_idx(const std::vector<float>& freq);
 
+struct BlueprintTimingConfig {
+  long preflop_threshold_m = 800;
+  long snapshot_interval_m = 200;
+  long prune_thresh_m = 200;
+  long lcfr_thresh_m = 400;
+  long discount_interval_m = 10;
+  long log_interval_m = 1;
+};
+
 struct BlueprintTrainerConfig {
   BlueprintTrainerConfig(int n_players = 2, int n_chips = 10'000, int ante = 0);
   BlueprintTrainerConfig(const PokerConfig& poker_);
@@ -62,10 +71,19 @@ struct BlueprintTrainerConfig {
 
   bool operator==(const BlueprintTrainerConfig&) const = default;
 
+  void set_iterations(const BlueprintTimingConfig& timings, long it_per_min) {
+    preflop_threshold = timings.preflop_threshold_m * it_per_min;
+    snapshot_interval = timings.snapshot_interval_m * it_per_min;
+    prune_thresh = timings.prune_thresh_m * it_per_min;
+    lcfr_thresh = timings.lcfr_thresh_m * it_per_min;
+    discount_interval = timings.discount_interval_m * it_per_min;
+    log_interval = timings.log_interval_m * it_per_min;
+  }
+
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(poker, action_profile, init_ranges, init_board, init_state, strategy_interval, preflop_threshold_m, snapshot_interval_m, 
-       prune_thresh_m, lcfr_thresh_m, discount_interval_m, log_interval_m, profiling_thresh, prune_cutoff, regret_floor);
+    ar(poker, action_profile, init_ranges, init_board, init_state, strategy_interval, preflop_threshold, snapshot_interval, 
+       prune_thresh, lcfr_thresh, discount_interval, log_interval, prune_cutoff, regret_floor);
   }
 
   PokerConfig poker;
@@ -74,13 +92,12 @@ struct BlueprintTrainerConfig {
   std::vector<uint8_t> init_board;
   PokerState init_state;
   long strategy_interval = 10'000;
-  long preflop_threshold_m = 800;
-  long snapshot_interval_m = 200;
-  long prune_thresh_m = 200;
-  long lcfr_thresh_m = 400;
-  long discount_interval_m = 10;
-  long log_interval_m = 1;
-  long profiling_thresh = 5'000'000;
+  long preflop_threshold;
+  long snapshot_interval;
+  long prune_thresh;
+  long lcfr_thresh;
+  long discount_interval;
+  long log_interval;
   int prune_cutoff = -300'000'000;
   int regret_floor = -310'000'000;
 };
@@ -100,7 +117,7 @@ public:
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_regrets, _phi, _config, _t, _it_per_min);
+    ar(_regrets, _phi, _config, _t);
   }
 
 private:
@@ -123,7 +140,6 @@ private:
   std::unique_ptr<wandb::Session> _wb;
   wandb::Run _wb_run;
   long _t;
-  long _it_per_min;
   bool _verbose = false;
   bool _verbose_update = false;
 };
