@@ -32,7 +32,8 @@ int sample_action_idx(const std::vector<float>& freq) {
 BlueprintTrainerConfig::BlueprintTrainerConfig(int n_players, int n_chips, int ante) 
     : BlueprintTrainerConfig{PokerConfig{n_players, n_chips, ante}} {}
 
-BlueprintTrainerConfig::BlueprintTrainerConfig(const PokerConfig& poker_) : poker{poker_}, init_state{poker_} {
+BlueprintTrainerConfig::BlueprintTrainerConfig(const PokerConfig& poker_) 
+    : poker{poker_}, action_profile{BlueprintActionProfile{poker_.n_players}}, init_state{poker_} {
   for(int i = 0; i < poker_.n_players; ++i) init_ranges.push_back(PokerRange::full());
   set_iterations(BlueprintTimingConfig{}, 10'000'000);
 }
@@ -91,11 +92,13 @@ BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, bool en
     };
     for(int r = 0; r < 4; ++r) {
       for(int b = 0; b < _config.action_profile.n_bet_levels(r); ++b) {
-        std::string prof_str;
-        for(Action a : _config.action_profile.get_actions(r, b)) {
-          prof_str += a.to_string() + ", ";
+        for(int p = 0; p < _config.poker.n_players; ++p) {
+          std::string prof_str;
+          for(Action a : _config.action_profile.get_actions(r, b, p)) {
+            prof_str += a.to_string() + ", ";
+          }
+          wb_config["action_profile_r" + std::to_string(r) + "_b" + std::to_string(b) + "_p" + std::to_string(p)] = prof_str;
         }
-        wb_config["action_profile_r" + std::to_string(r) + "_b" + std::to_string(b)] = prof_str;
       }
     }
     for(int p = 0; p < _config.poker.n_players; ++p) {

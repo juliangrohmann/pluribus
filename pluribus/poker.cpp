@@ -261,7 +261,7 @@ int total_bet_size(const PokerState& state, Action action) {
 }
 
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile) {
-  const std::vector<Action>& actions = profile.get_actions(state.get_round(), state.get_bet_level());
+  const std::vector<Action>& actions = profile.get_actions(state.get_round(), state.get_bet_level(), state.get_active());
   std::vector<Action> valid;
   const Player& player = state.get_players()[state.get_active()];
   for(Action a : actions) {

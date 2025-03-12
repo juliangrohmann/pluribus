@@ -58,7 +58,7 @@ void Blueprint::build(const std::string& preflop_fn, const std::vector<std::stri
     }
   }
   
-  StrategyStorage<int> cum_strategy;
+  StrategyStorage<int> cum_strategy{config.action_profile, n_clusters};
   cum_strategy.data().resize(max_regrets);
   for(std::string buf_fn : buffer_fns) {
     auto buf = cereal_load<Buffer>((buffer_dir / buf_fn).string());
@@ -70,7 +70,7 @@ void Blueprint::build(const std::string& preflop_fn, const std::vector<std::stri
   }
 
   std::cout << "Computing frequencies...\n";
-  _freq = std::unique_ptr<StrategyStorage<float>>{new StrategyStorage<float>};
+  _freq = std::unique_ptr<StrategyStorage<float>>{new StrategyStorage<float>{config.action_profile, n_clusters}};
   for(const auto& entry : history_map) {
     PokerState state{config.poker};
     state = state.apply(entry.first);

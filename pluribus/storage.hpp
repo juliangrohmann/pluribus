@@ -45,8 +45,10 @@ struct HistoryEntry {
 template<class T>
 class StrategyStorage {
 public:
-  StrategyStorage(const ActionProfile& action_profile = BlueprintActionProfile{}, int n_clusters = 200) : 
+  StrategyStorage(const ActionProfile& action_profile, int n_clusters = 200) : 
                _action_profile{action_profile}, _n_clusters{n_clusters} {};
+
+  StrategyStorage(int n_players = 2, int n_clusters = 200) : StrategyStorage{BlueprintActionProfile{n_players}, n_clusters} {}
 
   StrategyStorage(const StrategyStorage& other) 
       : _data(other._data), 

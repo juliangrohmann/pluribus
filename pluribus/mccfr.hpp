@@ -87,7 +87,7 @@ struct BlueprintTrainerConfig {
   }
 
   PokerConfig poker;
-  ActionProfile action_profile = BlueprintActionProfile{};
+  ActionProfile action_profile;
   std::vector<PokerRange> init_ranges;
   std::vector<uint8_t> init_board;
   PokerState init_state;
