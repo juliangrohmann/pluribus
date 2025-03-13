@@ -391,8 +391,8 @@ int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Boar
 void log_preflop_strategy(const BlueprintTrainer& trainer, bool force_regrets, nlohmann::json& metrics) {
   PokerState state = trainer.get_config().init_state;
   Board board("2c2d2h3c3h");
-  auto actions = valid_actions(state, trainer.get_config().action_profile);
   for(int p = 0; p < trainer.get_config().poker.n_players - 1; ++p) {
+    auto actions = valid_actions(state, trainer.get_config().action_profile);
     PokerRange range_copy = trainer.get_config().init_ranges[state.get_active()];
     auto ranges = trainer_ranges(trainer, state, board, range_copy, force_regrets);
     for(Action a : actions) {
@@ -428,7 +428,7 @@ void BlueprintTrainer::log_metrics(long t) {
       else if(el.value().is_string()) wb_data[el.key()] = el.value().get<std::string>();
     }
     _wb_run.log(wb_data);
-  }
+  } 
 }
 
 bool BlueprintTrainer::operator==(const BlueprintTrainer& other) const {
