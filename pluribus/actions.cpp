@@ -88,18 +88,18 @@ std::string ActionProfile::to_string() const {
 BlueprintActionProfile::BlueprintActionProfile(int n_players) {
   if(n_players > 2) {
     for(int pos = 2; pos < n_players - 2; ++pos) {
-      set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.40f}, Action::ALL_IN}, 0, 1, pos);
+      set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.40f}}, 0, 1, pos);
     }
-    if(n_players > 3) set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.52f}, Action::ALL_IN}, 0, 1, n_players - 2);
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, n_players - 1);
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action::ALL_IN}, 0, 1, 0);
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action::ALL_IN}, 0, 1, 1);
+    if(n_players > 3) set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.52f}}, 0, 1, n_players - 2);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}}, 0, 1, n_players - 1);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}}, 0, 1, 0);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}}, 0, 1, 1);
   }
   else {
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, 0);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}}, 0, 1, 0);
   }
 
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.80f}, Action{1.00f}, Action{1.20f}, Action::ALL_IN}, 0, 2, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.80f}, Action{1.00f}, Action{1.20f}}, 0, 2, 0);
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.80f}, Action{1.00f}, Action::ALL_IN}, 0, 3, 0);
 
   set_actions({Action::CHECK_CALL, Action{0.16}, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
