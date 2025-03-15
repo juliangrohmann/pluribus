@@ -1,6 +1,6 @@
 apt update
 apt upgrade
-apt install g++ cmake libsdl2-dev libsdl2-image-dev
+apt install g++ cmake libsdl2-dev libsdl2-image-dev python3.10-venv
 apt-get install libboost-all-dev
 apt-get install libtbb-dev
 apt-get install libsdl2-ttf-dev
@@ -19,6 +19,13 @@ cmake ..
 make
 make install
 cd ../..
+
+cd pluribus
+python3 -m venv venv
+source venv/bin/activate
+pip install wandb
+deactivate
+cd ..
 
 cd pluribus
 mkdir build
