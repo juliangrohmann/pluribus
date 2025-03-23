@@ -269,7 +269,7 @@ TEST_CASE("Serialize StrategyStorage, BlueprintTrainer", "[serialize][blueprint]
   BlueprintTrainer trainer{config};
   trainer.mccfr_p(100'000);
 
-  REQUIRE(test_serialization(trainer.get_regrets()));
+  REQUIRE(test_serialization(trainer.get_strategy()));
   REQUIRE(test_serialization(trainer));
 }
 

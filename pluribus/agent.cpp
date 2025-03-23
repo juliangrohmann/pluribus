@@ -18,13 +18,13 @@ Action RandomAgent::act(const PokerState& state, const Board& board, const Hand&
 Action BlueprintAgent::act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) {
   auto actions = valid_actions(state, _trainer_p->get_config().action_profile);
   int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
-  size_t base_idx = _trainer_p->get_regrets().index(state, cluster);
-  auto freq = calculate_strategy(_trainer_p->get_regrets(), base_idx, actions.size());
+  size_t base_idx = _trainer_p->get_strategy().index(state, cluster);
+  auto freq = calculate_strategy(_trainer_p->get_strategy(), base_idx, actions.size());
   return actions[sample_action_idx(freq)];
 }
 
 // SampledBlueprintAgent::SampledBlueprintAgent(const BlueprintTrainer& trainer) : 
-//     _strategy{trainer.get_config().poker, trainer.get_regrets().n_clusters()}, _action_profile{trainer.get_config().action_profile} {
+//     _strategy{trainer.get_config().poker, trainer.get_strategy().n_clusters()}, _action_profile{trainer.get_config().action_profile} {
 //   std::cout << "Populating sampled blueprint...\n";
 //   populate(PokerState{trainer.get_config().poker}, trainer);
 // }
@@ -46,8 +46,8 @@ Action BlueprintAgent::act(const PokerState& state, const Board& board, const Ha
 //       freq = calculate_strategy(trainer.get_phi().at(info_set), actions.size());
 //     }
 //     else {
-//       size_t base_idx = trainer.get_regrets().index(state, c);
-//       freq = calculate_strategy(trainer.get_regrets(), base_idx, actions.size());
+//       size_t base_idx = trainer.get_strategy().index(state, c);
+//       freq = calculate_strategy(trainer.get_strategy(), base_idx, actions.size());
 //     }
 //     int a_idx = sample_action_idx(freq);
 //     _strategy[info_set] = actions[a_idx];

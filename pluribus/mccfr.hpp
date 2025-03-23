@@ -102,13 +102,20 @@ struct BlueprintTrainerConfig {
   int regret_floor = -310'000'000;
 };
 
-class BlueprintTrainer {
+template<class T>
+class Strategy {
+public:
+  virtual const StrategyStorage<T>& get_strategy() const = 0;
+  virtual const BlueprintTrainerConfig& get_config() const = 0;
+};
+
+class BlueprintTrainer : public Strategy<int> {
 public:
   BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, bool enable_wandb = false, const std::string& snapshot_dir = "snapshots", const std::string& metrics_dir = "metrics");
   void mccfr_p(long T);
   bool operator==(const BlueprintTrainer& other) const;
-  const StrategyStorage<int>& get_regrets() const { return _regrets; }
-  StrategyStorage<int>& get_regrets() { return _regrets; }
+  const StrategyStorage<int>& get_strategy() const { return _regrets; }
+  StrategyStorage<int>& get_strategy() { return _regrets; }
   const StrategyStorage<float>& get_phi() const { return _phi; }
   const BlueprintTrainerConfig& get_config() const { return _config; }
   void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }

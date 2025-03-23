@@ -13,21 +13,11 @@
 namespace pluribus {
 
 Action str_to_action(const std::string& str) {
-  if(str.starts_with("check") || str.starts_with("call")) {
-    return Action::CHECK_CALL;
-  }
-  else if(str.starts_with("fold")) {
-    return Action::FOLD;
-  }
-  else if(str.starts_with("all-in")) {
-    return Action::ALL_IN;
-  }
-  else if(str.starts_with("bet")) {
-    return Action(std::stoi(str.substr(4)) / 100.0);
-  }
-  else {
-    throw std::runtime_error("Invalid action string: " + str);
-  }
+  if(str.starts_with("check") || str.starts_with("call")) return Action::CHECK_CALL;
+  else if(str.starts_with("fold")) return Action::FOLD;
+  else if(str.starts_with("all-in")) return Action::ALL_IN;
+  else if(str.starts_with("bet")) return Action(std::stoi(str.substr(4)) / 100.0);
+  else throw std::runtime_error("Invalid action string: " + str);
 }
 
 std::unordered_map<Action, RenderableRange> trainer_ranges(const BlueprintTrainer& bp, const PokerState& state, 
@@ -53,8 +43,14 @@ std::unordered_map<Action, RenderableRange> trainer_ranges(const BlueprintTraine
           freq = calculate_strategy(bp.get_phi(), base_idx, actions.size());
         }
         else {
-          int base_idx = bp.get_regrets().index(state, cluster);
-          freq = calculate_strategy(bp.get_regrets(), base_idx, actions.size());
+          int base_idx = bp.get_strategy().index(state, cluster);
+          freq = calculate_strategy(bp.get_strategy(), base_idx, actions.size());
+          // if(hand.to_string()[0] == '6' && hand.to_string()[2] == '5' && a == actions[0]) {
+          //   std::cout << hand.to_string() << " regrets: \n";
+          //   for(int aidx = 0; aidx < actions.size(); ++aidx) {
+          //     std::cout << "\t" << actions[aidx].to_string() << ": " << bp.get_strategy()[base_idx + aidx] << "\n";
+          //   }
+          // }
         }
         int a_idx = std::distance(actions.begin(), std::find(actions.begin(), actions.end(), a));
         action_range.add_hand(hand, freq[a_idx]);
@@ -94,7 +90,7 @@ void traverse(RangeViewer* viewer_p, const std::string& bp_fn) {
   PokerState state = bp.get_config().init_state;
   std::vector<PokerRange> ranges = bp.get_config().init_ranges;
   for(int i = 0; i < bp.get_config().poker.n_players; ++i) ranges.push_back(PokerRange::full());
-  auto action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()], false);
+  auto action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()], true);
   render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
 
   std::cout << state.to_string();
@@ -121,7 +117,7 @@ void traverse(RangeViewer* viewer_p, const std::string& bp_fn) {
       state = bp.get_config().init_state;
     }
 
-    action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()], false);
+    action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()], true);
     render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
     std::cout << state.to_string();
     std::cout << "\nAction: ";

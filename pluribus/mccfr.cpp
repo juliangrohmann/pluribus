@@ -60,13 +60,18 @@ std::string BlueprintTrainerConfig::to_string() const {
   return oss.str();
 }
 
+std::string action_str(const std::vector<Action>& actions) {
+  std::string str;
+  for(Action a : actions) {
+    str += a.to_string() + ", ";
+  }
+  return str;
+}
+
 BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, bool enable_wandb, const std::string& snapshot_dir, const std::string& metrics_dir) 
     : _regrets{config.action_profile, 200}, _phi{config.action_profile, 169}, _config{config}, _snapshot_dir{snapshot_dir}, 
       _metrics_dir{metrics_dir}, _t{1} {
   if(_config.init_state.get_players().size() != config.poker.n_players) throw std::runtime_error("Player number mismatch");
-  std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
-  std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
-  std::cout << _config.to_string() << "\n";
   if(!create_dir(snapshot_dir)) throw std::runtime_error("Failed to create snapshot dir: " + snapshot_dir);
   if(!create_dir(metrics_dir)) throw std::runtime_error("Failed to create metrics dir: " + metrics_dir);
 
@@ -93,14 +98,13 @@ BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, bool en
     for(int r = 0; r < 4; ++r) {
       for(int b = 0; b < _config.action_profile.n_bet_levels(r); ++b) {
         for(int p = 0; p < _config.poker.n_players; ++p) {
-          std::string prof_str;
-          for(Action a : _config.action_profile.get_actions(r, b, p)) {
-            prof_str += a.to_string() + ", ";
-          }
+          std::string prof_str = action_str(_config.action_profile.get_actions(r, b, p, 150));
           wb_config["action_profile_r" + std::to_string(r) + "_b" + std::to_string(b) + "_p" + std::to_string(p)] = prof_str;
         }
       }
     }
+    std::string prof_str = action_str(_config.action_profile.get_actions(0, 1, 1, 250));
+    wb_config["action_profile_iso_actions"] = prof_str;
     for(int p = 0; p < _config.poker.n_players; ++p) {
       wb_config["init_range_combos_p" + std::to_string(p)] = _config.init_ranges[p].n_combos();
     }
@@ -123,6 +127,10 @@ bool are_full_ranges(const std::vector<PokerRange>& ranges) {
 }
 
 void BlueprintTrainer::mccfr_p(long T) {
+  std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
+  std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
+  std::cout << _config.to_string() << "\n";
+
   if(_verbose || _verbose_update) {
     std::cout << "Launched in verbose single threaded mode.\n";
     omp_set_num_threads(1);

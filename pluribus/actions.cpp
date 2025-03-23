@@ -43,7 +43,8 @@ void ActionProfile::set_actions(const std::vector<Action>& actions, int round, i
   _profile[round][bet_level][pos] = actions;
 }
 
-const std::vector<Action>& ActionProfile::get_actions(int round, int bet_level, int pos) const { 
+const std::vector<Action>& ActionProfile::get_actions(int round, int bet_level, int pos, int pot) const { 
+  if(round == 0 && bet_level == 1 && pot > 150) return _iso_actions;
   int level_idx = std::min(bet_level, static_cast<int>(_profile[round].size()) - 1);
   int pos_idx = std::min(pos, static_cast<int>(_profile[round][level_idx].size()) - 1);
   return _profile[round][level_idx][pos_idx]; 
@@ -56,15 +57,15 @@ void ActionProfile::add_action(const Action& action, int round, int bet_level, i
 }
 
 int ActionProfile::max_actions() const {
-  int ret;
+  int ret = 0;
   for(auto& round : _profile) {
     for(auto& level : round) {
       for(auto& pos : level) {
-        ret = std::max(static_cast<int>(level.size()), ret);
+        ret = std::max(static_cast<int>(pos.size()), ret);
       }
     }
   }
-  return ret;
+  return std::max(ret, static_cast<int>(_iso_actions.size()));
 }
 
 std::string ActionProfile::to_string() const {
@@ -88,15 +89,17 @@ std::string ActionProfile::to_string() const {
 BlueprintActionProfile::BlueprintActionProfile(int n_players) {
   if(n_players > 2) {
     for(int pos = 2; pos < n_players - 2; ++pos) {
-      set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.40f}}, 0, 1, pos);
+      set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.40f}, Action::ALL_IN}, 0, 1, pos);
     }
-    if(n_players > 3) set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.52f}}, 0, 1, n_players - 2);
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}}, 0, 1, n_players - 1);
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}}, 0, 1, 0);
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}}, 0, 1, 1);
+    if(n_players > 3) set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.52f}, Action::ALL_IN}, 0, 1, n_players - 2);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, n_players - 1);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action::ALL_IN}, 0, 1, 0);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action::ALL_IN}, 0, 1, 1);
+    set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{2.00f}, Action::ALL_IN});
   }
   else {
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}}, 0, 1, 0);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, 0);
+    set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{2.00f}, Action::ALL_IN});
   }
 
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.80f}, Action{1.00f}, Action{1.20f}}, 0, 2, 0);

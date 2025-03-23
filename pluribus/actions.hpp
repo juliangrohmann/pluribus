@@ -64,7 +64,8 @@ private:
 class ActionProfile {
 public:
   void set_actions(const std::vector<Action>& actions, int round, int bet_level, int pos);
-  const std::vector<Action>& get_actions(int round, int bet_level, int pos) const;
+  void set_iso_actions(const std::vector<Action>& actions) { _iso_actions = actions; }
+  const std::vector<Action>& get_actions(int round, int bet_level, int pos, int pot) const;
   void add_action(const Action& action, int round, int bet_level, int pos);
   int n_bet_levels(int round) const { return _profile[round].size(); }
   int max_actions() const;
@@ -79,6 +80,7 @@ public:
 
 private:
   std::array<std::vector<std::vector<std::vector<Action>>>, 4> _profile;
+  std::vector<Action> _iso_actions;
 };
 
 class BlueprintActionProfile : public ActionProfile {

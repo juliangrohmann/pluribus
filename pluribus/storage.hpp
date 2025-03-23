@@ -67,6 +67,7 @@ public:
   inline const tbb::concurrent_vector<std::atomic<T>>& data() const { return _data; }
   inline tbb::concurrent_vector<std::atomic<T>>& data() { return _data; }
   inline const tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map() const { return _history_map; }
+  inline tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map() { return _history_map; }
   inline const ActionProfile& action_profile() const { return _action_profile; }
   inline int n_clusters() const { return _n_clusters; }
 

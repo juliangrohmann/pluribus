@@ -3,12 +3,14 @@
 #include <string>
 #include <vector>
 #include <cereal/cereal.hpp>
+#include <cereal/types/memory.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/storage.hpp>
+#include <pluribus/mccfr.hpp>
 
 namespace pluribus {
 
-class Blueprint {
+class Blueprint : public Strategy<float> {
 public:
   Blueprint() : _freq{nullptr} {}
 
@@ -21,15 +23,16 @@ public:
 
 private:
   std::unique_ptr<StrategyStorage<float>> _freq;
+  BlueprintTrainerConfig _config;
 };
 
 struct Buffer {
-  tbb::concurrent_vector<int> regrets;
+  std::vector<float> freqs;
   size_t offset;
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(regrets, offset);
+    ar(freqs, offset);
   }
 };
 
