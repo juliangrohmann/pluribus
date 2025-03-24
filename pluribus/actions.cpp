@@ -98,7 +98,7 @@ BlueprintActionProfile::BlueprintActionProfile(int n_players) {
     set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{2.00f}, Action::ALL_IN});
   }
   else {
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, 0);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.75f}, Action::ALL_IN}, 0, 1, 0);
     set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{2.00f}, Action::ALL_IN});
   }
 
