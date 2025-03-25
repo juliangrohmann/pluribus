@@ -126,7 +126,8 @@ bool are_full_ranges(const std::vector<PokerRange>& ranges) {
   return true;
 }
 
-void BlueprintTrainer::mccfr_p(long T) {
+void BlueprintTrainer::mccfr_p(long t_plus) {
+  long T = _t + t_plus;
   std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << _config.to_string() << "\n";
@@ -189,6 +190,11 @@ void BlueprintTrainer::mccfr_p(long T) {
         else {
           if(_verbose) std::cout << "============== Traverse MCCFR ==============\n";
           traverse_mccfr(_config.init_state, i, board, hands, eval);
+        }
+        if(_verbose) {
+          std::string buf;
+          std::cout << "Press a key to continue\n:";
+          std::cin >> buf;
         }
       }
     }
@@ -293,25 +299,26 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
   else if(state.get_active() == i) {
     auto actions = valid_actions(state, _config.action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
-    if(_verbose) std::cout << "Cluster " << state.get_active() << ": " << cluster << "\n";
+    if(_verbose) std::cout << "Cluster" << state.get_active() << ": " << cluster << "\n";
     size_t base_idx = _regrets.index(state, cluster);
     auto freq = calculate_strategy(_regrets, base_idx, actions.size());
 
     std::unordered_map<Action, int> values;
-    int v = 0;
+    float v_exact = 0;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       int v_a = traverse_mccfr(state.apply(a), i, board, hands, eval);
       values[a] = v_a;
-      v += freq[a_idx] * v_a;
+      v_exact += freq[a_idx] * v_a;
       if(_verbose) {
         std::cout << "Action EV: " << relative_history_str(state, _config) << "\n";
         std::cout << "\tu(" << a.to_string() << ") @ " << std::setprecision(2) << std::fixed << freq[a_idx] << " = " << v_a << "\n";
       }
     }
+    int v = round(v_exact);
     if(_verbose) {
       std::cout << "Net EV: " << relative_history_str(state, _config) << "\n";
-      std::cout << "\tu(sigma) = " << v << "\n";
+      std::cout << "\tu(sigma) = " << std::setprecision(2) << std::fixed << v << " (exact=" << v_exact << ")\n";
     }
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       int dR = values[actions[a_idx]] - v;

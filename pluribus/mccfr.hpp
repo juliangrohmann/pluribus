@@ -112,12 +112,13 @@ public:
 class BlueprintTrainer : public Strategy<int> {
 public:
   BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, bool enable_wandb = false, const std::string& snapshot_dir = "snapshots", const std::string& metrics_dir = "metrics");
-  void mccfr_p(long T);
+  void mccfr_p(long t_plus);
   bool operator==(const BlueprintTrainer& other) const;
   const StrategyStorage<int>& get_strategy() const { return _regrets; }
   StrategyStorage<int>& get_strategy() { return _regrets; }
   const StrategyStorage<float>& get_phi() const { return _phi; }
   const BlueprintTrainerConfig& get_config() const { return _config; }
+  BlueprintTrainerConfig& get_config() { return _config; }
   void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
   void set_metrics_dir(std::string metrics_dir) { _metrics_dir = metrics_dir; }
   void set_verbose(bool verbose) { _verbose = verbose; }

@@ -51,6 +51,7 @@ public:
 
   std::array<uint8_t, N>& cards() { return _cards; }
   const std::array<uint8_t, N>& cards() const { return _cards; }
+  std::vector<uint8_t> as_vector() { return std::vector<uint8_t>{_cards.data(), _cards.data() + _cards.size()}; }
   std::string to_string() const { return cards_to_str(_cards.data(), N); }
 
   bool operator==(const CardSet<N>&) const = default;
