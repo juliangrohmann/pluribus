@@ -403,16 +403,18 @@ int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Boar
   return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
 }
 
-void log_preflop_strategy(const BlueprintTrainer& trainer, nlohmann::json& metrics) {
-  PokerState state = trainer.get_config().init_state;
+template <class T>
+void log_preflop_strategy(const StrategyStorage<T>& strat, const BlueprintTrainerConfig& config, nlohmann::json& metrics, bool phi) {
+  PokerState state = config.init_state;
   Board board("2c2d2h3c3h");
-  for(int p = 0; p < trainer.get_config().poker.n_players - 1; ++p) {
-    auto actions = valid_actions(state, trainer.get_config().action_profile);
-    PokerRange range_copy = trainer.get_config().init_ranges[state.get_active()];
-    auto ranges = trainer_ranges(trainer, state, board, range_copy);
+  for(int p = 0; p < config.poker.n_players - 1; ++p) {
+    auto actions = valid_actions(state, config.action_profile);
+    PokerRange range_copy = config.init_ranges[state.get_active()];
+    
+    auto ranges = trainer_ranges(strat, config, state, board, range_copy);
     for(Action a : actions) {
       double freq = ranges.at(a).get_range().n_combos() / 1326.0;
-      std::string data_label = pos_to_str(state.get_active(), trainer.get_config().poker.n_players) + " " + a.to_string();
+      std::string data_label = pos_to_str(state.get_active(), config.poker.n_players) + " " + a.to_string() + (!phi ? " (regrets)" : " (phi)");
       metrics[data_label] = freq;
     }
     state = state.apply(Action::FOLD);
@@ -429,8 +431,8 @@ void BlueprintTrainer::log_metrics(long t) {
     {"avg_regret", static_cast<int>(avg_regret)},
     {"t (M)", static_cast<float>(t / 1'000'000.0)}
   };
-  log_preflop_strategy(*this, metrics);
-  // log_preflop_strategy(*this, metrics);
+  log_preflop_strategy(get_strategy(), get_config(), metrics, false);
+  log_preflop_strategy(get_phi(), get_config(), metrics, true);
   std::ostringstream metrics_fn;
   metrics_fn << std::setprecision(1) << std::fixed << t / 1'000'000.0 << ".json";
   write_to_file(_metrics_dir / metrics_fn.str(), metrics.dump());

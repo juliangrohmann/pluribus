@@ -22,10 +22,10 @@ Action str_to_action(const std::string& str);
 void render_ranges(RangeViewer* viewer_p, const PokerRange& base_range, const std::unordered_map<Action, RenderableRange>& action_ranges);
 
 template <class T>
-std::unordered_map<Action, RenderableRange> trainer_ranges(const Strategy<T>& bp, const PokerState& state, 
-                                                           const Board& board, PokerRange& base_range) {
+std::unordered_map<Action, RenderableRange> trainer_ranges(const StrategyStorage<T>& strat, const BlueprintTrainerConfig& config,
+                                                           const PokerState& state, const Board& board, PokerRange& base_range) {
   std::unordered_map<Action, RenderableRange> ranges;
-  auto actions = valid_actions(state, bp.get_config().action_profile);
+  auto actions = valid_actions(state, config.action_profile);
   auto color_map = map_colors(actions);
   for(Action a : actions) {
     PokerRange action_range;
@@ -40,14 +40,8 @@ std::unordered_map<Action, RenderableRange> trainer_ranges(const Strategy<T>& bp
         
         int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
         std::vector<float> freq;
-        // if(state.get_round() == 0 && !force_regrets) {
-        //   int base_idx = bp.get_phi().index(state, cluster);
-        //   freq = calculate_strategy(bp.get_phi(), base_idx, actions.size());
-        // }
-        // else {
-        int base_idx = bp.get_strategy().index(state, cluster);
-        freq = calculate_strategy(bp.get_strategy(), base_idx, actions.size());
-        // }
+        int base_idx = strat.index(state, cluster);
+        freq = calculate_strategy(strat, base_idx, actions.size());
         int a_idx = std::distance(actions.begin(), std::find(actions.begin(), actions.end(), a));
         action_range.add_hand(hand, freq[a_idx]);
       }
@@ -77,7 +71,7 @@ void traverse(RangeViewer* viewer_p, const Strategy<T>& bp) {
   PokerState state = bp.get_config().init_state;
   std::vector<PokerRange> ranges = bp.get_config().init_ranges;
   for(int i = 0; i < bp.get_config().poker.n_players; ++i) ranges.push_back(PokerRange::full());
-  auto action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()]);
+  auto action_ranges = trainer_ranges(bp.get_strategy(), bp.get_config(), state, board, ranges[state.get_active()]);
   render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
 
   std::cout << state.to_string();
@@ -104,7 +98,7 @@ void traverse(RangeViewer* viewer_p, const Strategy<T>& bp) {
       state = bp.get_config().init_state;
     }
 
-    action_ranges = trainer_ranges(bp, state, board, ranges[state.get_active()]);
+    action_ranges = trainer_ranges(bp.get_strategy(), bp.get_config(), state, board, ranges[state.get_active()]);
     render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
     std::cout << state.to_string();
     std::cout << "\nAction: ";
