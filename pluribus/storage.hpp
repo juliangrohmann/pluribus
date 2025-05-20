@@ -66,8 +66,8 @@ public:
 
   inline const tbb::concurrent_vector<std::atomic<T>>& data() const { return _data; }
   inline tbb::concurrent_vector<std::atomic<T>>& data() { return _data; }
-  inline const tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map() const { return _history_map; }
-  inline tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map() { return _history_map; }
+  inline const tbb::concurrent_unordered_map<ActionHistory, HistoryEntry>& history_map() const { return _history_map; }
+  inline tbb::concurrent_unordered_map<ActionHistory, HistoryEntry>& history_map() { return _history_map; }
   inline const ActionProfile& action_profile() const { return _action_profile; }
   inline int n_clusters() const { return _n_clusters; }
 
@@ -121,7 +121,7 @@ public:
     size_t n_actions = valid_actions(state, _action_profile).size();
     auto it = _history_map.find(state.get_action_history());
     if(it != _history_map.end()) return it->second.idx + cluster * n_actions + action;
-    throw std::runtime_error("StrategyStorage --- Indexed out of range.");
+    throw std::runtime_error("StrategyStorage --- Indexed with unknown action history.");
   }
 
   bool operator==(const StrategyStorage& other) const {

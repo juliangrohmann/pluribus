@@ -6,8 +6,18 @@
 #include <pluribus/cluster.hpp>
 #include <pluribus/range_viewer.hpp>
 #include <pluribus/traverse.hpp>
+#include <pluribus/blueprint.hpp>
 
 using namespace pluribus;
+
+void traverse_strategy(RangeViewer* viewer_p, std::string fn, bool trainer) {
+  if(trainer) {
+    traverse_trainer(viewer_p, fn);
+  }
+  else {
+    traverse_blueprint(viewer_p, fn);
+  }
+}
 
 int main(int argc, char* argv[]) {
   if(argc < 2) {
@@ -28,18 +38,29 @@ int main(int argc, char* argv[]) {
     }
   }
   else if(command == "traverse") {
-    if(argc > 3 && strcmp(argv[2], "--png") == 0) {
+    bool trainer = strcmp(argv[2], "--trainer") == 0;
+    if(argc > 4 && strcmp(argv[3], "--png") == 0) {
       if(argc <= 4) std::cout << "Missing filename.\n";
       else {
-        PngRangeViewer viewer{argv[3]};
-        traverse(&viewer, argv[4]);
+        PngRangeViewer viewer{argv[4]};
+        traverse_strategy(&viewer, argv[5], trainer);
       }
     }
     else {
       WindowRangeViewer viewer{"traverse"};
-      traverse(&viewer, argv[2]);
+      traverse_strategy(&viewer, argv[3], trainer);
     }
     
+  }
+  else if(command == "blueprint") {
+    if(argc < 6) {
+      std::cout << "Missing arguments to build blueprint.\n";
+    }
+    else {
+      Blueprint bp;
+      bp.build(argv[2], get_filepaths(argv[3]), argv[4]);
+      cereal_save(bp, argv[5]);
+    }
   }
   else {
     std::cout << "Unknown command." << std::endl;

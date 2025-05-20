@@ -51,6 +51,7 @@ void Blueprint::build(const std::string& preflop_fn, const std::vector<std::stri
       max_regrets = regrets.data().size();
       std::cout << "New max regrets: " << max_regrets << "\n";
       history_map = regrets.history_map();
+      std::cout << "New history map size: " << history_map.size() << "\n";
     }
 
     size_t bidx_start = 0;
@@ -140,6 +141,7 @@ void Blueprint::build(const std::string& preflop_fn, const std::vector<std::stri
       }
     }
   }
+  std::cout << "Blueprint built.\n";
 }
 
 }

@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <cassert>
 #include <string>
+#include <vector>
 #include <ctime>
 #include <sstream>
 #include <fstream>
@@ -33,6 +34,15 @@ bool create_dir(const std::filesystem::path& path) {
     std::cerr << "Error creating directory: " << e.what() << std::endl;
     return false;
   }
+}
+
+std::vector<std::string> get_filepaths(std::string path) {
+  std::filesystem::path base_dir{path};
+  std::vector<std::string> fns;
+  for(const auto& entry : std::filesystem::directory_iterator(path)) {
+    fns.push_back((base_dir / entry.path().filename().string()).string());
+  }
+  return fns;
 }
 
 void write_to_file(const std::filesystem::path& file_path, const std::string& content) {

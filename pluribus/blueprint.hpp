@@ -16,6 +16,12 @@ public:
 
   void build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir = "");
 
+  virtual const StrategyStorage<float>& get_strategy() const {
+    if(_freq) return *_freq;
+    throw std::runtime_error("Blueprint strategy is null.");
+  }
+  virtual const BlueprintTrainerConfig& get_config() const { return _config; }
+  
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_freq);
