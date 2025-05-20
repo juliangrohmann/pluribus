@@ -15,7 +15,7 @@ void Blueprint::build(const std::string& preflop_fn, const std::vector<std::stri
   std::filesystem::path buffer_dir = buf_dir;
   size_t max_regrets = 0;
   tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map;
-  int n_clusters;
+  int n_clusters = -1;
 
   std::vector<std::string> buffer_fns;
   int buf_idx = 0;
@@ -128,8 +128,15 @@ void Blueprint::build(const std::string& preflop_fn, const std::vector<std::stri
       for(size_t aidx = 0; aidx < n_actions; ++aidx) {
         total += _freq->operator[](base_idx + aidx);
       }
-      for(size_t aidx = 0; aidx < n_actions; ++aidx) {
-        _freq->operator[](base_idx + aidx) / total;
+      if(total > 0) {
+        for(size_t aidx = 0; aidx < n_actions; ++aidx) {
+          _freq->operator[](base_idx + aidx).store(_freq->operator[](base_idx + aidx).load() / total);
+        }
+      }
+      else {
+        for(size_t aidx = 0; aidx < n_actions; ++aidx) {
+          _freq->operator[](base_idx + aidx).store(1.0 / n_actions);
+        }
       }
     }
   }
