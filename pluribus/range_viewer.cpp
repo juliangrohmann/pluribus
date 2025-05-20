@@ -182,7 +182,13 @@ void RangeViewer::render_range(const RenderableRange* range, const RenderableRan
 
 void RangeViewer::render_legend(const std::vector<RenderableRange>& ranges) {
   int n_rel_ranges = 0;
-  for(const auto& range : ranges) if(range.is_relative()) ++n_rel_ranges;
+  float n_combos = 0;
+  for(const auto& range : ranges) {
+    if(range.is_relative()) {
+      n_combos += range.get_range().n_combos();
+      ++n_rel_ranges;
+    }
+  }
   int w = _window_width / n_rel_ranges;
   int h = 100;
   int x = 0;
@@ -193,6 +199,12 @@ void RangeViewer::render_legend(const std::vector<RenderableRange>& ranges) {
       SDL_RenderFillRect(get_renderer(), &rect);
       x += w;
       render_text(range.get_label(), rect.x + 5, rect.y + 3);
+      std::ostringstream combos_oss;
+      combos_oss << std::fixed << std::setprecision(1) << range.get_range().n_combos() << " combos";
+      render_text(combos_oss.str(), rect.x + 5, rect.y + 23);
+      std::ostringstream perc_oss;
+      perc_oss << std::fixed << std::setprecision(2) << range.get_range().n_combos() * 100.0 / n_combos << "%";
+      render_text(perc_oss.str(), rect.x + 5, rect.y + 43);
     }
   }
 }
