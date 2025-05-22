@@ -251,15 +251,16 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
     auto freq = calculate_strategy(_regrets, base_idx, actions.size());
 
     std::unordered_map<Action, int> values;
-    int v = 0;
+    float v_exact = 0;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       if(_regrets[base_idx + a_idx].load() > _config.prune_cutoff) {
         int v_a = traverse_mccfr_p(state.apply(a), i, board, hands, eval);
         values[a] = v_a;
-        v += freq[a_idx] * v_a;
+        v_exact += freq[a_idx] * v_a;
       }
     }
+    int v = round(v_exact);
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       if(values.find(a) != values.end()) {
