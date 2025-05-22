@@ -136,7 +136,7 @@ void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, in
 
 int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, 
                         const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
-  return trainer.traverse_mccfr(state, i, board, hands, eval);
+  return trainer.traverse_mccfr(state, 1, i, board, hands, eval);
 }
 
 }

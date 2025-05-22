@@ -171,7 +171,7 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
           }
         }
 
-        if(t % _config.strategy_interval == 0) {
+        if(t % _config.strategy_interval == 0 && t < _config.preflop_threshold) {
           if(_verbose) std::cout << "============== Updating strategy ==============\n";
           update_strategy(_config.init_state, i, board, hands);
         }
@@ -180,16 +180,16 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
           float q = dist(GlobalRNG::instance());
           if(q < 0.05f) {
             if(_verbose) std::cout << "============== Traverse MCCFR ==============\n";
-            traverse_mccfr(_config.init_state, i, board, hands, eval);
+            traverse_mccfr(_config.init_state, t, i, board, hands, eval);
           }
           else {
             if(_verbose) std::cout << "============== Traverse MCCFR-P ==============\n";
-            traverse_mccfr_p(_config.init_state, i, board, hands, eval);
+            traverse_mccfr_p(_config.init_state, t, i, board, hands, eval);
           }
         }
         else {
           if(_verbose) std::cout << "============== Traverse MCCFR ==============\n";
-          traverse_mccfr(_config.init_state, i, board, hands, eval);
+          traverse_mccfr(_config.init_state, t, i, board, hands, eval);
         }
         if(_verbose) {
           std::string buf;
@@ -232,14 +232,7 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
   cereal_save(*this, oss.str());
 }
 
-std::vector<float> get_freq(const PokerState& state, const Board& board, const Hand& hand, 
-                            int n_actions, StrategyStorage<int>& regrets) {
-  int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
-  size_t base_idx = regrets.index(state, cluster);
-  return calculate_strategy(regrets, base_idx, n_actions);
-}
-
-int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
+int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
                                        const omp::HandEvaluator& eval) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
     return utility(state, i, board, hands, eval);
@@ -255,12 +248,13 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       if(_regrets[base_idx + a_idx].load() > _config.prune_cutoff) {
-        int v_a = traverse_mccfr_p(state.apply(a), i, board, hands, eval);
+        int v_a = traverse_mccfr_p(state.apply(a), t, i, board, hands, eval);
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
       }
     }
     int v = round(v_exact);
+    if(state.get_round() == 0 && t > _config.preflop_threshold) return v;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       if(values.find(a) != values.end()) {
@@ -273,9 +267,15 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, int i, const Boa
   }
   else {
     auto actions = valid_actions(state, _config.action_profile);
-    auto freq = get_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
+    std::vector<float> freq;
+    if(state.get_round() == 0 && t > _config.preflop_threshold) {
+      freq = get_freq(state, board, hands[state.get_active()], actions.size(), _phi);
+    }
+    else {
+      freq = get_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
+    }
     Action a = actions[sample_action_idx(freq)];
-    return traverse_mccfr_p(state.apply(a), i, board, hands, eval);
+    return traverse_mccfr_p(state.apply(a), t, i, board, hands, eval);
   }
 }
 
@@ -283,7 +283,7 @@ std::string relative_history_str(const PokerState& state, const BlueprintTrainer
   return state.get_action_history().slice(config.init_state.get_action_history().size()).to_string();
 }
 
-int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
+int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
     int u = utility(state, i, board, hands, eval);
     if(_verbose) {
@@ -303,12 +303,11 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
     if(_verbose) std::cout << "Cluster" << state.get_active() << ": " << cluster << "\n";
     size_t base_idx = _regrets.index(state, cluster);
     auto freq = calculate_strategy(_regrets, base_idx, actions.size());
-
     std::unordered_map<Action, int> values;
     float v_exact = 0;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
-      int v_a = traverse_mccfr(state.apply(a), i, board, hands, eval);
+      int v_a = traverse_mccfr(state.apply(a), t, i, board, hands, eval);
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
       if(_verbose) {
@@ -320,7 +319,10 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
     if(_verbose) {
       std::cout << "Net EV: " << relative_history_str(state, _config) << "\n";
       std::cout << "\tu(sigma) = " << std::setprecision(2) << std::fixed << v << " (exact=" << v_exact << ")\n";
+      if(state.get_round() == 0) std::cout << "Preflop frozen, skipping regret update.\n";
     }
+    if(state.get_round() == 0 && t > _config.preflop_threshold) return v;
+
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       int dR = values[actions[a_idx]] - v;
       int next_r = _regrets[base_idx + a_idx].load() + dR;
@@ -335,7 +337,13 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
   }
   else {
     auto actions = valid_actions(state, _config.action_profile);
-    auto freq = get_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
+    std::vector<float> freq;
+    if(state.get_round() == 0 && t > _config.preflop_threshold) {
+      freq = get_freq(state, board, hands[state.get_active()], actions.size(), _phi);
+    }
+    else {
+      freq = get_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
+    }
     if(_verbose) {
       std::cout << "Sampling: " << relative_history_str(state, _config) << "\n\t";
       for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
@@ -345,7 +353,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, int i, const Board
     }
     Action a = actions[sample_action_idx(freq)];
     if(_verbose) std::cout << "\tSampled: " << a.to_string() << "\n";
-    return traverse_mccfr(state.apply(a), i, board, hands, eval);
+    return traverse_mccfr(state.apply(a), t, i, board, hands, eval);
   }
 }
 

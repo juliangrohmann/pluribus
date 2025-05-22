@@ -16,6 +16,7 @@
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/infoset.hpp>
+#include <pluribus/cluster.hpp>
 #include <pluribus/storage.hpp>
 
 
@@ -50,6 +51,14 @@ void lcfr_discount(StrategyStorage<T>& regrets, double d) {
   for(auto& e : regrets.data()) {
     e.store(e.load() * d);
   }
+}
+
+template <class T>
+std::vector<float> get_freq(const PokerState& state, const Board& board, const Hand& hand, 
+                            int n_actions, StrategyStorage<T>& strategy) {
+  int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
+  size_t base_idx = strategy.index(state, cluster);
+  return calculate_strategy(strategy, base_idx, n_actions);
 }
 
 int sample_action_idx(const std::vector<float>& freq);
@@ -130,8 +139,8 @@ public:
   }
 
 private:
-  int traverse_mccfr_p(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
-  int traverse_mccfr(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
+  int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
+  int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
   int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
   int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
