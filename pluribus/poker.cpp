@@ -265,7 +265,7 @@ std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& 
   std::vector<Action> valid;
   const Player& player = state.get_players()[state.get_active()];
   for(Action a : actions) {
-    if(a == Action::CHECK_CALL) {
+    if(a == Action::CHECK_CALL || a == Action::BIAS_NONE || a == Action::BIAS_FOLD || a == Action::BIAS_CALL || a == Action::BIAS_RAISE) {
       valid.push_back(a);
       continue;
     }

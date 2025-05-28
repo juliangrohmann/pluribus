@@ -29,6 +29,10 @@ public:
   }
 
   static Action UNDEFINED;
+  static Action BIAS_FOLD;
+  static Action BIAS_CALL;
+  static Action BIAS_RAISE;
+  static Action BIAS_NONE;
   static Action ALL_IN;
   static Action FOLD;
   static Action CHECK_CALL;
@@ -86,6 +90,11 @@ private:
 class BlueprintActionProfile : public ActionProfile {
 public:
   BlueprintActionProfile(int n_players);
+};
+
+class BiasActionProfile : public ActionProfile {
+public:
+  BiasActionProfile();
 };
 
 }

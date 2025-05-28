@@ -432,7 +432,7 @@ void log_preflop_strategy(const StrategyStorage<T>& strat, const BlueprintTraine
 
 void BlueprintTrainer::log_metrics(long t) {
   long avg_regret = 0;
-  for(auto& r : _regrets.data()) avg_regret += std::max(r.load(), 0);
+  for(auto& r : _regrets.data()) avg_regret += std::max(r.load(), 0); // should be sum of the maximum regret at each infoset, not sum of all regrets
   avg_regret /= t;
   std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    " << "avg_regret=" << avg_regret << "\n";
 

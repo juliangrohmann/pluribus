@@ -21,6 +21,7 @@
 #include <pluribus/simulate.hpp>
 #include <pluribus/actions.hpp>
 #include <pluribus/storage.hpp>
+#include <pluribus/blueprint.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
@@ -232,6 +233,41 @@ TEST_CASE("Sample PokerRange with dead_cards", "[range]") {
     REQUIRE(hand.cards()[0] != dead_card);
     REQUIRE(hand.cards()[1] != dead_card);
   }
+}
+
+void test_biased_freq(std::vector<Action> actions, std::vector<float> freq, Action bias, float factor, std::vector<int> biased_idxs) {
+  auto b_freq = biased_freq(actions, freq, bias, factor);
+  float b_sum = 0.0f, norm_sum = 0.0f;
+  std::vector<float> correct_freq;
+  for(int fidx = 0; fidx < b_freq.size(); ++fidx) {
+    correct_freq.push_back(std::find(biased_idxs.begin(), biased_idxs.end(), fidx) != biased_idxs.end() ?
+                                     freq[fidx] * factor : freq[fidx]);
+    b_sum += b_freq[fidx];
+    norm_sum += correct_freq[fidx];
+  }
+  for(int fidx = 0; fidx < correct_freq.size(); ++fidx) {
+    correct_freq[fidx] /= norm_sum;
+    REQUIRE(b_freq[fidx] == correct_freq[fidx]);
+  }
+  REQUIRE(abs(b_sum - 1.0f) < 0.001);
+}
+
+TEST_CASE("Bias action frequencies", "[bias]") {
+  std::vector<Action> no_fold = {Action::CHECK_CALL, Action{0.50f}, Action::ALL_IN};
+  std::vector<Action> no_bet = {Action::FOLD, Action::CHECK_CALL};
+  std::vector<Action> facing_bet = {Action::FOLD, Action::CHECK_CALL, Action{0.30f}, Action{0.80f}, Action::ALL_IN};
+  std::vector<Action> facing_check = {Action::CHECK_CALL, Action{0.30f}, Action{0.50f}, Action{1.50f}, Action::ALL_IN};
+  float factor = 0.5f;
+  std::vector<float> freq_2 = {0.25f, 0.75f};
+  std::vector<float> freq_3 = {0.10f, 0.25f, 0.65f};
+  std::vector<float> freq_5 = {0.10f, 0.25f, 0.15f, 0.30f, 0.20f};
+  test_biased_freq(no_fold, freq_3, Action::BIAS_FOLD, 5.0f, {});
+  test_biased_freq(no_fold, freq_3, Action::BIAS_CALL, 5.0f, {0});
+  test_biased_freq(no_fold, freq_3, Action::BIAS_RAISE, 5.0f, {1, 2});
+  test_biased_freq(no_bet, freq_2, Action::BIAS_RAISE, 5.0f, {});
+  test_biased_freq(no_bet, freq_2, Action::BIAS_CALL, 5.0f, {1});
+  test_biased_freq(facing_bet, freq_5, Action::BIAS_RAISE, 5.0f, {2, 3, 4});
+  test_biased_freq(facing_check, freq_5, Action::BIAS_RAISE, 5.0f, {1, 2, 3, 4});
 }
 
 TEST_CASE("Serialize Hand", "[serialize]") {

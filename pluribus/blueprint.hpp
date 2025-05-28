@@ -10,36 +10,42 @@
 
 namespace pluribus {
 
-class Blueprint : public Strategy<float> {
+template <class T>
+class Blueprint : public Strategy<T> {
 public:
   Blueprint() : _freq{nullptr} {}
 
-  void build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir = "");
-
-  virtual const StrategyStorage<float>& get_strategy() const {
+  virtual const StrategyStorage<T>& get_strategy() const {
     if(_freq) return *_freq;
     throw std::runtime_error("Blueprint strategy is null.");
   }
   virtual const BlueprintTrainerConfig& get_config() const { return _config; }
+  void set_config(BlueprintTrainerConfig config) { _config = config; }
   
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_freq);
   }
 
+protected:
+  void assign_freq(StrategyStorage<T>* freq) { _freq = std::unique_ptr<StrategyStorage<T>>{freq}; }
+  std::unique_ptr<StrategyStorage<T>>& get_freq() { return _freq; }
+
 private:
-  std::unique_ptr<StrategyStorage<float>> _freq;
+  std::unique_ptr<StrategyStorage<T>> _freq;
   BlueprintTrainerConfig _config;
 };
 
-struct Buffer {
-  std::vector<float> freqs;
-  size_t offset;
-
-  template <class Archive>
-  void serialize(Archive& ar) {
-    ar(freqs, offset);
-  }
+class LosslessBlueprint : public Blueprint<float> {
+public:
+  void build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir = "");
 };
+
+class SampledBlueprint : public Blueprint<Action> {
+public:
+  SampledBlueprint(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor = 5.0f);
+};
+
+std::vector<float> biased_freq(const std::vector<Action>& actions, const std::vector<float>& freq, Action bias, float factor);
 
 }

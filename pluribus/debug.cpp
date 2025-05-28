@@ -25,7 +25,7 @@ std::string round_to_str(int round) {
   }
 }
 
-const std::vector<std::string> positions{"BTN", "CO", "HJ", "LJ", "UTG+2", "UTG+1", "UTG", "BB", "SB"};
+const std::vector<std::string> positions{"BTN", "CO", "HJ", "LJ", "UTG+2", "UTG+1", "UTG"};
 std::string pos_to_str(int idx, int n_players) {
   if(idx == 0) return "SB";
   if(idx == 1) return "BB";

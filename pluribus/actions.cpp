@@ -11,7 +11,11 @@
 namespace pluribus {
 
 std::string Action::to_string() const {
-  if(_bet_type == -3.0f) return "Undefined";
+  if(_bet_type == -7.0f) return "Undefined";
+  if(_bet_type == -6.0f) return "Bias: Fold";
+  if(_bet_type == -5.0f) return "Bias: Call";
+  if(_bet_type == -4.0f) return "Bias: Raise";
+  if(_bet_type == -3.0f) return "Bias: None";
   if(_bet_type == -2.0f) return "All-in";
   if(_bet_type == -1.0f) return "Fold";
   if(_bet_type == 0.0f) return "Check/Call";
@@ -20,7 +24,11 @@ std::string Action::to_string() const {
   return oss.str();
 }
 
-Action Action::UNDEFINED{-3.0f};
+Action Action::UNDEFINED{-7.0f};
+Action Action::BIAS_FOLD{-6.0f};
+Action Action::BIAS_CALL{-5.0f};
+Action Action::BIAS_RAISE{-4.0f};
+Action Action::BIAS_NONE{-3.0f};
 Action Action::ALL_IN{-2.0f};
 Action Action::FOLD{-1.0f};
 Action Action::CHECK_CALL{0.0f};
@@ -128,6 +136,14 @@ BlueprintActionProfile::BlueprintActionProfile(int n_players) {
   // river
   set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 3, 0, 0);  
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 3, 1, 0);
+}
+
+BiasActionProfile::BiasActionProfile() {
+  std::vector<Action> bias_actions = {Action::BIAS_FOLD, Action::BIAS_CALL, Action::BIAS_RAISE, Action::BIAS_NONE};
+  set_iso_actions(bias_actions);
+  for(int round = 0; round <= 3; ++round) {
+    set_actions(bias_actions, round, 0, 0);
+  }
 }
 
 }
