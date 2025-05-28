@@ -111,7 +111,11 @@ BlueprintActionProfile::BlueprintActionProfile(int n_players) {
   }
   
   if(n_players > 2) { // preflop 3-bet
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.80f}, Action{1.00f}, Action{1.20f}}, 0, 2, 0);
+    for(int pos = 2; pos < n_players; ++pos) {
+      set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{1.20f}}, 0, 2, pos);
+    }
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.20f}, Action{1.40f}}, 0, 2, 0);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.20f}, Action{1.40f}}, 0, 2, 1);
   }
   else {
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.20f}, Action{1.40f}, Action{1.60f}, Action{1.80f}}, 0, 2, 0);
@@ -121,11 +125,11 @@ BlueprintActionProfile::BlueprintActionProfile(int n_players) {
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.80f}, Action{1.00f}, Action::ALL_IN}, 0, 3, 0);
 
   // flop
-  if(n_players == 2) {
-    set_actions({Action::CHECK_CALL, Action{0.16f}, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
+  if(n_players > 2) {
+    set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
   }
   else {
-    set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
+    set_actions({Action::CHECK_CALL, Action{0.16f}, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0); 
   }
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 1, 0);
 
