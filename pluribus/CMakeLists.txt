@@ -15,4 +15,4 @@ add_library(
   util.cpp
   debug.cpp
 )
-target_link_libraries(PluribusLib PRIVATE SDL2_image::SDL2_image ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES} TBB::tbb OpenMP::OpenMP_CXX cnpy z HandIsoLib OMPEvalLib ${Boost_LIBRARIES})
+target_link_libraries(PluribusLib PRIVATE ${SDL2_IMAGE_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES} TBB::tbb OpenMP::OpenMP_CXX cnpy z HandIsoLib OMPEvalLib ${Boost_LIBRARIES})
