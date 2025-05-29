@@ -1,7 +1,8 @@
 #include <numeric>
 #include <pluribus/rng.hpp>
-#include <pluribus/range.hpp>
 #include <pluribus/poker.hpp>
+#include <pluribus/mccfr.hpp>
+#include <pluribus/range.hpp>
 
 namespace pluribus {
 
@@ -25,6 +26,17 @@ HoleCardIndexer::HoleCardIndexer() {
 
 std::unique_ptr<HoleCardIndexer> HoleCardIndexer::_instance = nullptr;
 
+std::vector<Hand> PokerRange::hands() const {
+  std::vector<Hand> ret;
+  for(uint8_t c1 = 0; c1 < 52; ++c1) {
+    for(uint8_t c2 = 0; c2 < c1; ++c2) {
+      Hand hand = canonicalize(Hand{c1, c2});
+      if(frequency(hand) > 0) ret.push_back(hand);
+    } 
+  }
+  return ret;
+}
+
 float PokerRange::n_combos() const {
   return std::reduce(_weights.begin(), _weights.end());
 }
@@ -40,6 +52,14 @@ Hand PokerRange::sample(std::unordered_set<uint8_t> dead_cards) const {
   }
   std::discrete_distribution<> dist(masked_weights.begin(), masked_weights.end());
   return HoleCardIndexer::get_instance()->hand(dist(GlobalRNG::instance()));
+}
+
+void PokerRange::remove_cards(const std::vector<uint8_t>& cards) {
+  for(const auto& hand : hands()) {
+    if(collides(hand, cards)) {
+      set_frequency(hand, 0.0f);
+    }
+  }
 }
 
 PokerRange& PokerRange::operator+=(const PokerRange& other) { 

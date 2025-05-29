@@ -172,6 +172,97 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
   std::cout << "Lossless blueprint built.\n";
 }
 
+bool any_collision(const Hand& hero, const Hand& villain, const std::vector<uint8_t>& board) {
+  return collides(hero, villain) || collides(hero, board) || collides(villain, board);
+}
+
+bool any_collision(uint8_t card, const std::vector<Hand>& hands, const std::vector<uint8_t>& board) {
+  for(const auto& hand : hands) {
+    if(card == hand.cards()[0] || card == hand.cards()[1]) return true;
+  }
+  return std::find(board.begin(), board.end(), card) != board.end();
+}
+
+std::vector<Hand> construct_hands(const PokerState& state, int i, const Hand& hero, const Hand& villain) {
+  std::vector<Hand> hands;
+  bool found_hero = false, found_villain = false;
+  for(int p = 0; p < state.get_players().size(); ++p) {
+    if(!state.get_players()[p].has_folded()) {
+      if(p == i) {
+        hands.push_back(hero);
+        found_hero = true;
+      }
+      else {
+        if(found_villain) throw std::runtime_error("Found multiple villains while constructing hands for EV enumeration.");
+        hands.push_back(villain);
+        found_villain = true;
+      }
+    }
+    else {
+      hands.push_back(Hand{{52, 52}}); // placeholder
+    }
+  }
+  if(!found_hero) throw std::runtime_error("Hero missing while constructing hands for EV enumeration.");
+  if(hands.size() != state.get_players().size()) throw std::runtime_error("Number of constructed hands does not match players for EV enumeration.");
+  return hands;
+}
+
+double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const PokerRange& hero, const PokerRange& villain, const std::vector<uint8_t>& board) const {
+  if(state.active_players() != 2) throw std::runtime_error("Enumeration of expected value is only possible with two players.");
+  omp::HandEvaluator eval;
+  auto hero_hands = hero.hands();
+  auto villain_hands = villain.hands();
+
+  double ev = 0.0;
+  float hero_combos = 0.0;
+  for(const auto& hh : hero_hands) {
+    double hand_ev = 0.0;
+    float villain_combos = 0.0f;
+    for(const auto& vh : villain_hands) {
+      if(any_collision(hh, vh, board)) continue;
+      auto hands = construct_hands(state, i, hh, vh);
+      float villain_freq = villain.frequency(vh);
+      hand_ev += villain_freq * expected_value(state, i, hands, board, get_config().poker.n_chips, eval);
+      villain_combos += villain_freq;
+    }
+    hand_ev /= villain_combos;
+    float hero_freq = hero.frequency(hh);
+    ev += hero_freq * hand_ev;
+    hero_combos += hero_freq;
+  }
+  return ev / hero_combos;
+}
+
+double LosslessBlueprint::expected_value(const PokerState& state, int i, const std::vector<Hand>& hands, const std::vector<uint8_t>& board, int stack_size, const omp::HandEvaluator& eval) const {
+  if(state.is_terminal()) {
+    return utility(state, i, Board{board}, hands, stack_size, eval);
+  }
+  else if(board.size() < n_board_cards(state.get_round())) {
+    double ev = 0.0;
+    int total = 0;
+    for(uint8_t card = 0; card < 52; ++card) {
+      if(any_collision(card, hands, board)) continue;
+      auto next_board = board;
+      next_board.push_back(card);
+      ev += expected_value(state, i, hands, next_board, stack_size, eval);
+      ++total;
+    }
+    return ev / total;
+  }
+  else {
+    const auto& strat = get_strategy();
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[state.get_active()]);
+    int base_idx = strat.index(state, cluster);
+    auto actions = valid_actions(state, get_config().action_profile);
+    double ev = 0.0;
+    for(int aidx = 0; aidx < actions.size(); ++aidx) {
+      float freq = strat[base_idx + aidx];
+      ev += freq * expected_value(state.apply(actions[aidx]), i, hands, board, stack_size, eval);
+    }
+    return ev;
+  }
+}
+
 struct SampledMetadata {
   BlueprintTrainerConfig config;
   std::vector<std::string> buffer_fns;

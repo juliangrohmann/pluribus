@@ -51,7 +51,9 @@ public:
 
   std::array<uint8_t, N>& cards() { return _cards; }
   const std::array<uint8_t, N>& cards() const { return _cards; }
-  std::vector<uint8_t> as_vector() { return std::vector<uint8_t>{_cards.data(), _cards.data() + _cards.size()}; }
+  std::vector<uint8_t> as_vector(int n = -1) const { 
+    return std::vector<uint8_t>{_cards.data(), _cards.data() + (n == -1 ? _cards.size() : n)}; 
+  }
   std::string to_string() const { return cards_to_str(_cards.data(), N); }
 
   bool operator==(const CardSet<N>&) const = default;
@@ -88,6 +90,13 @@ public:
 inline Hand canonicalize(const Hand& hand) {
   return hand.cards()[0] > hand.cards()[1] ? hand : Hand{hand.cards()[1], hand.cards()[0]};
 }
+
+bool collides(uint8_t card, const Hand& hand);
+bool collides(uint8_t card, const Board& board);
+bool collides(uint8_t card, const std::vector<uint8_t> cards);
+bool collides(const Hand& h1, const Hand& h2);
+bool collides(const Hand& hand, const Board& board);
+bool collides(const Hand& hand, const std::vector<uint8_t>& cards);
 
 class Player {
 public:
@@ -153,6 +162,7 @@ public:
   inline uint8_t get_bet_level() const { return _bet_level; }
   inline int8_t get_winner() const { return _winner; }
   inline bool is_terminal() const { return get_winner() != -1 || get_round() >= 4; };
+  int active_players() const;
   PokerState apply(Action action) const;
   PokerState apply(const ActionHistory& action_history) const;
   std::string to_string() const;
@@ -185,6 +195,7 @@ int total_bet_size(const PokerState& state, Action action);
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile);
 
 std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board board_cards, const omp::HandEvaluator& eval);
+int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands);
 void deal_board(Deck& deck, std::array<uint8_t, 5>& board);
 }

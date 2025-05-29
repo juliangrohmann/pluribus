@@ -36,6 +36,33 @@ void Deck::shuffle() {
   _current = 0;
 }
 
+bool collides(uint8_t card, const Hand& hand) {
+  return hand.cards()[0] == card || hand.cards()[1] == card;
+}
+
+bool collides(uint8_t card, const Board& board) {
+  return std::find(board.cards().begin(), board.cards().end(), card) != board.cards().end();
+}
+
+bool collides(uint8_t card, const std::vector<uint8_t> cards) {
+  return std::find(cards.begin(), cards.end(), card) != cards.end();
+}
+
+bool collides(const Hand& h1, const Hand& h2) {
+  return h1.cards()[0] == h2.cards()[0] || h1.cards()[1] == h2.cards()[1] ||
+         h1.cards()[0] == h2.cards()[1] || h1.cards()[1] == h2.cards()[0];
+}
+
+bool collides(const Hand& hand, const Board& board) {
+  return std::find(board.cards().begin(), board.cards().end(), hand.cards()[0]) != board.cards().end() ||
+         std::find(board.cards().begin(), board.cards().end(), hand.cards()[1]) != board.cards().end();
+}
+
+bool collides(const Hand& hand, const std::vector<uint8_t>& cards) {
+  return std::find(cards.begin(), cards.end(), hand.cards()[0]) != cards.end() ||
+         std::find(cards.begin(), cards.end(), hand.cards()[1]) != cards.end();
+}
+
 void Player::invest(int amount) {
   assert(!has_folded() && "Attempted to invest but player already folded.");
   assert(get_chips() >= amount && "Attempted to invest more chips than available.");
@@ -90,6 +117,14 @@ PokerState PokerState::next_state(Action action) const {
   if(action == Action::FOLD) return fold();
   if(action == Action::CHECK_CALL) return player.get_betsize() == _max_bet ? check() : call();
   return bet(total_bet_size(*this, action) - player.get_betsize());
+}
+
+int PokerState::active_players() const {
+  int n = 0;
+  for(const auto& p : _players) {
+    if(!p.has_folded()) ++n;
+  }
+  return n;
 }
 
 PokerState PokerState::apply(Action action) const {
@@ -306,6 +341,12 @@ std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& h
     }
   }
   return winners;
+}
+
+int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
+  if(state.get_players()[i].has_folded()) return 0;
+  std::vector<uint8_t> win_idxs = winners(state, hands, board, eval);
+  return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
 }
 
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands) {

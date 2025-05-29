@@ -62,6 +62,7 @@ std::vector<float> get_freq(const PokerState& state, const Board& board, const H
 }
 
 int sample_action_idx(const std::vector<float>& freq);
+int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, const omp::HandEvaluator& eval);
 
 struct BlueprintTimingConfig {
   long preflop_threshold_m = 800;
@@ -142,8 +143,6 @@ private:
   int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
   int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
-  int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
-  int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const;
   void log_metrics(long t);
 
 #ifdef UNIT_TEST

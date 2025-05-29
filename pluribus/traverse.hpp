@@ -22,30 +22,28 @@ Action str_to_action(const std::string& str);
 void render_ranges(RangeViewer* viewer_p, const PokerRange& base_range, const std::unordered_map<Action, RenderableRange>& action_ranges);
 
 template <class T>
-std::unordered_map<Action, RenderableRange> trainer_ranges(const StrategyStorage<T>& strat, const BlueprintTrainerConfig& config,
-                                                           const PokerState& state, const Board& board, PokerRange& base_range) {
+PokerRange build_action_range(const PokerRange& base_range, const Action& a, const PokerState& state, const Board& board, const StrategyStorage<T>& strat, const ActionProfile& profile) {
+  auto actions = valid_actions(state, profile);
+  PokerRange rel_range;
+  for(const auto& hand : base_range.hands()) {
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
+    int base_idx = strat.index(state, cluster);
+    auto freq = calculate_strategy(strat, base_idx, actions.size());
+    int a_idx = std::distance(actions.begin(), std::find(actions.begin(), actions.end(), a));
+    rel_range.add_hand(hand, freq[a_idx]);
+  }
+  return rel_range;
+}
+
+template <class T>
+std::unordered_map<Action, RenderableRange> build_renderable_ranges(const StrategyStorage<T>& strat, const ActionProfile& profile, 
+                                                                    const PokerState& state, const Board& board, PokerRange& base_range) {
   std::unordered_map<Action, RenderableRange> ranges;
-  auto actions = valid_actions(state, config.action_profile);
+  auto actions = valid_actions(state, profile);
   auto color_map = map_colors(actions);
+  base_range.remove_cards(board.as_vector(n_board_cards(state.get_round())));
   for(Action a : actions) {
-    PokerRange action_range;
-    for(uint8_t i = 0; i < 52; ++i) {
-      for(uint8_t j = i + 1; j < 52; ++j) {
-        Hand hand{j, i};
-        for(int card_idx = 0; card_idx < n_board_cards(state.get_round()); ++card_idx) {
-          if(i == board.cards()[card_idx] || j == board.cards()[card_idx]) {
-            base_range.set_frequency(hand, 0.0f);
-          }
-        }
-        
-        int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
-        std::vector<float> freq;
-        int base_idx = strat.index(state, cluster);
-        freq = calculate_strategy(strat, base_idx, actions.size());
-        int a_idx = std::distance(actions.begin(), std::find(actions.begin(), actions.end(), a));
-        action_range.add_hand(hand, freq[a_idx]);
-      }
-    }
+    PokerRange action_range = build_action_range(base_range, a, state, board, strat, profile);
     ranges.insert({a, RenderableRange{base_range * action_range, a.to_string(), color_map[a], true}});
   }
   return ranges;
@@ -71,7 +69,7 @@ void traverse(RangeViewer* viewer_p, const Strategy<T>& bp) {
   PokerState state = bp.get_config().init_state;
   std::vector<PokerRange> ranges = bp.get_config().init_ranges;
   for(int i = 0; i < bp.get_config().poker.n_players; ++i) ranges.push_back(PokerRange::full());
-  auto action_ranges = trainer_ranges(bp.get_strategy(), bp.get_config(), state, board, ranges[state.get_active()]);
+  auto action_ranges = build_renderable_ranges(bp.get_strategy(), bp.get_config().action_profile, state, board, ranges[state.get_active()]);
   render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
 
   std::cout << state.to_string();
@@ -98,7 +96,7 @@ void traverse(RangeViewer* viewer_p, const Strategy<T>& bp) {
       state = bp.get_config().init_state;
     }
 
-    action_ranges = trainer_ranges(bp.get_strategy(), bp.get_config(), state, board, ranges[state.get_active()]);
+    action_ranges = build_renderable_ranges(bp.get_strategy(), bp.get_config().action_profile, state, board, ranges[state.get_active()]);
     render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
     std::cout << state.to_string();
     std::cout << "\nAction: ";

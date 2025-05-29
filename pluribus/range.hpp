@@ -48,6 +48,8 @@ public:
   void set_frequency(const Hand& hand, float freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] = freq; }
   float frequency(const Hand& hand) const { return _weights[HoleCardIndexer::get_instance()->index(hand)]; }
   const std::vector<float>& weights() { return _weights; }
+  void remove_cards(const std::vector<uint8_t>& cards);
+  std::vector<Hand> hands() const;
   float n_combos() const;
   Hand sample(std::unordered_set<uint8_t> dead_cards = {}) const;
 

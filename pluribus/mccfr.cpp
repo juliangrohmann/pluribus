@@ -29,6 +29,21 @@ int sample_action_idx(const std::vector<float>& freq) {
   return dist(GlobalRNG::instance());
 }
 
+int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, const omp::HandEvaluator& eval) {
+  if(state.get_players()[i].has_folded()) {
+    return state.get_players()[i].get_chips() - stack_size;
+  }
+  else if(state.get_winner() != -1) {
+    return state.get_players()[i].get_chips() - stack_size + (state.get_winner() == i ? state.get_pot() : 0);
+  }
+  else if(state.get_round() >= 4) {
+    return state.get_players()[i].get_chips() - stack_size + showdown_payoff(state, i, board, hands, eval);
+  }
+  else {
+    throw std::runtime_error("Non-terminal state does not have utility.");
+  }
+}
+
 BlueprintTrainerConfig::BlueprintTrainerConfig(int n_players, int n_chips, int ante) 
     : BlueprintTrainerConfig{PokerConfig{n_players, n_chips, ante}} {}
 
@@ -235,7 +250,7 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
 int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
                                        const omp::HandEvaluator& eval) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
-    return utility(state, i, board, hands, eval);
+    return utility(state, i, board, hands, _config.poker.n_chips, eval);
   }
   else if(state.get_active() == i) {
     auto actions = valid_actions(state, _config.action_profile);
@@ -285,7 +300,7 @@ std::string relative_history_str(const PokerState& state, const BlueprintTrainer
 
 int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
-    int u = utility(state, i, board, hands, eval);
+    int u = utility(state, i, board, hands, _config.poker.n_chips, eval);
     if(_verbose) {
       std::cout << "Terminal: " << relative_history_str(state, _config) << "\n";
       std::cout << "\tHands: ";
@@ -391,27 +406,6 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
   }
 }
 
-int BlueprintTrainer::utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const {
-  if(state.get_players()[i].has_folded()) {
-    return state.get_players()[i].get_chips() - _config.poker.n_chips;
-  }
-  else if(state.get_winner() != -1) {
-    return state.get_players()[i].get_chips() - _config.poker.n_chips + (state.get_winner() == i ? state.get_pot() : 0);
-  }
-  else if(state.get_round() >= 4) {
-    return state.get_players()[i].get_chips() - _config.poker.n_chips + showdown_payoff(state, i, board, hands, eval);
-  }
-  else {
-    throw std::runtime_error("Non-terminal state does not have utility.");
-  }
-}
-
-int BlueprintTrainer::showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) const {
-  if(state.get_players()[i].has_folded()) return 0;
-  std::vector<uint8_t> win_idxs = winners(state, hands, board, eval);
-  return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
-}
-
 template <class T>
 void log_preflop_strategy(const StrategyStorage<T>& strat, const BlueprintTrainerConfig& config, nlohmann::json& metrics, bool phi) {
   PokerState state = config.init_state;
@@ -420,7 +414,7 @@ void log_preflop_strategy(const StrategyStorage<T>& strat, const BlueprintTraine
     auto actions = valid_actions(state, config.action_profile);
     PokerRange range_copy = config.init_ranges[state.get_active()];
     
-    auto ranges = trainer_ranges(strat, config, state, board, range_copy);
+    auto ranges = build_renderable_ranges(strat, config.action_profile, state, board, range_copy);
     for(Action a : actions) {
       double freq = ranges.at(a).get_range().n_combos() / 1326.0;
       std::string data_label = pos_to_str(state.get_active(), config.poker.n_players) + " " + a.to_string() + (!phi ? " (regrets)" : " (phi)");
