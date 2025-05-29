@@ -40,4 +40,20 @@ void render_ranges(RangeViewer* viewer_p, const PokerRange& base_range, const st
   viewer_p->render(ranges);
 }
 
+std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const Board& board, const Strategy<float>& strat) {
+  PokerState curr_state = strat.get_config().init_state;
+  std::vector<PokerRange> ranges = strat.get_config().init_ranges;
+  for(int aidx = 0; aidx < actions.size(); ++aidx) {
+    ranges[curr_state.get_active()] *= build_action_range(ranges[curr_state.get_active()], actions[aidx], curr_state, board, 
+                                                          strat.get_strategy(), strat.get_config().action_profile);
+    if(aidx != actions.size() - 1) {
+      curr_state = curr_state.apply(actions[aidx]); // don't apply last action to avoid incrementing the round before card removal
+    }
+  }
+  for(auto& r : ranges) {
+    r.remove_cards(board.as_vector(n_board_cards(curr_state.get_round())));
+  }
+  return ranges;
+}
+
 }

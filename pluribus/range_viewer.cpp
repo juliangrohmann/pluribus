@@ -189,6 +189,8 @@ void RangeViewer::render_legend(const std::vector<RenderableRange>& ranges) {
       ++n_rel_ranges;
     }
   }
+  if(n_rel_ranges == 0) return;
+  
   int w = _window_width / n_rel_ranges;
   int h = 100;
   int x = 0;

@@ -20,6 +20,7 @@ void traverse_trainer(RangeViewer* viewer_p, const std::string& bp_fn);
 void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn);
 Action str_to_action(const std::string& str);
 void render_ranges(RangeViewer* viewer_p, const PokerRange& base_range, const std::unordered_map<Action, RenderableRange>& action_ranges);
+std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const Board& board, const Strategy<float>& strat);
 
 template <class T>
 PokerRange build_action_range(const PokerRange& base_range, const Action& a, const PokerState& state, const Board& board, const StrategyStorage<T>& strat, const ActionProfile& profile) {
