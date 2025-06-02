@@ -24,6 +24,25 @@
 
 namespace pluribus {
 
+// void BlueprintTrainerConfig::set_iterations(const BlueprintTimingConfig& timings, long it_per_min) {
+//   preflop_threshold = timings.preflop_threshold_m * it_per_min;
+//   snapshot_interval = timings.snapshot_interval_m * it_per_min;
+//   prune_thresh = timings.prune_thresh_m * it_per_min;
+//   lcfr_thresh = timings.lcfr_thresh_m * it_per_min;
+//   discount_interval = timings.discount_interval_m * it_per_min;
+//   log_interval = timings.log_interval_m * it_per_min;
+// }
+
+// long BlueprintTrainerConfig::next_discount_step(long t, long T) const {
+//   long next_disc = ((t + 1) / discount_interval + 1) * discount_interval;
+//   return next_disc < lcfr_thresh ? next_disc : T + 1;
+// }
+
+// long BlueprintTrainerConfig::next_snapshot_step(long t, long T) const {
+//     long next_snap = std::max((t - preflop_threshold + 1) / snapshot_interval + 1, 0L) * snapshot_interval + preflop_threshold;
+//     return next_snap < T ? next_snap : T;
+// }
+
 int sample_action_idx(const std::vector<float>& freq) {
   std::discrete_distribution<> dist(freq.begin(), freq.end());
   return dist(GlobalRNG::instance());
@@ -154,7 +173,7 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
   long next_discount = _config.discount_interval;
   long next_snapshot = _config.preflop_threshold;
   bool full_ranges = are_full_ranges(_config.init_ranges);
-  std::cout << "Full ranges: " << full_ranges << "\n";
+  std::cout << "Full ranges: " << (full_ranges ? "true" : "false") << "\n";
   std::cout << "Training blueprint from " << _t << " to " << std::to_string(T) << "\n";
   while(_t < T) {
     long init_t = _t;
@@ -247,6 +266,13 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
   cereal_save(*this, oss.str());
 }
 
+std::string info_str(const PokerState& state, int prev_r, int d_r, long t, const Board& board, const std::vector<Hand>& hands) {
+  std::string str = "r=" + std::to_string(prev_r) + " + " + std::to_string(d_r) + "\nt=" + 
+         std::to_string(t) + "\nBoard=" + board.to_string() + "\nHands=";
+  for(const auto& hand : hands) str += hand.to_string() + "  ";
+  str += "\n" + state.get_action_history().to_string();
+}
+
 int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
                                        const omp::HandEvaluator& eval) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
@@ -273,8 +299,16 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       if(values.find(a) != values.end()) {
-        int next_r = _regrets[base_idx + a_idx].load() + values[a] - v;
-        if(next_r > 2'000'000'000) throw std::runtime_error("Regret overflowing!");
+        int prev_r = _regrets[base_idx + a_idx].load();
+        int d_r = values[a] - v;
+        int next_r = prev_r + d_r;
+        if(next_r > 2'000'000'000) {
+          throw std::runtime_error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands));
+        }
+        else if(d_r > state.get_players().size() * get_config().poker.n_chips) {
+          std::cout << "Overflow: values[a]=" + std::to_string(values[actions[a_idx]]) + ", v=" + std::to_string(v);
+          throw std::runtime_error("Utility too large!\n" + info_str(state, prev_r, d_r, t, board, hands));
+        }
         _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       }
     }
@@ -339,12 +373,19 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, con
     if(state.get_round() == 0 && t > _config.preflop_threshold) return v;
 
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-      int dR = values[actions[a_idx]] - v;
-      int next_r = _regrets[base_idx + a_idx].load() + dR;
-      if(next_r > 2'000'000'000) throw std::runtime_error("Regret overflowing!");
+      int prev_r = _regrets[base_idx + a_idx].load();
+      int d_r = values[actions[a_idx]] - v;
+      int next_r = _regrets[base_idx + a_idx].load() + d_r;
+      if(next_r > 2'000'000'000) {
+        throw std::runtime_error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands));
+      }
+      else if(d_r > state.get_players().size() * get_config().poker.n_chips) {
+        std::cout << "Overflow: values[a]=" + std::to_string(values[actions[a_idx]]) + ", v=" + std::to_string(v);
+        throw std::runtime_error("Utility too large!\n" + info_str(state, prev_r, d_r, t, board, hands));
+      }
       _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       if(_verbose) {
-        std::cout << "\tR(" << actions[a_idx].to_string() << ") = " << dR << "\n";
+        std::cout << "\tR(" << actions[a_idx].to_string() << ") = " << d_r << "\n";
         std::cout << "\tcum R(" << actions[a_idx].to_string() << ") = " << _regrets[base_idx + a_idx].load() << "\n";
       }
     }
