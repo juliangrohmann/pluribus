@@ -303,11 +303,10 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
         int d_r = values[a] - v;
         int next_r = prev_r + d_r;
         if(next_r > 2'000'000'000) {
-          throw std::runtime_error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands));
+          throw std::runtime_error("Regret overflowing!\n");
         }
         else if(d_r > state.get_players().size() * get_config().poker.n_chips) {
-          std::cout << "Overflow: values[a]=" + std::to_string(values[actions[a_idx]]) + ", v=" + std::to_string(v);
-          throw std::runtime_error("Utility too large!\n" + info_str(state, prev_r, d_r, t, board, hands));
+          throw std::runtime_error("Utility too large!\n");
         }
         _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       }
@@ -377,11 +376,10 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, con
       int d_r = values[actions[a_idx]] - v;
       int next_r = _regrets[base_idx + a_idx].load() + d_r;
       if(next_r > 2'000'000'000) {
-        throw std::runtime_error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands));
+        throw std::runtime_error("Regret overflowing!");
       }
       else if(d_r > state.get_players().size() * get_config().poker.n_chips) {
-        std::cout << "Overflow: values[a]=" + std::to_string(values[actions[a_idx]]) + ", v=" + std::to_string(v);
-        throw std::runtime_error("Utility too large!\n" + info_str(state, prev_r, d_r, t, board, hands));
+        throw std::runtime_error("Utility too large!");
       }
       _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       if(_verbose) {
