@@ -271,6 +271,7 @@ std::string info_str(const PokerState& state, int prev_r, int d_r, long t, const
          std::to_string(t) + "\nBoard=" + board.to_string() + "\nHands=";
   for(const auto& hand : hands) str += hand.to_string() + "  ";
   str += "\n" + state.get_action_history().to_string();
+  return str;
 }
 
 int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
@@ -303,10 +304,11 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
         int d_r = values[a] - v;
         int next_r = prev_r + d_r;
         if(next_r > 2'000'000'000) {
-          throw std::runtime_error("Regret overflowing!\n");
+          throw std::runtime_error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands));
         }
         else if(d_r > state.get_players().size() * get_config().poker.n_chips) {
-          throw std::runtime_error("Utility too large!\n");
+          std::cout << "Overflow: values[a]=" + std::to_string(values[actions[a_idx]]) + ", v=" + std::to_string(v);
+          throw std::runtime_error("Utility too large!\n" + info_str(state, prev_r, d_r, t, board, hands));
         }
         _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       }
@@ -376,10 +378,11 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, con
       int d_r = values[actions[a_idx]] - v;
       int next_r = _regrets[base_idx + a_idx].load() + d_r;
       if(next_r > 2'000'000'000) {
-        throw std::runtime_error("Regret overflowing!");
+        throw std::runtime_error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands));
       }
       else if(d_r > state.get_players().size() * get_config().poker.n_chips) {
-        throw std::runtime_error("Utility too large!");
+        std::cout << "Overflow: values[a]=" + std::to_string(values[actions[a_idx]]) + ", v=" + std::to_string(v);
+        throw std::runtime_error("Utility too large!\n" + info_str(state, prev_r, d_r, t, board, hands));
       }
       _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       if(_verbose) {
