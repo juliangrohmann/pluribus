@@ -303,14 +303,20 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
         int prev_r = _regrets[base_idx + a_idx].load();
         int d_r = values[a] - v;
         int next_r = prev_r + d_r;
+
+        int n_players = state.get_players().size();
+        int n_chips = get_config().poker.n_chips;
+        int product = n_players * n_chips;
+        bool condition_met = d_r > product;
+        std::string debug_pre = "DEBUG PRE: n_players=" + std::to_string(n_players) + ", n_chips=" + std::to_string(n_chips) + "d_r=" + std::to_string(d_r) + ", product=" + std::to_string(product) + ", condition=" + std::to_string(condition_met) + "\n";
         if(next_r > 2'000'000'000) {
           throw std::runtime_error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands));
         }
-        else if(d_r > state.get_players().size() * get_config().poker.n_chips) {
-          std::string err_info = "values[a]=" + std::to_string(values[actions[a_idx]]) + ", v=" + std::to_string(v) + "\n";
-          err_info += "n_chips=" + std::to_string(get_config().poker.n_chips) + "\nplayers=" + std::to_string(state.get_players().size()) + "\nproduct=" + std::to_string(state.get_players().size() * get_config().poker.n_chips) + "\nd_r=" + std::to_string(d_r) + "\n";
-          throw std::runtime_error("Utility too large!\n" + info_str(state, prev_r, d_r, t, board, hands) + err_info);
-      }
+        else if(condition_met) {
+          std::string debug_post = "DEBUG POST: n_players=" + std::to_string(n_players) + ", n_chips=" + std::to_string(n_chips) + "d_r=" + std::to_string(d_r) + ", product=" + std::to_string(product) + ", condition=" + std::to_string(condition_met) + "\n";
+          throw std::runtime_error("Utility too large!\n" + info_str(state, prev_r, d_r, t, board, hands) + debug_pre + debug_post);
+        }
+
         _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       }
     }
@@ -377,15 +383,21 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, con
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       int prev_r = _regrets[base_idx + a_idx].load();
       int d_r = values[actions[a_idx]] - v;
-      int next_r = _regrets[base_idx + a_idx].load() + d_r;
+      int next_r = prev_r + d_r;
+      
+      int n_players = state.get_players().size();
+      int n_chips = get_config().poker.n_chips;
+      int product = n_players * n_chips;
+      bool condition_met = d_r > product;
+      std::string debug_pre = "DEBUG PRE: n_players=" + std::to_string(n_players) + ", n_chips=" + std::to_string(n_chips) + "d_r=" + std::to_string(d_r) + ", product=" + std::to_string(product) + ", condition=" + std::to_string(condition_met) + "\n";
       if(next_r > 2'000'000'000) {
         throw std::runtime_error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands));
       }
-      else if(d_r > state.get_players().size() * get_config().poker.n_chips) {
-        std::string err_info = "values[a]=" + std::to_string(values[actions[a_idx]]) + ", v=" + std::to_string(v) + "\n";
-        err_info += "n_chips=" + std::to_string(get_config().poker.n_chips) + "\nplayers=" + std::to_string(state.get_players().size()) + "\nproduct=" + std::to_string(state.get_players().size() * get_config().poker.n_chips) + "\nd_r=" + std::to_string(d_r) + "\n";
-        throw std::runtime_error("Utility too large!\n" + info_str(state, prev_r, d_r, t, board, hands) + err_info);
+      else if(condition_met) {
+        std::string debug_post = "DEBUG POST: n_players=" + std::to_string(n_players) + ", n_chips=" + std::to_string(n_chips) + "d_r=" + std::to_string(d_r) + ", product=" + std::to_string(product) + ", condition=" + std::to_string(condition_met) + "\n";
+        throw std::runtime_error("Utility too large!\n" + info_str(state, prev_r, d_r, t, board, hands) + debug_pre + debug_post);
       }
+
       _regrets[base_idx + a_idx].store(std::max(next_r, _config.regret_floor));
       if(_verbose) {
         std::cout << "\tR(" << actions[a_idx].to_string() << ") = " << d_r << "\n";
