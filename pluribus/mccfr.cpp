@@ -24,24 +24,24 @@
 
 namespace pluribus {
 
-// void BlueprintTrainerConfig::set_iterations(const BlueprintTimingConfig& timings, long it_per_min) {
-//   preflop_threshold = timings.preflop_threshold_m * it_per_min;
-//   snapshot_interval = timings.snapshot_interval_m * it_per_min;
-//   prune_thresh = timings.prune_thresh_m * it_per_min;
-//   lcfr_thresh = timings.lcfr_thresh_m * it_per_min;
-//   discount_interval = timings.discount_interval_m * it_per_min;
-//   log_interval = timings.log_interval_m * it_per_min;
-// }
+void BlueprintTrainerConfig::set_iterations(const BlueprintTimingConfig& timings, long it_per_min) {
+  preflop_threshold = timings.preflop_threshold_m * it_per_min;
+  snapshot_interval = timings.snapshot_interval_m * it_per_min;
+  prune_thresh = timings.prune_thresh_m * it_per_min;
+  lcfr_thresh = timings.lcfr_thresh_m * it_per_min;
+  discount_interval = timings.discount_interval_m * it_per_min;
+  log_interval = timings.log_interval_m * it_per_min;
+}
 
-// long BlueprintTrainerConfig::next_discount_step(long t, long T) const {
-//   long next_disc = ((t + 1) / discount_interval + 1) * discount_interval;
-//   return next_disc < lcfr_thresh ? next_disc : T + 1;
-// }
+long BlueprintTrainerConfig::next_discount_step(long t, long T) const {
+  long next_disc = ((t + 1) / discount_interval + 1) * discount_interval;
+  return next_disc < lcfr_thresh ? next_disc : T + 1;
+}
 
-// long BlueprintTrainerConfig::next_snapshot_step(long t, long T) const {
-//     long next_snap = std::max((t - preflop_threshold + 1) / snapshot_interval + 1, 0L) * snapshot_interval + preflop_threshold;
-//     return next_snap < T ? next_snap : T;
-// }
+long BlueprintTrainerConfig::next_snapshot_step(long t, long T) const {
+    long next_snap = std::max((t - preflop_threshold + 1) / snapshot_interval + 1, 0L) * snapshot_interval + preflop_threshold;
+    return next_snap < T ? next_snap : T;
+}
 
 int sample_action_idx(const std::vector<float>& freq) {
   std::discrete_distribution<> dist(freq.begin(), freq.end());
@@ -186,6 +186,7 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
       thread_local Deck deck{_config.init_board};
       thread_local Board board;
       thread_local std::vector<Hand> hands{static_cast<size_t>(_config.poker.n_players)};
+      thread_local std::ostringstream debug;
       if(_verbose) std::cout << "============== t = " << t << " ==============\n";
       if(t % (_config.log_interval) == 0) log_metrics(t);
       for(int i = 0; i < _config.poker.n_players; ++i) {
@@ -214,21 +215,23 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
           float q = dist(GlobalRNG::instance());
           if(q < 0.05f) {
             if(_verbose) std::cout << "============== Traverse MCCFR ==============\n";
-            traverse_mccfr(_config.init_state, t, i, board, hands, eval);
+            traverse_mccfr(_config.init_state, t, i, board, hands, eval, debug);
           }
           else {
             if(_verbose) std::cout << "============== Traverse MCCFR-P ==============\n";
-            traverse_mccfr_p(_config.init_state, t, i, board, hands, eval);
+            traverse_mccfr_p(_config.init_state, t, i, board, hands, eval, debug);
           }
         }
         else {
           if(_verbose) std::cout << "============== Traverse MCCFR ==============\n";
-          traverse_mccfr(_config.init_state, t, i, board, hands, eval);
+          traverse_mccfr(_config.init_state, t, i, board, hands, eval, debug);
         }
         if(_verbose) {
-          std::string buf;
-          std::cout << "Press a key to continue\n:";
-          std::cin >> buf;
+          // std::cout << debug.str();
+          // debug.clear()
+          // std::string buf;
+          // std::cout << "Press a key to continue\n:";
+          // std::cin >> buf;
         }
       }
     }
@@ -275,7 +278,7 @@ std::string info_str(const PokerState& state, int prev_r, int d_r, long t, const
 }
 
 int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-                                       const omp::HandEvaluator& eval) {
+                                       const omp::HandEvaluator& eval, std::ostringstream& debug) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
     return utility(state, i, board, hands, _config.poker.n_chips, eval);
   }
@@ -290,7 +293,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       if(_regrets[base_idx + a_idx].load() > _config.prune_cutoff) {
-        int v_a = traverse_mccfr_p(state.apply(a), t, i, board, hands, eval);
+        int v_a = traverse_mccfr_p(state.apply(a), t, i, board, hands, eval, debug);
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
       }
@@ -332,7 +335,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
       freq = get_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
     }
     Action a = actions[sample_action_idx(freq)];
-    return traverse_mccfr_p(state.apply(a), t, i, board, hands, eval);
+    return traverse_mccfr_p(state.apply(a), t, i, board, hands, eval, debug);
   }
 }
 
@@ -340,7 +343,8 @@ std::string relative_history_str(const PokerState& state, const BlueprintTrainer
   return state.get_action_history().slice(config.init_state.get_action_history().size()).to_string();
 }
 
-int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
+int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
+                                     const omp::HandEvaluator& eval, std::ostringstream& debug) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
     int u = utility(state, i, board, hands, _config.poker.n_chips, eval);
     if(_verbose) {
@@ -364,7 +368,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, con
     float v_exact = 0;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
-      int v_a = traverse_mccfr(state.apply(a), t, i, board, hands, eval);
+      int v_a = traverse_mccfr(state.apply(a), t, i, board, hands, eval, debug);
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
       if(_verbose) {
@@ -424,7 +428,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, con
     }
     Action a = actions[sample_action_idx(freq)];
     if(_verbose) std::cout << "\tSampled: " << a.to_string() << "\n";
-    return traverse_mccfr(state.apply(a), t, i, board, hands, eval);
+    return traverse_mccfr(state.apply(a), t, i, board, hands, eval, debug);
   }
 }
 

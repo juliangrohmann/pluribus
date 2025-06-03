@@ -209,23 +209,30 @@ std::vector<Hand> construct_hands(const PokerState& state, int i, const Hand& he
 
 double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const PokerRange& hero, const PokerRange& villain, const std::vector<uint8_t>& board) const {
   if(state.active_players() != 2) throw std::runtime_error("Enumeration of expected value is only possible with two players.");
+  int round = state.get_round() == 0 ? state.get_round() : get_config().init_state.apply(state.get_action_history().slice(0, state.get_action_history().size() - 1)).get_round();
+  int n_cards = n_board_cards(round);
+  std::vector<uint8_t> real_board = board.size() > n_cards ? std::vector<uint8_t>{board.begin(), board.begin() + n_cards} : board;
+  std::cout << "Round = " << round << "\n";
+  std::cout << "Real board = " << Board{real_board}.to_string() << "\n";
   omp::HandEvaluator eval;
-  auto hero_hands = hero.hands();
-  auto villain_hands = villain.hands();
-
   double ev = 0.0;
   float hero_combos = 0.0;
-  for(const auto& hh : hero_hands) {
+  for(const auto& hh : hero.hands()) {
+    if(collides(hh, real_board)) continue;
     double hand_ev = 0.0;
     float villain_combos = 0.0f;
-    for(const auto& vh : villain_hands) {
-      if(any_collision(hh, vh, board)) continue;
+    for(const auto& vh : villain.hands()) {
+      if(any_collision(hh, vh, real_board)) continue;
       auto hands = construct_hands(state, i, hh, vh);
       float villain_freq = villain.frequency(vh);
-      hand_ev += villain_freq * expected_value(state, i, hands, board, get_config().poker.n_chips, eval);
+      double abs_ev = expected_value(state, i, hands, real_board, get_config().poker.n_chips, eval);
+      hand_ev += villain_freq * abs_ev;
       villain_combos += villain_freq;
     }
+    if(villain_combos)
+    std::cout << hh.to_string() << " total EV = " << hand_ev << ", combos = " << villain_combos << "\n";
     hand_ev /= villain_combos;
+    std::cout << hh.to_string() << " EV = " << hand_ev << "\n";
     float hero_freq = hero.frequency(hh);
     ev += hero_freq * hand_ev;
     hero_combos += hero_freq;

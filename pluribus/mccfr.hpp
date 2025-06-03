@@ -81,14 +81,9 @@ struct BlueprintTrainerConfig {
 
   bool operator==(const BlueprintTrainerConfig&) const = default;
 
-  void set_iterations(const BlueprintTimingConfig& timings, long it_per_min) {
-    preflop_threshold = timings.preflop_threshold_m * it_per_min;
-    snapshot_interval = timings.snapshot_interval_m * it_per_min;
-    prune_thresh = timings.prune_thresh_m * it_per_min;
-    lcfr_thresh = timings.lcfr_thresh_m * it_per_min;
-    discount_interval = timings.discount_interval_m * it_per_min;
-    log_interval = timings.log_interval_m * it_per_min;
-  }
+  void set_iterations(const BlueprintTimingConfig& timings, long it_per_min);
+  long next_discount_step(long t, long T) const;
+  long next_snapshot_step(long t, long T) const;
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -140,14 +135,14 @@ public:
   }
 
 private:
-  int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
-  int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
+  int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval, std::ostringstream& debug);
+  int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval, std::ostringstream& debug);
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
   void log_metrics(long t);
 
 #ifdef UNIT_TEST
   friend int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
-                                 const omp::HandEvaluator& eval);
+                                 const omp::HandEvaluator& eval, std::ostringstream& debug);
   friend void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
 #endif
   StrategyStorage<int> _regrets;

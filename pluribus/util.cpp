@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iterator>
 #include <iomanip>
 #include <cassert>
 #include <string>
@@ -80,12 +81,20 @@ void str_to_cards(std::string card_str, uint8_t cards[]) {
   }
 }
 
-std::string cards_to_str(const uint8_t cards[], int n) {
+std::string cards_to_str(const uint8_t* begin, const uint8_t* end) {
   std::string str = "";
-  for(int i = 0; i < n; ++i) {
-    str += idx_to_card(cards[i]);
+  for(; begin != end; ++begin) {
+    str += idx_to_card(*begin);
   }
   return str;
+}
+
+std::string cards_to_str(const uint8_t cards[], int n) {
+  return cards_to_str(cards, cards + n);
+}
+
+std::string cards_to_str(const std::vector<uint8_t>& cards) {
+  return cards_to_str(&cards[0], &cards[0] + cards.size());
 }
 
 int n_board_cards(int round) {
