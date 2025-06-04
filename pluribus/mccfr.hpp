@@ -22,25 +22,26 @@
 
 namespace pluribus {
 
-// using PreflopMap = tbb::concurrent_unordered_map<InformationSet, tbb::concurrent_vector<float>>;
-
 template <class T>
 std::vector<float> calculate_strategy(const StrategyStorage<T>& data, size_t base_idx, int n_actions) {
-  T sum = 0;
-  for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-    sum += std::max(data[base_idx + a_idx].load(), static_cast<T>(0));
-  }
-
   std::vector<float> freq;
   freq.reserve(n_actions);
+  float sum = 0;
+  for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
+    float value = std::max(static_cast<float>(data[base_idx + a_idx].load()), 0.0f);
+    freq.push_back(value);
+    sum += value;
+  }
+
   if(sum > 0) {
-    for(igitnt a_idx = 0; a_idx < n_actions; ++a_idx) {
-      freq.push_back(std::max(data[base_idx + a_idx].load(), static_cast<T>(0)) / static_cast<double>(sum));
+    for(auto& f : freq) {
+      f /= sum;
     }
   }
   else {
-    for(int i = 0; i < n_actions; ++i) {
-      freq.push_back(1.0 / n_actions);
+    float uni = 1.0f / n_actions;
+    for(auto& f : freq) {
+      f = uni;
     }
   }
   return freq;
