@@ -283,7 +283,6 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
     int u = utility(state, i, board, hands, _config.poker.n_chips, eval);
     if(_log_level != BlueprintLogLevel::NONE) log_utility(u, state, hands, debug);
-    if(abs(u) > (state.get_players().size() - 1) * _config.poker.n_chips) error("Utility too large!", debug);
     return u;
   }
   else if(state.get_active() == i) {
@@ -307,7 +306,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
     int v = round(v_exact);
     if(_log_level != BlueprintLogLevel::NONE) log_net_ev(v, v_exact, state, debug);
     if(abs(v) > (state.get_players().size() - 1) * _config.poker.n_chips) {
-      error("EV too large!\n" + state.get_action_history().to_string() + "\nEV=" + std::to_string(v), debug);
+      error("EV too large!\nEV=" + std::to_string(v), debug);
     }
     if(state.get_round() == 0 && t > _config.preflop_threshold) return v;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
@@ -316,21 +315,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
         int prev_r = _regrets[base_idx + a_idx].load();
         int d_r = values[a] - v;
         int next_r = prev_r + d_r;
-
-        // clean up
-        int n_players = state.get_players().size();
-        int n_chips = get_config().poker.n_chips;
-        int product = (n_players - 1) * n_chips;
-        bool condition_met = abs(d_r) > product * 2;
-        std::string debug_pre = "DEBUG PRE: n_players=" + std::to_string(n_players) + ", n_chips=" + std::to_string(n_chips) + ", d_r=" + std::to_string(d_r) + ", product=" + std::to_string(product) + ", condition=" + std::to_string(condition_met) + "\n";
-        if(next_r > 2'000'000'000) {
-          error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
-        }
-        else if(condition_met) {
-          std::string debug_post = "DEBUG POST: n_players=" + std::to_string(n_players) + ", n_chips=" + std::to_string(n_chips) + ", d_r=" + std::to_string(d_r) + ", product=" + std::to_string(product) + ", condition=" + std::to_string(condition_met) + "\n";
-          error("Regret change too large!\n" + info_str(state, prev_r, d_r, t, board, hands) + debug_pre + debug_post, debug);
-        }
-
+        if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
         int total_r = std::max(next_r, _config.regret_floor);
         _regrets[base_idx + a_idx].store(total_r);
         if(_log_level != BlueprintLogLevel::NONE) log_regret(actions[a_idx], d_r, total_r, debug);
@@ -391,21 +376,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, con
       int prev_r = _regrets[base_idx + a_idx].load();
       int d_r = values[actions[a_idx]] - v;
       int next_r = prev_r + d_r;
-      
-      // clean up
-      int n_players = state.get_players().size();
-      int n_chips = get_config().poker.n_chips;
-      int product = (n_players - 1) * n_chips;
-      bool condition_met = abs(d_r) > product * 2;
-      std::string debug_pre = "DEBUG PRE: n_players=" + std::to_string(n_players) + ", n_chips=" + std::to_string(n_chips) + ", d_r=" + std::to_string(d_r) + ", product=" + std::to_string(product) + ", condition=" + std::to_string(condition_met) + "\n";
-      if(next_r > 2'000'000'000) {
-        error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
-      }
-      else if(condition_met) {
-        std::string debug_post = "DEBUG POST: n_players=" + std::to_string(n_players) + ", n_chips=" + std::to_string(n_chips) + ", d_r=" + std::to_string(d_r) + ", product=" + std::to_string(product) + ", condition=" + std::to_string(condition_met) + "\n";
-        error("Regret change too large!\n" + info_str(state, prev_r, d_r, t, board, hands) + debug_pre + debug_post, debug);
-      }
-
+      if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
       int total_r = std::max(next_r, _config.regret_floor);
       _regrets[base_idx + a_idx].store(total_r);
       if(_log_level != BlueprintLogLevel::NONE) log_regret(actions[a_idx], d_r, total_r, debug);
