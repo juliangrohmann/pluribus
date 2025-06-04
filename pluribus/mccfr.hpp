@@ -34,7 +34,7 @@ std::vector<float> calculate_strategy(const StrategyStorage<T>& data, size_t bas
   std::vector<float> freq;
   freq.reserve(n_actions);
   if(sum > 0) {
-    for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
+    for(igitnt a_idx = 0; a_idx < n_actions; ++a_idx) {
       freq.push_back(std::max(data[base_idx + a_idx].load(), static_cast<T>(0)) / static_cast<double>(sum));
     }
   }
@@ -144,6 +144,11 @@ private:
   int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval, std::ostringstream& debug);
   int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval, std::ostringstream& debug);
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, std::ostringstream& debug);
+  void log_utility(int utility, const PokerState& state, const std::vector<Hand>& hands, std::ostringstream& debug) const;
+  void log_action_ev(Action a, float freq, int ev, const PokerState& state, std::ostringstream& debug) const;
+  void log_net_ev(int ev, float ev_exact, const PokerState& state, std::ostringstream& debug) const;
+  void log_regret(Action a, int d_r, int total_r, std::ostringstream& debug) const;
+  void log_external_sampling(Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq, const PokerState& state, std::ostringstream& debug) const;
   void log_metrics(long t);
   void error(const std::string& msg, const std::ostringstream& debug) const;
 
