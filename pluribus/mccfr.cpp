@@ -317,6 +317,7 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
         int d_r = values[a] - v;
         int next_r = prev_r + d_r;
 
+        // clean up
         int n_players = state.get_players().size();
         int n_chips = get_config().poker.n_chips;
         int product = (n_players - 1) * n_chips;
@@ -391,6 +392,7 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, con
       int d_r = values[actions[a_idx]] - v;
       int next_r = prev_r + d_r;
       
+      // clean up
       int n_players = state.get_players().size();
       int n_chips = get_config().poker.n_chips;
       int product = (n_players - 1) * n_chips;
