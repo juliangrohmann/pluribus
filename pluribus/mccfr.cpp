@@ -269,10 +269,13 @@ std::string info_str(const PokerState& state, int prev_r, int d_r, long t, const
 }
 
 void BlueprintTrainer::error(const std::string& msg, const std::ostringstream& debug) const {
+  std::string error_msg = msg;
   if(_log_level != BlueprintLogLevel::NONE) {
-    write_to_file(_log_dir / ("thread" + std::to_string(omp_get_thread_num()) + ".error"), debug.str() + "\nRUNTIME ERROR: " + msg);
+    auto debug_dir = _log_dir / ("thread" + std::to_string(omp_get_thread_num()) + ".error");
+    write_to_file(debug_dir, debug.str() + "\nRUNTIME ERROR: " + msg);
+    error_msg += "\nDebug logs written to " + debug_dir.string();
   }
-  throw std::runtime_error(msg);
+  throw std::runtime_error(error_msg);
 }
 
 int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 

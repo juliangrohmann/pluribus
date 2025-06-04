@@ -162,7 +162,7 @@ private:
   std::unique_ptr<wandb::Session> _wb;
   wandb::Run _wb_run;
   long _t;
-  BlueprintLogLevel _log_level = BlueprintLogLevel::NONE;
+  BlueprintLogLevel _log_level = BlueprintLogLevel::ERRORS;
 };
 
 }
