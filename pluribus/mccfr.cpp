@@ -166,13 +166,13 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
   std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
   std::cout << _config.to_string() << "\n";
 
-  long next_discount = _config.discount_interval;
-  long next_snapshot = _config.preflop_threshold;
   bool full_ranges = are_full_ranges(_config.init_ranges);
   std::cout << "Full ranges: " << (full_ranges ? "true" : "false") << "\n";
   std::cout << "Training blueprint from " << _t << " to " << std::to_string(T) << "\n";
   while(_t < T) {
     long init_t = _t;
+    long next_discount = _config.next_discount_step(_t, T);
+    long next_snapshot = _config.next_snapshot_step(_t, T);
     _t = std::min(std::min(next_discount, next_snapshot), T);
     auto interval_start = std::chrono::high_resolution_clock::now();
     std::cout << std::setprecision(1) << std::fixed << "Next step: " << _t / 1'000'000.0 << "M\n";
@@ -238,7 +238,6 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
       std::cout << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
       lcfr_discount(_regrets, d);
       lcfr_discount(_phi, d);
-      next_discount = next_discount + discount_interval < _config.lcfr_thresh ? next_discount + discount_interval : T + 1;
     }
     if(_t == next_snapshot) {
       std::ostringstream fn_stream;
@@ -251,7 +250,6 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
         fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
       }
       cereal_save(*this, (_snapshot_dir / fn_stream.str()).string());
-      next_snapshot += _config.snapshot_interval;
     }
   }
 
