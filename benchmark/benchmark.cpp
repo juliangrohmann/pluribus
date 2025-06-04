@@ -130,8 +130,8 @@ TEST_CASE("OCHS features", "[ochs]") {
 namespace pluribus {
 
 void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, 
-                          const std::vector<Hand>& hands) {
-  trainer.update_strategy(state, i, board, hands);
+                          const std::vector<Hand>& hands, std::ostringstream& debug) {
+  trainer.update_strategy(state, i, board, hands, debug);
 }
 
 int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, 
@@ -150,7 +150,7 @@ TEST_CASE("Blueprint trainer", "[mccfr]") {
   std::ostringstream debug;
 
   BENCHMARK("Update strategy") {
-    call_update_strategy(trainer, PokerState{config}, 0, board, hands);
+    call_update_strategy(trainer, PokerState{config}, 0, board, hands, debug);
   };
   BENCHMARK("Traverse MCCFR") {
     call_traverse_mccfr(trainer, PokerState{config}, 0, board, hands, eval, debug);

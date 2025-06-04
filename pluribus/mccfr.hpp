@@ -114,9 +114,15 @@ public:
   virtual const BlueprintTrainerConfig& get_config() const = 0;
 };
 
+enum class BlueprintLogLevel : int {
+  NONE = 0,
+  ERRORS = 1,
+  DEBUG = 2
+};
+
 class BlueprintTrainer : public Strategy<int> {
 public:
-  BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, bool enable_wandb = false, const std::string& snapshot_dir = "snapshots", const std::string& metrics_dir = "metrics");
+  BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, bool enable_wandb = false);
   void mccfr_p(long t_plus);
   bool operator==(const BlueprintTrainer& other) const;
   const StrategyStorage<int>& get_strategy() const { return _regrets; }
@@ -126,8 +132,8 @@ public:
   BlueprintTrainerConfig& get_config() { return _config; }
   void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
   void set_metrics_dir(std::string metrics_dir) { _metrics_dir = metrics_dir; }
-  void set_verbose(bool verbose) { _verbose = verbose; }
-  void set_verbose_update(bool verbose_update) { _verbose_update = verbose_update; }
+  void set_log_dir(std::string log_dir) { _log_dir = log_dir; }
+  void set_log_level(BlueprintLogLevel log_level) { _log_level = log_level; }
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -137,24 +143,26 @@ public:
 private:
   int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval, std::ostringstream& debug);
   int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval, std::ostringstream& debug);
-  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
+  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, std::ostringstream& debug);
   void log_metrics(long t);
+  void error(const std::string& msg, const std::ostringstream& debug) const;
 
 #ifdef UNIT_TEST
   friend int call_traverse_mccfr(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
                                  const omp::HandEvaluator& eval, std::ostringstream& debug);
-  friend void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands);
+  friend void call_update_strategy(BlueprintTrainer& trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands,
+                                   std::ostringstream& debug);
 #endif
   StrategyStorage<int> _regrets;
   StrategyStorage<float> _phi;
   BlueprintTrainerConfig _config;
-  std::filesystem::path _snapshot_dir;
-  std::filesystem::path _metrics_dir;
+  std::filesystem::path _snapshot_dir = "snapshots";
+  std::filesystem::path _metrics_dir = "metrics";
+  std::filesystem::path _log_dir = "logs";
   std::unique_ptr<wandb::Session> _wb;
   wandb::Run _wb_run;
   long _t;
-  bool _verbose = false;
-  bool _verbose_update = false;
+  BlueprintLogLevel _log_level = BlueprintLogLevel::NONE;
 };
 
 }
