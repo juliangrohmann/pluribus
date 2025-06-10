@@ -43,6 +43,7 @@ public:
   CardSet(std::vector<uint8_t> cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
   CardSet(std::initializer_list<uint8_t> cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
   CardSet(std::string card_str) { str_to_cards(card_str, cards().data()); }
+  CardSet(Deck& deck, std::vector<uint8_t> init_cards = {}) { deal(deck, init_cards); }
 
   void deal(Deck& deck, std::vector<uint8_t> init_cards = {}) { 
     for(int i = 0; i < init_cards.size(); ++i) _cards[i] = init_cards[i];
@@ -69,6 +70,7 @@ public:
   Board(std::vector<uint8_t> cards) : CardSet<5>{cards} {}
   Board(std::initializer_list<uint8_t> cards) : CardSet<5>{cards} {}
   Board(std::string card_str) : CardSet<5>{card_str} {};
+  Board(Deck& deck, std::vector<uint8_t> init_cards = {}) : CardSet<5>{deck, init_cards} {};
   bool operator==(const Board&) const = default;
 };
 
@@ -79,6 +81,7 @@ public:
   Hand(std::vector<uint8_t> cards) : CardSet<2>{cards} {}
   Hand(std::initializer_list<uint8_t> cards) : CardSet<2>{cards} {}
   Hand(std::string card_str) : CardSet<2>{card_str} {};
+  Hand(Deck& deck, std::vector<uint8_t> init_cards = {}) : CardSet<2>{deck, init_cards} {};
   bool operator==(const Hand&) const = default;
 
   template <class Archive>
@@ -97,6 +100,7 @@ bool collides(uint8_t card, const std::vector<uint8_t> cards);
 bool collides(const Hand& h1, const Hand& h2);
 bool collides(const Hand& hand, const Board& board);
 bool collides(const Hand& hand, const std::vector<uint8_t>& cards);
+std::vector<uint8_t> collect_cards(const Board& board, const Hand& hand, int round = 3);
 
 class Player {
 public:
@@ -193,7 +197,7 @@ private:
 
 int total_bet_size(const PokerState& state, Action action);
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile);
-
+int round_of_last_action(const PokerState& state);
 std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board board_cards, const omp::HandEvaluator& eval);
 int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands);

@@ -1,7 +1,7 @@
 #include <vector>
 #include <pluribus/rng.hpp>
 #include <pluribus/poker.hpp>
-#include <pluribus/infoset.hpp>
+#include <pluribus/indexing.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/agent.hpp>

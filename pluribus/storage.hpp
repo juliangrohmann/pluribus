@@ -13,7 +13,7 @@
 #include <tbb/concurrent_vector.h>
 #include <omp.h>
 #include <pluribus/cereal_ext.hpp>
-#include <pluribus/infoset.hpp>
+#include <pluribus/indexing.hpp>
 #include <pluribus/history_index.hpp>
 #include <pluribus/actions.hpp>
 

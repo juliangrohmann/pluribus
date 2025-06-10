@@ -10,6 +10,7 @@
 #include <cereal/types/unordered_map.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
+#include <pluribus/indexing.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/range_viewer.hpp>
 #include <pluribus/rng.hpp>
@@ -183,6 +184,13 @@ bool any_collision(uint8_t card, const std::vector<Hand>& hands, const std::vect
   return std::find(board.begin(), board.end(), card) != board.end();
 }
 
+int villain_pos(const PokerState& state, int i) {
+  for(int p = 0; p < state.get_players().size(); ++p) {
+    if(p != i && !state.get_players()[p].has_folded()) return p;
+  }
+  throw std::runtime_error("Villain doesn't exist in state.");
+}
+
 std::vector<Hand> construct_hands(const PokerState& state, int i, const Hand& hero, const Hand& villain) {
   std::vector<Hand> hands;
   bool found_hero = false, found_villain = false;
@@ -207,68 +215,91 @@ std::vector<Hand> construct_hands(const PokerState& state, int i, const Hand& he
   return hands;
 }
 
-double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const PokerRange& hero, const PokerRange& villain, const std::vector<uint8_t>& board) const {
+double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const {
   if(state.active_players() != 2) throw std::runtime_error("Enumeration of expected value is only possible with two players.");
-  int round = state.get_round() == 0 ? state.get_round() : get_config().init_state.apply(state.get_action_history().slice(0, state.get_action_history().size() - 1)).get_round();
+  int round = round_of_last_action(state);
   int n_cards = n_board_cards(round);
+  int pos_v = villain_pos(state, i);
   std::vector<uint8_t> real_board = board.size() > n_cards ? std::vector<uint8_t>{board.begin(), board.begin() + n_cards} : board;
-  std::cout << "Round = " << round << "\n";
-  std::cout << "Real board = " << Board{real_board}.to_string() << "\n";
+  std::cout << "Round: " << round << "\n";
+  std::cout << "Real board: " << cards_to_str(real_board) << "\n";
+  std::cout << "Hero pos: " << i << "\n";
+  std::cout << "Villain pos: " << pos_v << "\n";
+
   omp::HandEvaluator eval;
+  std::vector<Hand> hands(ranges.size(), Hand{{52, 52}});
   double ev = 0.0;
   float hero_combos = 0.0;
-  for(const auto& hh : hero.hands()) {
+  for(const auto& hh : ranges[i].hands()) {
     if(collides(hh, real_board)) continue;
+    hands[i] = hh;
     double hand_ev = 0.0;
     float villain_combos = 0.0f;
-    for(const auto& vh : villain.hands()) {
-      if(any_collision(hh, vh, real_board)) continue;
-      auto hands = construct_hands(state, i, hh, vh);
-      float villain_freq = villain.frequency(vh);
-      double abs_ev = expected_value(state, i, hands, real_board, get_config().poker.n_chips, eval);
-      hand_ev += villain_freq * abs_ev;
+    for(const auto& vh : ranges[pos_v].hands()) {
+      if(collides(hh, vh) || collides(vh, real_board)) continue;
+      hands[pos_v] = vh;
+      float villain_freq = ranges[pos_v].frequency(vh);
+      std::vector<CachedIndexer> indexers;
+      for(int i = 0; i < hands.size(); ++i) indexers.push_back(CachedIndexer{3});
+      double hev = expected_value(state, i, hands, real_board, get_config().poker.n_chips, indexers, eval);
+      double vev = expected_value(state, 1 - i, hands, real_board, get_config().poker.n_chips, indexers, eval);
+      if(hev + vev != 0) throw std::runtime_error("EV mismatch: hero=" + std::to_string(hev) + ", villain=" + std::to_string(vev) + "\n");
+      hand_ev += villain_freq * hev;
       villain_combos += villain_freq;
     }
-    if(villain_combos)
-    std::cout << hh.to_string() << " total EV = " << hand_ev << ", combos = " << villain_combos << "\n";
+    if(villain_combos == 0) continue;
     hand_ev /= villain_combos;
     std::cout << hh.to_string() << " EV = " << hand_ev << "\n";
-    float hero_freq = hero.frequency(hh);
+    float hero_freq = ranges[i].frequency(hh);
     ev += hero_freq * hand_ev;
     hero_combos += hero_freq;
   }
   return ev / hero_combos;
 }
 
-double LosslessBlueprint::expected_value(const PokerState& state, int i, const std::vector<Hand>& hands, const std::vector<uint8_t>& board, int stack_size, const omp::HandEvaluator& eval) const {
-  if(state.is_terminal()) {
-    return utility(state, i, Board{board}, hands, stack_size, eval);
-  }
-  else if(board.size() < n_board_cards(state.get_round())) {
+double LosslessBlueprint::expected_value(const PokerState& state, int i, const std::vector<Hand>& hands, const std::vector<uint8_t>& board, int stack_size, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
+  if(board.size() < n_board_cards(state.get_round())) {
     double ev = 0.0;
     int total = 0;
     for(uint8_t card = 0; card < 52; ++card) {
       if(any_collision(card, hands, board)) continue;
       auto next_board = board;
       next_board.push_back(card);
-      ev += expected_value(state, i, hands, next_board, stack_size, eval);
+      auto indexers_copy = indexers;
+      ev += expected_value(state, i, hands, next_board, stack_size, indexers_copy, eval);
       ++total;
     }
     return ev / total;
   }
+  else if(state.is_terminal()) {
+    int hu = utility(state, i, Board{board}, hands, stack_size, eval);
+    // int vu = utility(state, 1 - i, Board{board}, hands, stack_size, eval);
+    // if(vu + hu != 0) throw std::runtime_error("Utility mismatch: hero=" + std::to_string(hu) + ", villain=" + std::to_string(vu) + "\n");
+    return hu;
+  }
   else {
     const auto& strat = get_strategy();
-    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[state.get_active()]);
-    int base_idx = strat.index(state, cluster);
+    // int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[state.get_active()]);
+    hand_index_t cached_idx = indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round());
+    int cached_cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), cached_idx);
+    // if(cluster != cached_cluster) throw std::runtime_error("Cached cluster mismatch!\nBoard=" + cards_to_str(board) + ", Hand=" + hands[state.get_active()].to_string() + ", Cluster=" + std::to_string(cluster) + ", Cached=" + std::to_string(cached_cluster));
+    int base_idx = strat.index(state, cached_cluster);
     auto actions = valid_actions(state, get_config().action_profile);
     double ev = 0.0;
     for(int aidx = 0; aidx < actions.size(); ++aidx) {
-      float freq = strat[base_idx + aidx];
-      ev += freq * expected_value(state.apply(actions[aidx]), i, hands, board, stack_size, eval);
+      ev += strat[base_idx + aidx] * expected_value(state.apply(actions[aidx]), i, hands, board, stack_size, indexers, eval);
     }
     return ev;
   }
 }
+
+// double SampledBlueprint::monte_carlo_ev(int n, const PokerState& state, int i, const PokerRange& hero, const PokerRange& villain, const std::vector<uint8_t>& board) {
+//   double ev = 0.0;
+//   for(int t = 0; t < n; ++t) {
+
+//   }
+//   return ev / n;
+// }
 
 struct SampledMetadata {
   BlueprintTrainerConfig config;

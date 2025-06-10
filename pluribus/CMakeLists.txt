@@ -6,7 +6,7 @@ add_library(
   simulate.cpp
   actions.cpp
   history_index.cpp
-  infoset.cpp
+  indexing.cpp
   mccfr.cpp
   blueprint.cpp
   traverse.cpp

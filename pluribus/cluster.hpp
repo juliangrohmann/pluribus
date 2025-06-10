@@ -8,6 +8,7 @@
 #include <omp/Hand.h>
 #include <hand_isomorphism/hand_index.h>
 #include <pluribus/poker.hpp>
+#include <pluribus/indexing.hpp>
 
 namespace pluribus {
 
@@ -32,7 +33,9 @@ std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(int n_clusters);
 class FlatClusterMap {
 public:
   uint16_t cluster(int round, uint64_t index) const { return _cluster_map[round][index]; }
-  uint16_t cluster(int round, const Board& board, const Hand& hand) const;
+  uint16_t cluster(int round, const Board& board, const Hand& hand) const {
+    return cluster(round, HandIndexer::get_instance()->index(board, hand, round));
+  };
 
   static FlatClusterMap* get_instance() {
     if(!_instance) {

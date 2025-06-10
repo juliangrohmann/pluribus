@@ -25,6 +25,7 @@
 #include <pluribus/mccfr.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
+#include <pluribus/debug.hpp>
 #include <pluribus/rng.hpp>
 
 using namespace pluribus;
@@ -167,7 +168,7 @@ TEST_CASE("Simple equity solver", "[equity]") {
   }
 }
 
-TEST_CASE("Simulate hands", "[poker]") {
+TEST_CASE("Simulate hands", "[poker][slow]") {
   int n_players = 9;
   std::vector<RandomAgent> rng_agents;
   for(int i = 0; i < n_players; ++i) rng_agents.push_back(RandomAgent{BlueprintActionProfile{n_players}});
@@ -197,7 +198,7 @@ TEST_CASE("Split pot", "[poker]") {
   REQUIRE(result[2] == 25);
 }
 
-TEST_CASE("Sample PokerRange", "[range]") {
+TEST_CASE("Sample PokerRange", "[range][slow]") {
   std::uniform_real_distribution<float> dist(0.0f, 1.0f);
   PokerRange range;
   for(uint8_t i = 0; i < 52; ++i) {
@@ -270,6 +271,49 @@ TEST_CASE("Bias action frequencies", "[bias]") {
   test_biased_freq(facing_check, freq_5, Action::BIAS_RAISE, 5.0f, {1, 2, 3, 4});
 }
 
+std::array<uint16_t, 4> independent_indices(const Board& board, const Hand& hand) {
+  std::array<uint16_t, 4> single_clusters;
+  for(int round = 0; round < 4; ++round) {
+    single_clusters[round] = FlatClusterMap::get_instance()->cluster(round, board, hand);
+  }
+  return single_clusters;
+}
+
+TEST_CASE("Progressive indexing", "[index-prog]") {
+  Deck deck;
+  for(int i = 0; i < 100; ++i) {
+    deck.reset();
+    Board board{deck};
+    Hand hand{deck};
+    auto single_clusters = independent_indices(board, hand);
+
+    auto cards = collect_cards(board, hand);
+    hand_index_t prog_indices[4];
+    hand_index_all(HandIndexer::get_instance()->get_indexer(3), cards.data(), prog_indices);
+    for(int round = 0; round < 4; ++round) {
+      uint16_t prog_cluster = FlatClusterMap::get_instance()->cluster(round, prog_indices[round]);
+      REQUIRE(prog_cluster == single_clusters[round]);
+    }
+  }
+}
+
+TEST_CASE("Cached indexing", "[index-cached]") {
+  Deck deck;
+  for(int i = 0; i < 100; ++i) {
+    deck.reset();
+    Board board{deck};
+    Hand hand{deck};
+    auto single_clusters = independent_indices(board, hand);
+
+    auto cards = collect_cards(board, hand);
+    auto indexer = CachedIndexer(3);
+    for(int round = 0; round < 4; ++round) {
+      uint16_t cached_cluster = FlatClusterMap::get_instance()->cluster(round, indexer.index(board, hand, round));
+      REQUIRE(cached_cluster == single_clusters[round]);
+    }
+  }
+}
+
 TEST_CASE("Serialize Hand", "[serialize]") {
   REQUIRE(test_serialization(Hand{"Ac2s"}));
   REQUIRE(test_serialization(Hand{"3h5h"}));
@@ -300,7 +344,7 @@ TEST_CASE("Serialize ActionHistory", "[serialize]") {
   REQUIRE(test_serialization(actions));
 }
 
-TEST_CASE("Serialize StrategyStorage, BlueprintTrainer", "[serialize][blueprint]") {
+TEST_CASE("Serialize StrategyStorage, BlueprintTrainer", "[serialize][blueprint][slow]") {
   BlueprintTrainerConfig config{};
   BlueprintTrainer trainer{config};
   trainer.mccfr_p(100'000);

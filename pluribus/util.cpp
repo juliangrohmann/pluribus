@@ -98,7 +98,7 @@ std::string cards_to_str(const std::vector<uint8_t>& cards) {
 }
 
 int n_board_cards(int round) {
-  return round == 0 ? 0 : 2 + round;
+  return round == 0 ? 0 : std::min(2 + round, 5);
 }
 
 int init_indexer(hand_indexer_t& indexer, int round) {

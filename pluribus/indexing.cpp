@@ -6,7 +6,7 @@
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/history_index.hpp>
-#include <pluribus/infoset.hpp>
+#include <pluribus/indexing.hpp>
 
 namespace pluribus {
 
@@ -22,26 +22,26 @@ HandIndexer::HandIndexer() {
   _indexers = init_indexer_vec();
 }
 
-// InformationSet::InformationSet(const ActionHistory& history, const Board& board, const Hand& hand, int round, const PokerConfig& config) : 
-//     _history_idx{HistoryIndexer::get_instance()->index(history, config)} {
-//   int card_sum = round == 0 ? 2 : 4 + round;
-//   std::vector<uint8_t> cards(card_sum);
-//   std::copy(hand.cards().begin(), hand.cards().end(), cards.data());
-//   if(round > 0) std::copy(board.cards().begin(), board.cards().begin() + card_sum - 2, cards.data() + 2);
-//   uint64_t idx = HandIndexer::get_instance()->index(cards.data(), round);
-//   _cluster = FlatClusterMap::get_instance()->cluster(round, idx);
-// }
+uint64_t HandIndexer::index(const Board& board, const Hand& hand, int round) {
+  return index(collect_cards(board, hand, round).data(), round);
+}
 
-// InformationSet::InformationSet(const ActionHistory& history, uint16_t cluster, const PokerConfig& config) : 
-//     _history_idx{HistoryIndexer::get_instance()->index(history, config)}, _cluster{cluster} {}
+CachedIndexer::CachedIndexer(int max_round) : _max_round{max_round} {
+  hand_indexer_state_init(HandIndexer::get_instance()->get_indexer(max_round), &_state);
+}
 
-// bool InformationSet::operator==(const InformationSet& other) const {
-//   return _cluster == other._cluster && _history_idx == other._history_idx;
-// }
+uint64_t CachedIndexer::index(const uint8_t cards[], int round) {
+  while(_indices.size() <= round) {
+    int curr_round = _indices.size();
+    int offset = curr_round == 0 ? 0 : n_board_cards(curr_round - 1) + 2;
+    _indices.push_back(hand_index_next_round(HandIndexer::get_instance()->get_indexer(_max_round), cards + offset, &_state));
+  }
+  return _indices[round];
+}
 
-// std::string InformationSet::to_string() const {
-//   return "Cluster: " + std::to_string(_cluster) + ", History index: " + std::to_string(_history_idx);
-// }
+uint64_t CachedIndexer::index(const Board& board, const Hand& hand, int round) {
+  return index(collect_cards(board, hand, round).data(), round);
+}
 
 long count(const PokerState& state, const ActionProfile& action_profile, int max_round, bool infosets) {
   if(state.is_terminal() || state.get_round() > max_round) {

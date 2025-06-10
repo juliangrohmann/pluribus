@@ -63,6 +63,14 @@ bool collides(const Hand& hand, const std::vector<uint8_t>& cards) {
          std::find(cards.begin(), cards.end(), hand.cards()[1]) != cards.end();
 }
 
+std::vector<uint8_t> collect_cards(const Board& board, const Hand& hand, int round) {
+  int card_sum = 2 + n_board_cards(round);
+  std::vector<uint8_t> cards(card_sum);
+  std::copy(hand.cards().begin(), hand.cards().end(), cards.data());
+  if(round > 0) std::copy(board.cards().begin(), board.cards().begin() + card_sum - 2, cards.data() + 2);
+  return cards;
+}
+
 void Player::invest(int amount) {
   assert(!has_folded() && "Attempted to invest but player already folded.");
   assert(get_chips() >= amount && "Attempted to invest more chips than available.");
@@ -268,6 +276,10 @@ bool is_round_complete(const PokerState& state) {
          (state.get_max_bet() > 100 || state.get_active() != big_blind_idx(state) || state.get_round() != 0); // preflop, big blind
 }
 
+int round_of_last_action(const PokerState& state) {
+  return state.get_round() == 0 || state.get_max_bet() > 0 || state.get_active() != 0 ? state.get_round() : state.get_round() - 1;
+}
+
 void PokerState::next_player() {
   uint8_t init_player_idx = _active;
   bool all_in = false;
@@ -298,6 +310,7 @@ int total_bet_size(const PokerState& state, Action action) {
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile) {
   const std::vector<Action>& actions = profile.get_actions(state.get_round(), state.get_bet_level(), state.get_active(), state.get_pot());
   std::vector<Action> valid;
+  valid.reserve(actions.size());
   const Player& player = state.get_players()[state.get_active()];
   for(Action a : actions) {
     if(a == Action::CHECK_CALL || a == Action::BIAS_NONE || a == Action::BIAS_FOLD || a == Action::BIAS_CALL || a == Action::BIAS_RAISE) {

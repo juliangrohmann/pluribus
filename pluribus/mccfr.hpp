@@ -15,7 +15,7 @@
 #include <pluribus/range.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/poker.hpp>
-#include <pluribus/infoset.hpp>
+#include <pluribus/indexing.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/storage.hpp>
 
