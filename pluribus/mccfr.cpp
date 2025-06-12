@@ -327,10 +327,10 @@ int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, c
     auto actions = valid_actions(state, _config.action_profile);
     std::vector<float> freq;
     if(state.get_round() == 0 && t > _config.preflop_threshold) {
-      freq = get_freq(state, board, hands[state.get_active()], actions.size(), _phi);
+      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), _phi);
     }
     else {
-      freq = get_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
+      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
     }
     Action a = actions[sample_action_idx(freq)];
     
@@ -387,10 +387,10 @@ int BlueprintTrainer::traverse_mccfr(const PokerState& state, long t, int i, con
     auto actions = valid_actions(state, _config.action_profile);
     std::vector<float> freq;
     if(state.get_round() == 0 && t > _config.preflop_threshold) {
-      freq = get_freq(state, board, hands[state.get_active()], actions.size(), _phi);
+      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), _phi);
     }
     else {
-      freq = get_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
+      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), _regrets);
     }
     Action a = actions[sample_action_idx(freq)];
     if(_log_level != BlueprintLogLevel::NONE) log_external_sampling(a, actions, freq, state, debug);

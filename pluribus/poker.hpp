@@ -26,6 +26,11 @@ public:
 
   int draw();
   void add_dead_card(uint8_t card) { _dead_cards.insert(card); }
+
+  template<typename Container>
+  void add_dead_cards(const Container& cont) { for(auto it = cont.begin(); it != cont.end(); ++it) add_dead_card(*it); }
+
+  void clear_dead_cards() { _dead_cards.clear(); }
   void reset();
   void shuffle();
 

@@ -55,8 +55,8 @@ void lcfr_discount(StrategyStorage<T>& regrets, double d) {
 }
 
 template <class T>
-std::vector<float> get_freq(const PokerState& state, const Board& board, const Hand& hand, 
-                            int n_actions, StrategyStorage<T>& strategy) {
+std::vector<float> state_to_freq(const PokerState& state, const Board& board, const Hand& hand, 
+                            int n_actions, const StrategyStorage<T>& strategy) {
   int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
   size_t base_idx = strategy.index(state, cluster);
   return calculate_strategy(strategy, base_idx, n_actions);

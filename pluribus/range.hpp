@@ -47,7 +47,7 @@ public:
   void multiply_hand(const Hand& hand, double freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] *= freq; }
   void set_frequency(const Hand& hand, double freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] = freq; }
   double frequency(const Hand& hand) const { return _weights[HoleCardIndexer::get_instance()->index(hand)]; }
-  const std::vector<double>& weights() { return _weights; }
+  const std::vector<double>& weights() const { return _weights; }
   void remove_cards(const std::vector<uint8_t>& cards);
   std::vector<Hand> hands() const;
   double n_combos() const;

@@ -10,6 +10,7 @@
 #include <cereal/types/unordered_map.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
+#include <pluribus/debug.hpp>
 #include <pluribus/indexing.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/range_viewer.hpp>
@@ -215,40 +216,53 @@ std::vector<Hand> construct_hands(const PokerState& state, int i, const Hand& he
   return hands;
 }
 
-double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const {
-  if(state.active_players() != 2) throw std::runtime_error("Enumeration of expected value is only possible with two players.");
+void validate_ev_inputs(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) {
   int round = round_of_last_action(state);
   int n_cards = n_board_cards(round);
-  int pos_v = villain_pos(state, i);
   std::vector<uint8_t> real_board = board.size() > n_cards ? std::vector<uint8_t>{board.begin(), board.begin() + n_cards} : board;
-  std::cout << "Round: " << round << "\n";
+  std::cout << "Real round: " << round_to_str(round) << "\n";
   std::cout << "Real board: " << cards_to_str(real_board) << "\n";
-  std::cout << "Hero pos: " << i << "\n";
-  std::cout << "Villain pos: " << pos_v << "\n";
+  std::cout << "Hero pos: " << i << "(" << pos_to_str(i, state.get_players().size()) << ")\n";
+  int ridx = 0;
+  for(int p = 0; p < state.get_players().size(); ++p) {
+    if(!state.get_players()[p].has_folded()) {
+      std::cout << pos_to_str(p, state.get_players().size()) << ": " << ranges[ridx].n_combos() << "combos  ";
+      ++ridx;
+      if(ridx >= ranges.size()) break;
+    }
+  }
+  std::cout << "\nHero combos: " << ranges[i].n_combos() << "\n"; 
+  if(state.active_players() != 2) throw std::runtime_error("Expected value is only possible with two remaining players.");
+  if(board.size() > n_board_cards(round)) throw std::runtime_error("Too many board cards!");
+}
 
+double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const {
+  validate_ev_inputs(state, i, ranges, board);
+
+  int pos_v = villain_pos(state, i);
   omp::HandEvaluator eval;
-  std::vector<Hand> hands(ranges.size(), Hand{{52, 52}});
+  std::vector<Hand> hands(ranges.size());
   double ev = 0.0;
   double total = 0.0;
   for(const auto& hh : ranges[i].hands()) {
-    if(collides(hh, real_board)) continue;
+    if(collides(hh, board)) continue;
     for(const auto& vh : ranges[pos_v].hands()) {
-      if(collides(hh, vh) || collides(vh, real_board)) continue;
+      if(collides(hh, vh) || collides(vh, board)) continue;
       hands[i] = hh;
       hands[pos_v] = vh;
       std::vector<CachedIndexer> indexers;
       for(int i = 0; i < hands.size(); ++i) indexers.push_back(CachedIndexer{3});
       double freq = ranges[i].frequency(hh) * ranges[pos_v].frequency(vh);
-      ev += freq * expected_value(state, i, hands, real_board, get_config().poker.n_chips, indexers, eval);
+      ev += freq * node_ev(state, i, hands, board, get_config().poker.n_chips, indexers, eval);
       total += freq;
     }
     std::cout << hh.to_string() << "\n";
   }
-  std::cout << "EV: " << ev << "Total: " << total << "\n";
+  std::cout << "EV=" << ev << "\n";
   return ev / total;
 }
 
-double LosslessBlueprint::expected_value(const PokerState& state, int i, const std::vector<Hand>& hands, const std::vector<uint8_t>& board, int stack_size, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
+double LosslessBlueprint::node_ev(const PokerState& state, int i, const std::vector<Hand>& hands, const std::vector<uint8_t>& board, int stack_size, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
   if(board.size() < n_board_cards(state.get_round())) {
     double ev = 0.0;
     int total = 0;
@@ -257,7 +271,7 @@ double LosslessBlueprint::expected_value(const PokerState& state, int i, const s
       auto next_board = board;
       next_board.push_back(card);
       auto indexers_copy = indexers;
-      ev += expected_value(state, i, hands, next_board, stack_size, indexers_copy, eval);
+      ev += node_ev(state, i, hands, next_board, stack_size, indexers_copy, eval);
       ++total;
     }
     return ev / total;
@@ -274,19 +288,55 @@ double LosslessBlueprint::expected_value(const PokerState& state, int i, const s
     auto actions = valid_actions(state, get_config().action_profile);
     double ev = 0.0;
     for(int aidx = 0; aidx < actions.size(); ++aidx) {
-      ev += strat[base_idx + aidx] * expected_value(state.apply(actions[aidx]), i, hands, board, stack_size, indexers, eval);
+      ev += strat[base_idx + aidx] * node_ev(state.apply(actions[aidx]), i, hands, board, stack_size, indexers, eval);
     }
     return ev;
   }
 }
 
-// double SampledBlueprint::monte_carlo_ev(int n, const PokerState& state, int i, const PokerRange& hero, const PokerRange& villain, const std::vector<uint8_t>& board) {
-//   double ev = 0.0;
-//   for(int t = 0; t < n; ++t) {
+double LosslessBlueprint::monte_carlo_ev(int n, const PokerState& init_state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& init_board) const {
+  validate_ev_inputs(init_state, i, ranges, init_board);
 
-//   }
-//   return ev / n;
-// }
+  std::vector<double> weights;
+  std::vector<std::vector<Hand>> outcomes;
+  for(const auto& oop : ranges[0].hands()) {
+    for(const auto& ip : ranges[1].hands()) {
+      if(collides(oop, ip) || collides(oop, init_board) || collides(ip, init_board)) continue;
+      weights.push_back(ranges[0].frequency(oop) * ranges[1].frequency(ip));
+      outcomes.push_back({oop, ip});
+    }
+  }
+  std::discrete_distribution<> dist{weights.begin(), weights.end()};
+
+  Deck deck;
+  omp::HandEvaluator eval;
+  long value = 0;
+  for(int t = 0; t < n; ++t) {
+    deck.clear_dead_cards();
+    std::vector<Hand> hands = outcomes[dist(GlobalRNG::instance())];
+    for(const auto& hand : hands) deck.add_dead_cards(hand.cards());
+    deck.add_dead_cards(init_board);
+    deck.shuffle();
+    
+    auto board_cards = init_board;
+    while(board_cards.size() < 5) board_cards.push_back(deck.draw());
+    Board board{board_cards};
+
+    PokerState state = init_state;
+    while(!state.is_terminal()) {
+      auto actions = valid_actions(state, get_config().action_profile);
+      auto freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), get_strategy());
+      state = state.apply(actions[sample_action_idx(freq)]);
+    }
+    int u = utility(state, i, board, hands, get_config().poker.n_chips, eval);
+    value += u;
+    
+    if(t > 0 && t % 1'000'000 == 0) {
+      std::cout << std::fixed << std::setprecision(2) << "t=" << t / 1'000'000.0 << "M, EV=" << value / static_cast<double>(t) << "\n";
+    }
+  }
+  return value / static_cast<double>(n);
+}
 
 struct SampledMetadata {
   BlueprintTrainerConfig config;

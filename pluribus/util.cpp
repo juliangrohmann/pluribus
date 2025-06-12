@@ -81,6 +81,12 @@ void str_to_cards(std::string card_str, uint8_t cards[]) {
   }
 }
 
+std::vector<uint8_t> str_to_cards(std::string card_str) {
+  std::vector<uint8_t> cards(card_str.length() / 2);
+  str_to_cards(card_str, cards.data());
+  return cards;
+}
+
 std::string cards_to_str(const uint8_t* begin, const uint8_t* end) {
   std::string str = "";
   for(; begin != end; ++begin) {
