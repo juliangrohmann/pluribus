@@ -35,22 +35,22 @@ private:
 
 class PokerRange {
 public:
-  PokerRange(float freq = 0.0f) : _weights(1326, freq) { HoleCardIndexer::get_instance(); }
+  PokerRange(double freq = 0.0f) : _weights(1326, freq) { HoleCardIndexer::get_instance(); }
 
-  void add_hand(const Hand& hand, float freq = 1.0f) { 
+  void add_hand(const Hand& hand, double freq = 1.0f) { 
     int idx = HoleCardIndexer::get_instance()->index(hand);
     if(idx >= _weights.size()) {
       throw std::runtime_error{"PokerRange writing out of bounds!" + std::to_string(idx) + " < " + std::to_string(_weights.size())};
     }
     _weights[idx] += freq; 
   }
-  void multiply_hand(const Hand& hand, float freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] *= freq; }
-  void set_frequency(const Hand& hand, float freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] = freq; }
-  float frequency(const Hand& hand) const { return _weights[HoleCardIndexer::get_instance()->index(hand)]; }
-  const std::vector<float>& weights() { return _weights; }
+  void multiply_hand(const Hand& hand, double freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] *= freq; }
+  void set_frequency(const Hand& hand, double freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] = freq; }
+  double frequency(const Hand& hand) const { return _weights[HoleCardIndexer::get_instance()->index(hand)]; }
+  const std::vector<double>& weights() { return _weights; }
   void remove_cards(const std::vector<uint8_t>& cards);
   std::vector<Hand> hands() const;
-  float n_combos() const;
+  double n_combos() const;
   Hand sample(std::unordered_set<uint8_t> dead_cards = {}) const;
 
   PokerRange& operator+=(const PokerRange& other);
@@ -66,7 +66,7 @@ public:
 
   static PokerRange full() { return PokerRange{1.0f}; }
 private:
-  std::vector<float> _weights;
+  std::vector<double> _weights;
 };
 
 }

@@ -37,17 +37,17 @@ std::vector<Hand> PokerRange::hands() const {
   return ret;
 }
 
-float PokerRange::n_combos() const {
+double PokerRange::n_combos() const {
   return std::reduce(_weights.begin(), _weights.end());
 }
 
 Hand PokerRange::sample(std::unordered_set<uint8_t> dead_cards) const {
   // TODO: Alias Method with Precomputed Table for performance
-  std::vector<float> masked_weights = _weights;
+  std::vector<double> masked_weights = _weights;
   for(int i = 0; i < masked_weights.size(); ++i) {
     Hand hand = HoleCardIndexer::get_instance()->hand(i);
     if(dead_cards.find(hand.cards()[0]) != dead_cards.end() || dead_cards.find(hand.cards()[1]) != dead_cards.end()) {
-      masked_weights[i] = 0.0f;
+      masked_weights[i] = 0.0;
     }
   }
   std::discrete_distribution<> dist(masked_weights.begin(), masked_weights.end());
@@ -57,7 +57,7 @@ Hand PokerRange::sample(std::unordered_set<uint8_t> dead_cards) const {
 void PokerRange::remove_cards(const std::vector<uint8_t>& cards) {
   for(const auto& hand : hands()) {
     if(collides(hand, cards)) {
-      set_frequency(hand, 0.0f);
+      set_frequency(hand, 0.0);
     }
   }
 }
