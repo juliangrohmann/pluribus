@@ -229,20 +229,17 @@ double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std
   omp::HandEvaluator eval;
   std::vector<Hand> hands(ranges.size(), Hand{{52, 52}});
   double ev = 0.0;
-  float total = 0.0;
+  double total = 0.0;
   for(const auto& hh : ranges[i].hands()) {
     if(collides(hh, real_board)) continue;
     for(const auto& vh : ranges[pos_v].hands()) {
       if(collides(hh, vh) || collides(vh, real_board)) continue;
       hands[i] = hh;
       hands[pos_v] = vh;
-      float hero_freq = ranges[i].frequency(hh);
-      float vill_freq = ranges[pos_v].frequency(vh);
       std::vector<CachedIndexer> indexers;
       for(int i = 0; i < hands.size(); ++i) indexers.push_back(CachedIndexer{3});
-      double hev = expected_value(state, i, hands, real_board, get_config().poker.n_chips, indexers, eval);
-      float freq = hero_freq * vill_freq;
-      ev += hev * freq;
+      double freq = ranges[i].frequency(hh) * ranges[pos_v].frequency(vh);
+      ev += freq * expected_value(state, i, hands, real_board, get_config().poker.n_chips, indexers, eval);
       total += freq;
     }
     std::cout << hh.to_string() << "\n";
