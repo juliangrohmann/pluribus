@@ -271,7 +271,9 @@ class LosslessActionProvider : public _ActionProvider<float> {
 public:
   Action next_action(const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<float>& bp) const override {
     auto actions = valid_actions(state, bp.get_config().action_profile);
-    auto freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), bp.get_strategy());
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[state.get_active()]);
+    size_t base_idx = bp.get_strategy().index(state, cluster);
+    auto freq = calculate_strategy(bp.get_strategy(), base_idx, actions.size());
     return actions[sample_action_idx(freq)];
   }
 };
