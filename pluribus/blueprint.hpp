@@ -98,10 +98,6 @@ double _monte_carlo_ev(int n, const PokerState& init_state, int i, const std::ve
     }
     int u = utility(state, i, board, hands, stack_size, eval);
     value += u;
-    
-    if(t > 0 && t % 1'000'000 == 0) {
-      std::cout << std::fixed << std::setprecision(2) << "t=" << t / 1'000'000.0 << "M, EV=" << value / static_cast<double>(t) << "\n";
-    }
   }
   return value / static_cast<double>(n);
 }

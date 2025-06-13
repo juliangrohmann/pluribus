@@ -216,8 +216,11 @@ double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std
   std::vector<Hand> hands(ranges.size());
   double ev = 0.0;
   double total = 0.0;
+  double max_combos = 1.0;
+  for(const auto& r : ranges) max_combos *= r.n_combos();
   for(const auto& hh : ranges[i].hands()) {
     if(collides(hh, board)) continue;
+    std::cout << "Enumerate EV: " << std::fixed << std::setprecision(1) << total / max_combos * 100 << "%\n";
     for(const auto& vh : ranges[pos_v].hands()) {
       if(collides(hh, vh) || collides(vh, board)) continue;
       hands[i] = hh;
@@ -228,9 +231,7 @@ double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std
       ev += freq * node_ev(state, i, hands, board, get_config().poker.n_chips, indexers, eval);
       total += freq;
     }
-    std::cout << hh.to_string() << "\n";
   }
-  std::cout << "EV=" << ev << "\n";
   return ev / total;
 }
 
