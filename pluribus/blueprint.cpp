@@ -174,10 +174,6 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
   std::cout << "Lossless blueprint built.\n";
 }
 
-bool any_collision(const Hand& hero, const Hand& villain, const std::vector<uint8_t>& board) {
-  return collides(hero, villain) || collides(hero, board) || collides(villain, board);
-}
-
 bool any_collision(uint8_t card, const std::vector<Hand>& hands, const std::vector<uint8_t>& board) {
   for(const auto& hand : hands) {
     if(card == hand.cards()[0] || card == hand.cards()[1]) return true;
@@ -192,41 +188,17 @@ int villain_pos(const PokerState& state, int i) {
   throw std::runtime_error("Villain doesn't exist in state.");
 }
 
-std::vector<Hand> construct_hands(const PokerState& state, int i, const Hand& hero, const Hand& villain) {
-  std::vector<Hand> hands;
-  bool found_hero = false, found_villain = false;
-  for(int p = 0; p < state.get_players().size(); ++p) {
-    if(!state.get_players()[p].has_folded()) {
-      if(p == i) {
-        hands.push_back(hero);
-        found_hero = true;
-      }
-      else {
-        if(found_villain) throw std::runtime_error("Found multiple villains while constructing hands for EV enumeration.");
-        hands.push_back(villain);
-        found_villain = true;
-      }
-    }
-    else {
-      hands.push_back(Hand{{52, 52}}); // placeholder
-    }
-  }
-  if(!found_hero) throw std::runtime_error("Hero missing while constructing hands for EV enumeration.");
-  if(hands.size() != state.get_players().size()) throw std::runtime_error("Number of constructed hands does not match players for EV enumeration.");
-  return hands;
-}
-
-void validate_ev_inputs(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) {
+void _validate_ev_inputs(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) {
   int round = round_of_last_action(state);
   int n_cards = n_board_cards(round);
   std::vector<uint8_t> real_board = board.size() > n_cards ? std::vector<uint8_t>{board.begin(), board.begin() + n_cards} : board;
   std::cout << "Real round: " << round_to_str(round) << "\n";
   std::cout << "Real board: " << cards_to_str(real_board) << "\n";
-  std::cout << "Hero pos: " << i << "(" << pos_to_str(i, state.get_players().size()) << ")\n";
+  std::cout << "Hero pos: " << i << " (" << pos_to_str(i, state.get_players().size()) << ")\n";
   int ridx = 0;
   for(int p = 0; p < state.get_players().size(); ++p) {
     if(!state.get_players()[p].has_folded()) {
-      std::cout << pos_to_str(p, state.get_players().size()) << ": " << ranges[ridx].n_combos() << "combos  ";
+      std::cout << pos_to_str(p, state.get_players().size()) << ": " << ranges[ridx].n_combos() << " combos  ";
       ++ridx;
       if(ridx >= ranges.size()) break;
     }
@@ -237,7 +209,7 @@ void validate_ev_inputs(const PokerState& state, int i, const std::vector<PokerR
 }
 
 double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const {
-  validate_ev_inputs(state, i, ranges, board);
+  _validate_ev_inputs(state, i, ranges, board);
 
   int pos_v = villain_pos(state, i);
   omp::HandEvaluator eval;
@@ -294,48 +266,42 @@ double LosslessBlueprint::node_ev(const PokerState& state, int i, const std::vec
   }
 }
 
-double LosslessBlueprint::monte_carlo_ev(int n, const PokerState& init_state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& init_board) const {
-  validate_ev_inputs(init_state, i, ranges, init_board);
-
-  std::vector<double> weights;
-  std::vector<std::vector<Hand>> outcomes;
-  for(const auto& oop : ranges[0].hands()) {
-    for(const auto& ip : ranges[1].hands()) {
-      if(collides(oop, ip) || collides(oop, init_board) || collides(ip, init_board)) continue;
-      weights.push_back(ranges[0].frequency(oop) * ranges[1].frequency(ip));
-      outcomes.push_back({oop, ip});
-    }
+class LosslessActionProvider : public _ActionProvider<float> {
+public:
+  Action next_action(const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<float>& bp) const override {
+    auto actions = valid_actions(state, bp.get_config().action_profile);
+    auto freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), bp.get_strategy());
+    return actions[sample_action_idx(freq)];
   }
-  std::discrete_distribution<> dist{weights.begin(), weights.end()};
+};
 
-  Deck deck;
-  omp::HandEvaluator eval;
-  long value = 0;
-  for(int t = 0; t < n; ++t) {
-    deck.clear_dead_cards();
-    std::vector<Hand> hands = outcomes[dist(GlobalRNG::instance())];
-    for(const auto& hand : hands) deck.add_dead_cards(hand.cards());
-    deck.add_dead_cards(init_board);
-    deck.shuffle();
-    
-    auto board_cards = init_board;
-    while(board_cards.size() < 5) board_cards.push_back(deck.draw());
-    Board board{board_cards};
+class SampledActionProvider : public _ActionProvider<Action> {
+public:
+  SampledActionProvider(const std::vector<int>& bias_offsets) : _bias_offsets{bias_offsets} {}
 
-    PokerState state = init_state;
-    while(!state.is_terminal()) {
-      auto actions = valid_actions(state, get_config().action_profile);
-      auto freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), get_strategy());
-      state = state.apply(actions[sample_action_idx(freq)]);
-    }
-    int u = utility(state, i, board, hands, get_config().poker.n_chips, eval);
-    value += u;
-    
-    if(t > 0 && t % 1'000'000 == 0) {
-      std::cout << std::fixed << std::setprecision(2) << "t=" << t / 1'000'000.0 << "M, EV=" << value / static_cast<double>(t) << "\n";
-    }
+  Action next_action(const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<Action>& bp) const override {
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[state.get_active()]);
+    size_t base_idx = bp.get_strategy().index(state, cluster);
+    return bp.get_strategy()[base_idx + _bias_offsets[state.get_active()]];
   }
-  return value / static_cast<double>(n);
+private:
+  std::vector<int> _bias_offsets;
+};
+
+double LosslessBlueprint::monte_carlo_ev(int n, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const {
+  LosslessActionProvider action_provider;
+  return _monte_carlo_ev(n, state, i, ranges, board, get_config().poker.n_chips, action_provider, *this);
+}
+
+double SampledBlueprint::monte_carlo_ev(int n, const std::vector<Action>& biases, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const {
+  BiasActionProfile bias_profile;
+  const std::vector<Action>& all_biases = bias_profile.get_actions(0, 0, 0, 0);
+  std::vector<int> bias_offsets;
+  for(const auto& bias : biases) {
+    bias_offsets.push_back(std::distance(all_biases.begin(), std::find(all_biases.begin(), all_biases.end(), bias)));
+  }
+  SampledActionProvider action_provider{bias_offsets};
+  return _monte_carlo_ev(n, state, i, ranges, board, get_config().poker.n_chips, action_provider, *this);
 }
 
 struct SampledMetadata {
@@ -396,29 +362,33 @@ SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const s
 
   std::cout << "Collecting histories... " << std::flush;
   meta.histories.reserve(bp.get_strategy().history_map().size());
-  size_t fold_saved = 0, bet_saved = 0;;
+  // size_t fold_saved = 0, bet_saved = 0;;
+  PokerState init_state{meta.config.poker};
   for(const auto& entry : bp.get_strategy().history_map()) {
-    PokerState state{meta.config.poker};
-    state = state.apply(entry.first);
-    auto actions = valid_actions(state, bp.get_config().action_profile);
-    int bets = 0;
-    for(Action a : actions) {
-      if(a.get_bet_type() > 0 || a == Action::ALL_IN) ++bets;
-    }
-    if(std::find(actions.begin(), actions.end(), Action::FOLD) == actions.end()) {
-      fold_saved += 200;
-    }
-    if(bets == 0) {
-      bet_saved += 200;
-    }
+    PokerState state = init_state.apply(entry.first);
     if(!state.is_terminal()) {
       meta.histories.push_back(entry.first);
     }
+    else {
+      throw std::runtime_error("Found terminal state.");
+    }
+    // auto actions = valid_actions(state, bp.get_config().action_profile);
+    // int bets = 0;
+    // for(Action a : actions) {
+    //   if(a.get_bet_type() > 0 || a == Action::ALL_IN) ++bets;
+    // }
+    // if(std::find(actions.begin(), actions.end(), Action::FOLD) == actions.end()) {
+    //   fold_saved += 200;
+    // }
+    // if(bets == 0) {
+    //   bet_saved += 200;
+    // }
   }
-  std::cout << "Fold saved: " << fold_saved << '\n';
-  std::cout << "Bet saved: " << bet_saved << '\n';
+  // std::cout << "Fold saved: " << fold_saved << '\n';
+  // std::cout << "Bet saved: " << bet_saved << '\n';
   std::cout << "Collected " << meta.histories.size() << " (" << meta.n_clusters << " clusters).\n";
 
+  std::cout << "Clusters=" << meta.n_clusters << ", Biases=" << meta.biases.size() << "\n";
   std::cout << "Building buffers...\n";
   std::unordered_map<ActionHistory, std::vector<Action>> buffer;
   long long min_ram = 4 * pow(1024, 3);
@@ -427,8 +397,7 @@ SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const s
     std::vector<Action> sampled;
     sampled.reserve(meta.n_clusters * meta.biases.size());
     for(int c = 0; c < meta.n_clusters; ++c) {
-      PokerState state{bp.get_config().poker};
-      state.apply(meta.histories[hidx]);
+      PokerState state = init_state.apply(meta.histories[hidx]);
       auto actions = valid_actions(state, bp.get_config().action_profile);
       size_t base_idx = bp.get_strategy().index(state, c);
       auto freq = calculate_strategy(bp.get_strategy(), base_idx, actions.size());
@@ -451,7 +420,7 @@ SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const s
   return meta;
 }
 
-SampledBlueprint::SampledBlueprint(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor) {
+void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor) {
   {
     LosslessBlueprint bp = cereal_load<LosslessBlueprint>(lossless_bp_fn);
     std::cout << "Lossless data size: " << bp.get_strategy().data().size() << "\n";

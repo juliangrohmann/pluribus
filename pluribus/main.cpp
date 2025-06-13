@@ -61,7 +61,8 @@ int main(int argc, char* argv[]) {
       lossless_bp.build(argv[2], get_filepaths(argv[3]), argv[4]);
       std::string lossless_fn = "lossless_" + std::string{argv[5]};
       cereal_save(lossless_bp, lossless_fn);
-      SampledBlueprint sampled_bp{lossless_fn, argv[4]};
+      SampledBlueprint sampled_bp;
+      sampled_bp.build(lossless_fn, argv[4]);
       cereal_save(sampled_bp, "sampled_" + std::string{argv[5]});
 
     }
@@ -71,7 +72,8 @@ int main(int argc, char* argv[]) {
       std::cout << "Missing arguments to build blueprint.\n";
     }
     else {
-      SampledBlueprint sampled_bp{argv[2], argv[3]};
+      SampledBlueprint sampled_bp;
+      sampled_bp.build(argv[2], argv[3]);
       cereal_save(sampled_bp, "sampled_" + std::string{argv[4]});
 
     }

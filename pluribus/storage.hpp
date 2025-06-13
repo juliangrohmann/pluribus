@@ -121,7 +121,7 @@ public:
     size_t n_actions = valid_actions(state, _action_profile).size();
     auto it = _history_map.find(state.get_action_history());
     if(it != _history_map.end()) return it->second.idx + cluster * n_actions + action;
-    throw std::runtime_error("StrategyStorage --- Indexed with unknown action history.");
+    throw std::runtime_error("StrategyStorage --- Indexed with unknown action history:\n" + state.get_action_history().to_string());
   }
 
   bool operator==(const StrategyStorage& other) const {
