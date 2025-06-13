@@ -279,7 +279,7 @@ std::array<uint16_t, 4> independent_indices(const Board& board, const Hand& hand
   return single_clusters;
 }
 
-TEST_CASE("Progressive indexing", "[index-prog]") {
+TEST_CASE("Progressive indexing", "[index]") {
   Deck deck;
   for(int i = 0; i < 100; ++i) {
     deck.reset();
@@ -297,7 +297,7 @@ TEST_CASE("Progressive indexing", "[index-prog]") {
   }
 }
 
-TEST_CASE("Cached indexing", "[index-cached]") {
+TEST_CASE("Cached indexing", "[index]") {
   Deck deck;
   for(int i = 0; i < 100; ++i) {
     deck.reset();
