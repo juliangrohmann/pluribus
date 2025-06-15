@@ -15,14 +15,22 @@ public:
   void remap(const std::vector<double>& weights);
   void remap(const PokerRange& range) { remap(range.weights()); };
 
-  ~HandSampler();
-
 private:
   void _init(const std::vector<double>& weights);
   std::vector<double> _sparse_weights(const PokerRange& range);
 
-  ransampl_ws* _state = nullptr;
+  std::shared_ptr<ransampl_ws> _state = nullptr;
   std::vector<Hand> _hands;
+};
+
+class RoundSampler {
+public:
+  RoundSampler(const std::vector<PokerRange>& ranges);
+  std::vector<Hand> sample(const std::vector<uint8_t>& dead_cards = {}, const std::vector<Player>* players = nullptr);
+private:
+  std::vector<HandSampler> _samplers;
+  long _samples = 0;
+  long _rejections = 0;
 };
 
 }
