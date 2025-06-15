@@ -3,6 +3,7 @@
 #include <iostream>
 #include <random>
 #include <thread>
+#include <memory>
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
 
@@ -51,11 +52,13 @@ public:
 
 class GSLDiscreteDist {
 public:
-  GSLDiscreteDist(const std::vector<double> weights) { _dist = gsl_ran_discrete_preproc(weights.size(), weights.data()); }
-  size_t sample() { return gsl_ran_discrete(GSLGlobalRNG::instance(), _dist); }
-  ~GSLDiscreteDist() { gsl_ran_discrete_free(_dist); }
+  GSLDiscreteDist(const std::vector<double>& weights) { 
+    _dist = std::shared_ptr<gsl_ran_discrete_t>{gsl_ran_discrete_preproc(weights.size(), weights.data()), [](gsl_ran_discrete_t* p) { gsl_ran_discrete_free(p); }}; 
+  }
+  size_t sample() { return gsl_ran_discrete(GSLGlobalRNG::instance(), _dist.get()); }
+  ~GSLDiscreteDist() {  }
 private:
-  gsl_ran_discrete_t* _dist;
+  std::shared_ptr<gsl_ran_discrete_t> _dist = nullptr;
 };
 
 }
