@@ -226,7 +226,7 @@ double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std
       hands[i] = hh;
       hands[pos_v] = vh;
       std::vector<CachedIndexer> indexers;
-      for(int i = 0; i < hands.size(); ++i) indexers.push_back(CachedIndexer{3});
+      for(int i = 0; i < hands.size(); ++i) indexers.push_back(CachedIndexer{});
       double freq = ranges[i].frequency(hh) * ranges[pos_v].frequency(vh);
       ev += freq * node_ev(state, i, hands, board, get_config().poker.n_chips, indexers, eval);
       total += freq;
@@ -269,9 +269,10 @@ double LosslessBlueprint::node_ev(const PokerState& state, int i, const std::vec
 
 class LosslessActionProvider : public _ActionProvider<float> {
 public:
-  Action next_action(const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<float>& bp) const override {
+  Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<float>& bp) const override {
     auto actions = valid_actions(state, bp.get_config().action_profile);
-    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[state.get_active()]);
+    hand_index_t hand_idx = indexer.index(board, hands[state.get_active()], static_cast<int>(state.get_round()));
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
     size_t base_idx = bp.get_strategy().index(state, cluster);
     auto freq = calculate_strategy(bp.get_strategy(), base_idx, actions.size());
     return actions[sample_action_idx(freq)];
@@ -282,8 +283,9 @@ class SampledActionProvider : public _ActionProvider<Action> {
 public:
   SampledActionProvider(const std::vector<int>& bias_offsets) : _bias_offsets{bias_offsets} {}
 
-  Action next_action(const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<Action>& bp) const override {
-    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[state.get_active()]);
+  Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<Action>& bp) const override {
+    hand_index_t hand_idx = indexer.index(board, hands[state.get_active()], static_cast<int>(state.get_round()));
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
     size_t base_idx = bp.get_strategy().index(state, cluster);
     return bp.get_strategy()[base_idx + _bias_offsets[state.get_active()]];
   }
@@ -291,12 +293,12 @@ private:
   std::vector<int> _bias_offsets;
 };
 
-double LosslessBlueprint::monte_carlo_ev(int n, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const {
+double LosslessBlueprint::monte_carlo_ev(int n, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board, bool verbose) const {
   LosslessActionProvider action_provider;
-  return _monte_carlo_ev(n, state, i, ranges, board, get_config().poker.n_chips, action_provider, *this);
+  return _monte_carlo_ev(n, state, i, ranges, board, get_config().poker.n_chips, action_provider, *this, verbose);
 }
 
-double SampledBlueprint::monte_carlo_ev(int n, const std::vector<Action>& biases, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const {
+double SampledBlueprint::monte_carlo_ev(int n, const std::vector<Action>& biases, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board, bool verbose) const {
   BiasActionProfile bias_profile;
   const std::vector<Action>& all_biases = bias_profile.get_actions(0, 0, 0, 0);
   std::vector<int> bias_offsets;
@@ -304,7 +306,7 @@ double SampledBlueprint::monte_carlo_ev(int n, const std::vector<Action>& biases
     bias_offsets.push_back(std::distance(all_biases.begin(), std::find(all_biases.begin(), all_biases.end(), bias)));
   }
   SampledActionProvider action_provider{bias_offsets};
-  return _monte_carlo_ev(n, state, i, ranges, board, get_config().poker.n_chips, action_provider, *this);
+  return _monte_carlo_ev(n, state, i, ranges, board, get_config().poker.n_chips, action_provider, *this, verbose);
 }
 
 struct SampledMetadata {

@@ -33,7 +33,7 @@ private:
 
 class CachedIndexer {
 public:
-  CachedIndexer(int max_round);
+  CachedIndexer(int max_round = 3);
 
   hand_index_t index(const uint8_t cards[], int round);
   hand_index_t index(const Board& board, const Hand& hand, int round);

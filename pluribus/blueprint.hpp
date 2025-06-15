@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <chrono>
 #include <cereal/cereal.hpp>
 #include <cereal/types/memory.hpp>
 #include <pluribus/debug.hpp>
@@ -42,7 +43,7 @@ class LosslessBlueprint : public Blueprint<float> {
 public:
   void build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir = "");
   double enumerate_ev(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const;
-  double monte_carlo_ev(int n, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const;
+  double monte_carlo_ev(int n, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board, bool verbose = false) const;
 
 private:
   double node_ev(const PokerState& state, int i, const std::vector<Hand>& hands, const std::vector<uint8_t>& board, int stack_size, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const;
@@ -54,17 +55,17 @@ void _validate_ev_inputs(const PokerState& state, int i, const std::vector<Poker
 class SampledBlueprint : public Blueprint<Action> {
 public:
   void build(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor = 5.0f);
-  double monte_carlo_ev(int n, const std::vector<Action>& biases, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const;
+  double monte_carlo_ev(int n, const std::vector<Action>& biases, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board, bool verbose = false) const;
 };
 
 template <class T>
 class _ActionProvider {
 public:
-  virtual Action next_action(const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<T>& bp) const = 0;
+  virtual Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<T>& bp) const = 0;
 };
 
 template <class T>
-double _monte_carlo_ev(int n, const PokerState& init_state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& init_board, int stack_size, const _ActionProvider<T>& action_provider, const Blueprint<T>& bp) {
+double _monte_carlo_ev(int n, const PokerState& init_state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& init_board, int stack_size, const _ActionProvider<T>& action_provider, const Blueprint<T>& bp, bool verbose) {
   _validate_ev_inputs(init_state, i, ranges, init_board);
 
   std::vector<double> weights;
@@ -81,6 +82,7 @@ double _monte_carlo_ev(int n, const PokerState& init_state, int i, const std::ve
   Deck deck;
   omp::HandEvaluator eval;
   long value = 0;
+  auto t_0 = std::chrono::high_resolution_clock::now();
   for(int t = 0; t < n; ++t) {
     deck.clear_dead_cards();
     std::vector<Hand> hands = outcomes[dist(GlobalRNG::instance())];
@@ -92,12 +94,20 @@ double _monte_carlo_ev(int n, const PokerState& init_state, int i, const std::ve
     while(board_cards.size() < 5) board_cards.push_back(deck.draw());
     Board board{board_cards};
 
+    std::vector<CachedIndexer> indexers(ranges.size(), CachedIndexer{});
     PokerState state = init_state;
     while(!state.is_terminal()) {
-      state = state.apply(action_provider.next_action(state, hands, board, bp));
+      state = state.apply(action_provider.next_action(indexers[state.get_active()], state, hands, board, bp));
     }
     int u = utility(state, i, board, hands, stack_size, eval);
     value += u;
+    if(verbose && t > 0 && t % 100'000 == 0) {
+      auto t_i = std::chrono::high_resolution_clock::now();
+      auto dt = std::chrono::duration_cast<std::chrono::microseconds>(t_i - t_0).count();
+      std::cout << std::fixed << std::setprecision(1) << "t=" << t << "M, " 
+                << std::setprecision(2) << "EV=" << value / static_cast<double>(t + 1) << ", "
+                << std::setprecision(1) << static_cast<double>(t + 1) / (dt / 1'000.0) << "k it/sec)\n";
+    }
   }
   return value / static_cast<double>(n);
 }
