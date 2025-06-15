@@ -214,29 +214,24 @@ void test_hand_distribution(const PokerRange& range, std::function<Hand()>sample
   }
 }
 
-TEST_CASE("Sample PokerRange", "[range][slow]") {
-  auto range = PokerRange::random();
-  test_hand_distribution(range, [&]() -> Hand { return range.sample(); }, 2'000'000, 0.8);
-}
+// TEST_CASE("Sample PokerRange with dead_cards", "[range]") {
+//   std::uniform_real_distribution<float> dist(0.0f, 1.0f);
+//   PokerRange range;
+//   uint8_t dead_card = card_to_idx("Ad");
+//   range.add_hand(Hand{dead_card, card_to_idx("Jd")});
+//   range.add_hand(Hand{card_to_idx("9h"), dead_card});
+//   range.add_hand(Hand{"AdAh"});
+//   range.add_hand(Hand{"AcAd"});
+//   range.add_hand(Hand{"AcTh"});
+//   range.add_hand(Hand{"8s8h"});
 
-TEST_CASE("Sample PokerRange with dead_cards", "[range]") {
-  std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-  PokerRange range;
-  uint8_t dead_card = card_to_idx("Ad");
-  range.add_hand(Hand{dead_card, card_to_idx("Jd")});
-  range.add_hand(Hand{card_to_idx("9h"), dead_card});
-  range.add_hand(Hand{"AdAh"});
-  range.add_hand(Hand{"AcAd"});
-  range.add_hand(Hand{"AcTh"});
-  range.add_hand(Hand{"8s8h"});
-
-  std::unordered_map<Hand, float> sampled;
-  for(int i = 0; i < 10'000; ++i) {
-    Hand hand = range.sample({dead_card});
-    REQUIRE(hand.cards()[0] != dead_card);
-    REQUIRE(hand.cards()[1] != dead_card);
-  }
-}
+//   std::unordered_map<Hand, float> sampled;
+//   for(int i = 0; i < 10'000; ++i) {
+//     Hand hand = range.sample({dead_card});
+//     REQUIRE(hand.cards()[0] != dead_card);
+//     REQUIRE(hand.cards()[1] != dead_card);
+//   }
+// }
 
 void test_hand_sampler(const PokerRange& range, bool sparse, long n, double thresh) {
   HandSampler sampler{range, sparse};

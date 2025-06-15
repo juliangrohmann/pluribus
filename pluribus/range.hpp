@@ -51,7 +51,6 @@ public:
   void remove_cards(const std::vector<uint8_t>& cards);
   std::vector<Hand> hands() const;
   double n_combos() const;
-  Hand sample(std::unordered_set<uint8_t> dead_cards = {}) const;
 
   PokerRange& operator+=(const PokerRange& other);
   PokerRange& operator*=(const PokerRange& other);

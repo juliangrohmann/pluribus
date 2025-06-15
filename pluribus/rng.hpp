@@ -3,6 +3,10 @@
 #include <iostream>
 #include <random>
 #include <thread>
+#include <gsl/gsl_rng.h>
+#include <gsl/gsl_randist.h>
+
+namespace pluribus {
 
 class GlobalRNG {
 public:
@@ -17,3 +21,41 @@ public:
     return dist(instance());
   }
 };
+
+class GSLGlobalRNG {
+public:
+  static gsl_rng*& instance() {
+    thread_local gsl_rng* rng = nullptr;
+    if(!rng) {
+      rng = gsl_rng_alloc(gsl_rng_mt19937);
+      gsl_rng_set(rng, static_cast<unsigned long>(std::time(nullptr) + std::hash<std::thread::id>{}(std::this_thread::get_id())));
+    }
+    return rng;
+  }
+
+  static double uniform() {
+    return gsl_rng_uniform(instance());
+  }
+
+  static void cleanup() {
+    if(instance()) {
+      gsl_rng_free(instance());
+      instance() = nullptr;
+    }
+  }
+
+  ~GSLGlobalRNG() {
+    cleanup();
+  }
+};
+
+class GSLDiscreteDist {
+public:
+  GSLDiscreteDist(const std::vector<double> weights) { _dist = gsl_ran_discrete_preproc(weights.size(), weights.data()); }
+  size_t sample() { return gsl_ran_discrete(GSLGlobalRNG::instance(), _dist); }
+  ~GSLDiscreteDist() { gsl_ran_discrete_free(_dist); }
+private:
+  gsl_ran_discrete_t* _dist;
+};
+
+}

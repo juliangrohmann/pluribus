@@ -32,6 +32,7 @@ void Deck::reset() {
 }
 
 void Deck::shuffle() {
+  // gsl_ran_shuffle(GlobalRNG::instance(), _cards.data(), _cards.size(), sizeof(uint8_t)); // TODO: faster?
   std::shuffle(_cards.begin(), _cards.end(), GlobalRNG::instance());
   _current = 0;
 }

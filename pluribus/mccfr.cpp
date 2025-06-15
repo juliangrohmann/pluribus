@@ -196,7 +196,8 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
           std::unordered_set<uint8_t> dead_cards;
           std::copy(board.cards().begin(), board.cards().end(), std::inserter(dead_cards, dead_cards.end()));
           for(int p_idx = 0; p_idx < _config.poker.n_players; ++p_idx) {
-            hands[p_idx] = _config.init_ranges[p_idx].sample(dead_cards);
+            throw std::runtime_error("Biased MCCFR sampling not implemented.");
+            // hands[p_idx] = _config.init_ranges[p_idx].sample(dead_cards);
             dead_cards.insert(hands[p_idx].cards()[0]);
             dead_cards.insert(hands[p_idx].cards()[1]);
           }

@@ -5,7 +5,7 @@
 namespace pluribus {
 
 void HandSampler::_init(const std::vector<double>& weights) {
-  _state = ransampl_alloc(weights.size(), &GlobalRNG::uniform);
+  _state = ransampl_alloc(weights.size(), &GSLGlobalRNG::uniform);
   remap(weights);
 }
 
