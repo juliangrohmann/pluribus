@@ -24,11 +24,11 @@ class RoundSampler {
 public:
   RoundSampler(const std::vector<PokerRange>& ranges);
   std::vector<Hand> sample(const std::vector<uint8_t>& dead_cards = {}, const std::vector<Player>* players = nullptr);
-  long _samples = 0;
-  long _rejections = 0;
+  std::vector<Hand> sample(uint64_t& mask, const std::vector<uint8_t>& dead_cards = {}, const std::vector<Player>* players = nullptr);
 private:
   std::vector<HandSampler> _samplers;
-  
+  long _samples = 0;
+  long _rejections = 0;
 };
 
 }

@@ -34,33 +34,30 @@ RoundSampler::RoundSampler(const std::vector<PokerRange>& ranges) {
  for(const auto& r : ranges) _samplers.emplace_back(r);
 }
 
-bool _is_valid(const std::vector<Hand>& hands, const std::vector<uint8_t>& dead_cards, const std::vector<Player>* players) {
-  uint64_t mask = 0;
-  for(uint8_t card : dead_cards) mask |= 1L << card;
-  for(int i = 0; i < hands.size(); ++i) {
-    if(!players || !players->operator[](i).has_folded()) {
-      uint64_t curr_mask = (1L << hands[i].cards()[0]) | (1L << hands[i].cards()[1]);
-      if(mask & curr_mask) return false;
-      mask |= curr_mask;
-    }
-  }
-  return true;
-}
-
-std::vector<Hand> RoundSampler::sample(const std::vector<uint8_t>& dead_cards, const std::vector<Player>* players) {
+std::vector<Hand> RoundSampler::sample(uint64_t& mask, const std::vector<uint8_t>& dead_cards, const std::vector<Player>* players) {
   std::vector<Hand> hands(_samplers.size(), Hand{52, 52});
-  bool rejected = false;
+  for(uint8_t card : dead_cards) mask |= 1L << card;
+  uint64_t init_mask = mask;
+  int coll = 0;
   do {
+    mask = init_mask;
+    coll = 0;
+    ++_samples;
     for(int i = 0; i < hands.size(); ++i) {
       if(!players || !players->operator[](i).has_folded()) {
         hands[i] = _samplers[i].sample();
+        uint64_t curr_mask = (1L << hands[i].cards()[0]) | (1L << hands[i].cards()[1]);
+        coll += (mask & curr_mask) != 0;
+        mask |= curr_mask;
       }
     }
-    if(rejected) ++_rejections;
-    ++_samples;
-    rejected = true;
-  } while(!_is_valid(hands, dead_cards, players));
+  } while(coll > 0);
   return hands;
+}
+
+std::vector<Hand> RoundSampler::sample(const std::vector<uint8_t>& dead_cards, const std::vector<Player>* players) {
+  uint64_t mask = 0L;
+  return sample(mask, dead_cards, players);
 }
 
 }

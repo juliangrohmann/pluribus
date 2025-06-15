@@ -44,11 +44,11 @@ template<int N>
 class CardSet {
 public:
   CardSet() { _cards.fill(0); }
-  CardSet(std::array<uint8_t, N> cards) : _cards{cards} {}
-  CardSet(std::vector<uint8_t> cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
-  CardSet(std::initializer_list<uint8_t> cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
-  CardSet(std::string card_str) { str_to_cards(card_str, cards().data()); }
-  CardSet(Deck& deck, std::vector<uint8_t> init_cards = {}) { deal(deck, init_cards); }
+  CardSet(const std::array<uint8_t, N>& cards) : _cards{cards} {}
+  CardSet(const std::vector<uint8_t>& cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
+  CardSet(const std::initializer_list<uint8_t>& cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
+  CardSet(const std::string& card_str) { str_to_cards(card_str, cards().data()); }
+  CardSet(Deck& deck, const std::vector<uint8_t> init_cards = {}) { deal(deck, init_cards); }
 
   void deal(Deck& deck, std::vector<uint8_t> init_cards = {}) { 
     for(int i = 0; i < init_cards.size(); ++i) _cards[i] = init_cards[i];
@@ -71,22 +71,22 @@ protected:
 class Board : public CardSet<5> {
 public:
   Board() : CardSet<5>{} {}
-  Board(std::array<uint8_t, 5> cards) : CardSet<5>{cards} {}
-  Board(std::vector<uint8_t> cards) : CardSet<5>{cards} {}
-  Board(std::initializer_list<uint8_t> cards) : CardSet<5>{cards} {}
-  Board(std::string card_str) : CardSet<5>{card_str} {};
-  Board(Deck& deck, std::vector<uint8_t> init_cards = {}) : CardSet<5>{deck, init_cards} {};
+  Board(const std::array<uint8_t, 5>& cards) : CardSet<5>{cards} {}
+  Board(const std::vector<uint8_t>& cards) : CardSet<5>{cards} {}
+  Board(const std::initializer_list<uint8_t>& cards) : CardSet<5>{cards} {}
+  Board(const std::string& card_str) : CardSet<5>{card_str} {};
+  Board(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : CardSet<5>{deck, init_cards} {};
   bool operator==(const Board&) const = default;
 };
 
 class Hand : public CardSet<2> {
 public:
   Hand() : CardSet<2>{} {}
-  Hand(std::array<uint8_t, 2> cards) : CardSet<2>{cards} {}
-  Hand(std::vector<uint8_t> cards) : CardSet<2>{cards} {}
-  Hand(std::initializer_list<uint8_t> cards) : CardSet<2>{cards} {}
-  Hand(std::string card_str) : CardSet<2>{card_str} {};
-  Hand(Deck& deck, std::vector<uint8_t> init_cards = {}) : CardSet<2>{deck, init_cards} {};
+  Hand(const std::array<uint8_t, 2>& cards) : CardSet<2>{cards} {}
+  Hand(const std::vector<uint8_t>& cards) : CardSet<2>{cards} {}
+  Hand(const std::initializer_list<uint8_t>& cards) : CardSet<2>{cards} {}
+  Hand(const std::string& card_str) : CardSet<2>{card_str} {};
+  Hand(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : CardSet<2>{deck, init_cards} {};
   bool operator==(const Hand&) const = default;
 
   template <class Archive>

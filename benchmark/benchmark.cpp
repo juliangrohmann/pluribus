@@ -192,10 +192,13 @@ TEST_CASE("Round sampling", "[sampling]") {
   std::vector<PokerRange> ranges;
   for(int i = 0; i < 3; ++i) ranges.push_back(PokerRange::random());
   RoundSampler sampler{ranges};
-  BENCHMARK("3 players, full ranges") {
+  std::vector<uint8_t> dead_cards = {42, 10, 33, 22};
+  BENCHMARK("3 players, 0 dead cards") {
     sampler.sample();
   };
-  std::cout << "\nSample rejection: " << sampler._rejections << " / " << sampler._samples << "\n";
+  BENCHMARK("3 players, 4 dead cards") {
+    sampler.sample(dead_cards);
+  };
 }
 
 #endif
