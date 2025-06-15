@@ -7,6 +7,7 @@
 #include <cereal/types/memory.hpp>
 #include <pluribus/debug.hpp>
 #include <pluribus/rng.hpp>
+#include <pluribus/sampling.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/storage.hpp>
 #include <pluribus/mccfr.hpp>
@@ -68,24 +69,28 @@ template <class T>
 double _monte_carlo_ev(int n, const PokerState& init_state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& init_board, int stack_size, const _ActionProvider<T>& action_provider, const Blueprint<T>& bp, bool verbose) {
   _validate_ev_inputs(init_state, i, ranges, init_board);
 
-  std::vector<double> weights;
-  std::vector<std::vector<Hand>> outcomes;
-  for(const auto& oop : ranges[0].hands()) {
-    for(const auto& ip : ranges[1].hands()) {
-      if(collides(oop, ip) || collides(oop, init_board) || collides(ip, init_board)) continue;
-      weights.push_back(ranges[0].frequency(oop) * ranges[1].frequency(ip));
-      outcomes.push_back({oop, ip});
-    }
-  }
-  std::discrete_distribution<> dist{weights.begin(), weights.end()};
+  // std::vector<double> weights;
+  // std::vector<std::vector<Hand>> outcomes;
+  // for(const auto& oop : ranges[0].hands()) {
+  //   for(const auto& ip : ranges[1].hands()) {
+  //     if(collides(oop, ip) || collides(oop, init_board) || collides(ip, init_board)) continue;
+  //     weights.push_back(ranges[0].frequency(oop) * ranges[1].frequency(ip));
+  //     outcomes.push_back({oop, ip});
+  //   }
+  // }
+  // std::discrete_distribution<> dist{weights.begin(), weights.end()};
+  // GSLDiscreteDist dist{weights};
 
+  RoundSampler sampler{ranges};
   Deck deck;
   omp::HandEvaluator eval;
   long value = 0;
   auto t_0 = std::chrono::high_resolution_clock::now();
   for(int t = 0; t < n; ++t) {
     deck.clear_dead_cards();
-    std::vector<Hand> hands = outcomes[dist(GlobalRNG::instance())];
+    // std::vector<Hand> hands = outcomes[dist.sample()];
+    // std::vector<Hand> hands = outcomes[dist(GlobalRNG::instance())];
+    std::vector<Hand> hands = sampler.sample(init_board, &init_state.get_players());
     for(const auto& hand : hands) deck.add_dead_cards(hand.cards());
     deck.add_dead_cards(init_board);
     deck.shuffle();

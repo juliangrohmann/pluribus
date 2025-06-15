@@ -13,6 +13,7 @@
 #include <omp/HandEvaluator.h>
 #include <hand_isomorphism/hand_index.h>
 #include <pluribus/poker.hpp>
+#include <pluribus/rng.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/sampling.hpp>
 #include <pluribus/mccfr.hpp>
@@ -158,7 +159,20 @@ TEST_CASE("Blueprint trainer", "[mccfr]") {
   };
 }
 
-TEST_CASE("Hand sampler", "[sampling]") {
+TEST_CASE("GSL discrete sampling", "[sampling]") {
+  auto sparse_range = PokerRange();
+  sparse_range.add_hand({"AcAh"}, 0.5);
+  sparse_range.add_hand({"AcKh"}, 1.0);
+  sparse_range.add_hand({"2c2h"}, 0.25);
+  GSLDiscreteDist dist{sparse_range.weights()};
+
+  double sum = 0.0;
+  BENCHMARK("Sample") {
+    HoleCardIndexer::get_instance()->hand(dist.sample());
+  };
+}
+
+TEST_CASE("Hand sampling", "[sampling]") {
   auto sparse_range = PokerRange();
   sparse_range.add_hand({"AcAh"}, 0.5);
   sparse_range.add_hand({"AcKh"}, 1.0);
@@ -172,6 +186,16 @@ TEST_CASE("Hand sampler", "[sampling]") {
   BENCHMARK("Sparse range") {
     sparse_sampler.sample();
   };
+}
+
+TEST_CASE("Round sampling", "[sampling]") {
+  std::vector<PokerRange> ranges;
+  for(int i = 0; i < 3; ++i) ranges.push_back(PokerRange::random());
+  RoundSampler sampler{ranges};
+  BENCHMARK("3 players, full ranges") {
+    sampler.sample();
+  };
+  std::cout << "Rejection: " << sampler._rejections << " / " << sampler._samples << "\n";
 }
 
 #endif
