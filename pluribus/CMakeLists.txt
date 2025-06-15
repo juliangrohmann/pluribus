@@ -6,7 +6,6 @@ find_package(GSL REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf)
-pkg_check_modules(RANSAMPL REQUIRED ransampl)
 
 add_library(
   PluribusLib
@@ -27,7 +26,6 @@ add_library(
   debug.cpp
 )
 target_link_libraries(PluribusLib PUBLIC 
-  ${RANSAMPL_LIBRARIES} 
   ${SDL2_IMAGE_LIBRARIES} 
   ${SDL2_LIBRARIES} 
   ${SDL2_TTF_LIBRARIES} 

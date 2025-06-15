@@ -7,6 +7,7 @@
 namespace pluribus {
 
 HoleCardIndexer::HoleCardIndexer() {
+  _idx_to_hand.resize(1326);
   int idx = 0;
   for(uint8_t c1 = 0; c1 < 52; ++c1) {
     for(uint8_t c2 = 0; c2 < c1; ++c2) {

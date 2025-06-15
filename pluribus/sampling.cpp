@@ -4,12 +4,8 @@
 
 namespace pluribus {
 
-void HandSampler::_init(const std::vector<double>& weights) {
-  _state = std::shared_ptr<ransampl_ws>{ransampl_alloc(weights.size(), &GSLGlobalRNG::uniform), [](ransampl_ws* s) { ransampl_free(s); }};
-  remap(weights);
-}
-
-std::vector<double> HandSampler::_sparse_weights(const PokerRange& range) {
+std::vector<double> HandSampler::_weights_of_range(const PokerRange& range, bool sparse) {
+  if(!sparse) return range.weights();
   std::vector<double> weights;
   for(uint8_t c1 = 0; c1 < 52; ++c1) {
     for(uint8_t c2 = 0; c2 < c1; ++c2) {
@@ -24,26 +20,12 @@ std::vector<double> HandSampler::_sparse_weights(const PokerRange& range) {
   return weights;
 }
 
-HandSampler::HandSampler(const std::vector<Hand>& hands, const std::vector<double>& weights) : _hands{hands} {
-  _init(weights);
-}
+HandSampler::HandSampler(const std::vector<Hand>& hands, const std::vector<double>& weights) : _hands{hands}, _dist{weights} {}
 
-HandSampler::HandSampler(const PokerRange& range, bool sparse) {
-  if(sparse) {
-    _init(_sparse_weights(range));
-  }
-  else {
-    _init(range.weights());
-  }
-}
-
-void HandSampler::remap(const std::vector<double>& weights) {
-  if(weights.size() != _state->n) throw std::runtime_error("Cannot change size of Hand distribution during remap.");
-  ransampl_set(_state.get(), weights.data());
-}
+HandSampler::HandSampler(const PokerRange& range, bool sparse) : _dist{_weights_of_range(range, sparse)} {}
 
 Hand HandSampler::sample() const {
-  int idx = ransampl_draw(_state.get());
+  int idx = _dist.sample();
   return _hands.size() == 0 ? HoleCardIndexer::get_instance()->hand(idx) : _hands[idx];
 }
 
@@ -53,14 +35,13 @@ RoundSampler::RoundSampler(const std::vector<PokerRange>& ranges) {
 }
 
 bool _is_valid(const std::vector<Hand>& hands, const std::vector<uint8_t>& dead_cards, const std::vector<Player>* players) {
-  std::unordered_set<uint8_t> cards{dead_cards.begin(), dead_cards.end()};
-  int added = cards.size();
+  uint64_t mask = 0;
+  for(uint8_t card : dead_cards) mask |= 1L << card;
   for(int i = 0; i < hands.size(); ++i) {
     if(!players || !players->operator[](i).has_folded()) {
-      cards.insert(hands[i].cards()[0]);
-      cards.insert(hands[i].cards()[1]);
-      added += 2;
-      if(cards.size() != added) return false;
+      uint64_t curr_mask = (1L << hands[i].cards()[0]) | (1L << hands[i].cards()[1]);
+      if(mask & curr_mask) return false;
+      mask |= curr_mask;
     }
   }
   return true;

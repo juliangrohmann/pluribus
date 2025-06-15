@@ -28,7 +28,7 @@ private:
   HoleCardIndexer();
 
   std::unordered_map<Hand, uint16_t> _hand_to_idx;
-  std::unordered_map<uint16_t, Hand> _idx_to_hand;
+  std::vector<Hand> _idx_to_hand;
 
   static std::unique_ptr<HoleCardIndexer> _instance;
 };

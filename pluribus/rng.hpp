@@ -55,7 +55,7 @@ public:
   GSLDiscreteDist(const std::vector<double>& weights) { 
     _dist = std::shared_ptr<gsl_ran_discrete_t>{gsl_ran_discrete_preproc(weights.size(), weights.data()), [](gsl_ran_discrete_t* p) { gsl_ran_discrete_free(p); }}; 
   }
-  size_t sample() { return gsl_ran_discrete(GSLGlobalRNG::instance(), _dist.get()); }
+  size_t sample() const { return gsl_ran_discrete(GSLGlobalRNG::instance(), _dist.get()); }
   ~GSLDiscreteDist() {  }
 private:
   std::shared_ptr<gsl_ran_discrete_t> _dist = nullptr;

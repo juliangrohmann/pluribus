@@ -1,8 +1,7 @@
 #pragma once 
 
-#include "ransampl.h"
 #include <pluribus/poker.hpp>
-#include <pluribus/poker.hpp>
+#include <pluribus/rng.hpp>
 #include <pluribus/range.hpp>
 
 namespace pluribus {
@@ -13,14 +12,11 @@ public:
   HandSampler(const PokerRange& range, bool sparse = false);
 
   Hand sample() const;
-  void remap(const std::vector<double>& weights);
-  void remap(const PokerRange& range) { remap(range.weights()); };
 
 private:
-  void _init(const std::vector<double>& weights);
-  std::vector<double> _sparse_weights(const PokerRange& range);
+  std::vector<double> _weights_of_range(const PokerRange& range, bool sparse);
 
-  std::shared_ptr<ransampl_ws> _state = nullptr;
+  GSLDiscreteDist _dist;
   std::vector<Hand> _hands;
 };
 

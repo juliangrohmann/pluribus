@@ -195,7 +195,7 @@ TEST_CASE("Round sampling", "[sampling]") {
   BENCHMARK("3 players, full ranges") {
     sampler.sample();
   };
-  std::cout << "Rejection: " << sampler._rejections << " / " << sampler._samples << "\n";
+  std::cout << "\nSample rejection: " << sampler._rejections << " / " << sampler._samples << "\n";
 }
 
 #endif
