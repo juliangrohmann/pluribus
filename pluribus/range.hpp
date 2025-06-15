@@ -65,6 +65,7 @@ public:
   }
 
   static PokerRange full() { return PokerRange{1.0f}; }
+  static PokerRange random();
 private:
   std::vector<double> _weights;
 };

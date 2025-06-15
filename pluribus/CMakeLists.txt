@@ -12,7 +12,8 @@ add_library(
   traverse.cpp
   range.cpp
   range_viewer.cpp
+  sampling.cpp
   util.cpp
   debug.cpp
 )
-target_link_libraries(PluribusLib PUBLIC ${RANSAMPL_LIBRARIES} ${SDL2_IMAGE_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES} TBB::tbb OpenMP::OpenMP_CXX cnpy z HandIsoLib OMPEvalLib ${Boost_LIBRARIES})
+target_link_libraries(PluribusLib PUBLIC ${ransampl_LIBRARIES} ${SDL2_IMAGE_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES} TBB::tbb OpenMP::OpenMP_CXX cnpy z HandIsoLib OMPEvalLib ${Boost_LIBRARIES})

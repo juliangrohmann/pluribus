@@ -23,6 +23,7 @@
 #include <pluribus/storage.hpp>
 #include <pluribus/blueprint.hpp>
 #include <pluribus/traverse.hpp>
+#include <pluribus/sampling.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
@@ -199,23 +200,23 @@ TEST_CASE("Split pot", "[poker]") {
   REQUIRE(result[2] == 25);
 }
 
-TEST_CASE("Sample PokerRange", "[range][slow]") {
-  std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-  PokerRange range;
-  for(uint8_t i = 0; i < 52; ++i) {
-    for(uint8_t j = i + 1; j < 52; ++j) {
-      range.add_hand(Hand{j, i}, dist(GlobalRNG::instance()));
-    }
+void test_hand_distribution(const PokerRange& range, std::function<Hand()>sampler, long n_samples, double threshold) {
+  double n_combos = range.n_combos();
+  std::unordered_map<Hand, long> sampled;
+  for(long i = 0; i < n_samples; ++i) {
+    sampled[sampler()] += 1;
   }
-
-  int n_combos = range.n_combos();
-  int n_samples = 2'000'000;
-  std::unordered_map<Hand, float> sampled;
-  for(int i = 0; i < n_samples; ++i) sampled[range.sample()] += 1.0f;
   for(auto& entry : sampled) {
-    float rel_freq = entry.second * n_combos / n_samples;
-    REQUIRE(abs(rel_freq - range.frequency(entry.first)) < 0.06);
+    std::cout << "n_combos=" << n_combos << ", n_samples=" << n_samples << ", sampled=" << entry.second << "\n";
+    double rel_freq = static_cast<double>(entry.second * n_combos) / n_samples;
+    std::cout << std::fixed << std::setprecision(2) << entry.first.to_string() << ": " << rel_freq << " (" << range.frequency(entry.first) << ")\n";
+    REQUIRE(abs(rel_freq - range.frequency(entry.first)) < threshold);
   }
+}
+
+TEST_CASE("Sample PokerRange", "[range][slow]") {
+  auto range = PokerRange::random();
+  test_hand_distribution(range, [&]() -> Hand { return range.sample(); }, 2'000'000, 0.8);
 }
 
 TEST_CASE("Sample PokerRange with dead_cards", "[range]") {
@@ -235,6 +236,21 @@ TEST_CASE("Sample PokerRange with dead_cards", "[range]") {
     REQUIRE(hand.cards()[0] != dead_card);
     REQUIRE(hand.cards()[1] != dead_card);
   }
+}
+
+void test_hand_sampler(const PokerRange& range, bool sparse, long n, double thresh) {
+  HandSampler sampler{range, sparse};
+  test_hand_distribution(range, [&]() -> Hand { return sampler.sample(); }, n, thresh);
+}
+
+TEST_CASE("Sample hands with HandSampler", "[sampler]") {
+  auto sparse_range = PokerRange();
+  sparse_range.add_hand({"AcAh"}, 0.5);
+  sparse_range.add_hand({"AcKh"}, 1.0);
+  sparse_range.add_hand({"2c2h"}, 0.25);
+  test_hand_sampler(sparse_range, false, 1'000'000, 0.01);
+  test_hand_sampler(sparse_range, true, 1'000'000, 0.01);
+  test_hand_sampler(PokerRange::random(), false, 10'000'000, 0.04);
 }
 
 void test_biased_freq(std::vector<Action> actions, std::vector<float> freq, Action bias, float factor, std::vector<int> biased_idxs) {

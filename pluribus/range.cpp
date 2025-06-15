@@ -84,5 +84,15 @@ PokerRange PokerRange::operator*(const PokerRange& other) const {
   return ret;
 }
 
+PokerRange PokerRange::random() {
+  PokerRange range{0.0};
+  for(uint8_t i = 0; i < 52; ++i) {
+    for(uint8_t j = i + 1; j < 52; ++j) {
+      range.add_hand(Hand{j, i}, GlobalRNG::uniform());
+    }
+  }
+  return range;
+}
+
 }
 

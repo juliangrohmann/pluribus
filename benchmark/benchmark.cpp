@@ -14,6 +14,7 @@
 #include <hand_isomorphism/hand_index.h>
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
+#include <pluribus/sampling.hpp>
 #include <pluribus/mccfr.hpp>
 
 using namespace pluribus;
@@ -154,6 +155,22 @@ TEST_CASE("Blueprint trainer", "[mccfr]") {
   };
   BENCHMARK("Traverse MCCFR") {
     call_traverse_mccfr(trainer, PokerState{config}, 0, board, hands, eval, debug);
+  };
+}
+
+TEST_CASE("Hand sampler", "[sampling]") {
+  auto sparse_range = PokerRange();
+  sparse_range.add_hand({"AcAh"}, 0.5);
+  sparse_range.add_hand({"AcKh"}, 1.0);
+  sparse_range.add_hand({"2c2h"}, 0.25);
+  HandSampler sparse_sampler{sparse_range, true};
+  HandSampler full_sampler{PokerRange::random()};
+
+  BENCHMARK("Random range") {
+    full_sampler.sample();
+  };
+  BENCHMARK("Sparse range") {
+    sparse_sampler.sample();
   };
 }
 
