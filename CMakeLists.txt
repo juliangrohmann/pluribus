@@ -27,12 +27,14 @@ find_package(SDL2_image REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf)
+pkg_check_modules(ransampl REQUIRED ransampl)
 
 link_directories("/usr/local/lib")
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${SDL2_INCLUDE_DIRS})
 include_directories(${SDL2_TTF_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${RANSAMPL_INCLUDE_DIRS})
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libwandb/include)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/libwandb/lib)
@@ -48,15 +50,15 @@ add_subdirectory(test/)
 add_subdirectory(benchmark/)
 
 add_executable(Pluribus pluribus/main.cpp)
-target_link_libraries(Pluribus PRIVATE ${SDL2_IMAGE_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES} TBB::tbb OpenMP::OpenMP_CXX cnpy z PluribusLib HandIsoLib OMPEvalLib ${Boost_LIBRARIES})
+target_link_libraries(Pluribus PRIVATE PluribusLib)
 
 add_executable(Temp temp/temp.cpp)
-target_link_libraries(Temp PRIVATE ${SDL2_IMAGE_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES} TBB::tbb OpenMP::OpenMP_CXX cnpy z PluribusLib HandIsoLib OMPEvalLib ${Boost_LIBRARIES})
+target_link_libraries(Temp PRIVATE PluribusLib)
 
 if(UNIT_TEST) 
   add_executable(Test test/test.cpp)
-  target_link_libraries(Test PRIVATE ${SDL2_IMAGE_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES} TBB::tbb OpenMP::OpenMP_CXX cnpy z PluribusLib HandIsoLib OMPEvalLib Catch2::Catch2WithMain ${Boost_LIBRARIES})
+  target_link_libraries(Test PRIVATE PluribusLib Catch2::Catch2WithMain)
 endif()
 
 add_executable(Benchmark benchmark/benchmark.cpp)
-target_link_libraries(Benchmark PRIVATE ${SDL2_IMAGE_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES} TBB::tbb OpenMP::OpenMP_CXX cnpy z PluribusLib HandIsoLib OMPEvalLib Catch2::Catch2WithMain ${Boost_LIBRARIES})
+target_link_libraries(Benchmark PRIVATE PluribusLib Catch2::Catch2WithMain)
