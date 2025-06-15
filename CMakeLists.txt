@@ -18,23 +18,9 @@ if(UNIT_TEST)
 endif()
 
 find_package(Catch2 3 REQUIRED)
-find_package(OpenMP REQUIRED)
-find_package(Boost REQUIRED)
-find_package(TBB REQUIRED)
-find_package(SDL2 REQUIRED)
-find_package(SDL2_image REQUIRED)
-
-
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf)
-pkg_check_modules(ransampl REQUIRED ransampl)
 
 link_directories("/usr/local/lib")
-include_directories(${Boost_INCLUDE_DIRS})
-include_directories(${SDL2_INCLUDE_DIRS})
-include_directories(${SDL2_TTF_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${RANSAMPL_INCLUDE_DIRS})
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/libwandb/include)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/libwandb/lib)

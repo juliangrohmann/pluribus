@@ -1,3 +1,12 @@
+find_package(OpenMP REQUIRED)
+find_package(TBB REQUIRED)
+find_package(SDL2 REQUIRED)
+find_package(SDL2_image REQUIRED)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf)
+pkg_check_modules(RANSAMPL REQUIRED ransampl)
+
 add_library(
   PluribusLib
   poker.cpp
@@ -16,4 +25,14 @@ add_library(
   util.cpp
   debug.cpp
 )
-target_link_libraries(PluribusLib PUBLIC ${ransampl_LIBRARIES} ${SDL2_IMAGE_LIBRARIES} ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES} TBB::tbb OpenMP::OpenMP_CXX cnpy z HandIsoLib OMPEvalLib ${Boost_LIBRARIES})
+target_link_libraries(PluribusLib PUBLIC 
+  ${RANSAMPL_LIBRARIES} 
+  ${SDL2_IMAGE_LIBRARIES} 
+  ${SDL2_LIBRARIES} 
+  ${SDL2_TTF_LIBRARIES} 
+  TBB::tbb 
+  OpenMP::OpenMP_CXX 
+  cnpy 
+  HandIsoLib 
+  OMPEvalLib
+)
