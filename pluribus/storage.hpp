@@ -87,14 +87,14 @@ public:
     auto history = state.get_action_history();
   
     // Fast path: no lock if already allocated and marked ready.
-    if (auto it = _history_map.find(history); it != _history_map.end() && it->second.ready.load(std::memory_order_acquire)) {
+    if(auto it = _history_map.find(history); it != _history_map.end() && it->second.ready.load(std::memory_order_acquire)) {
       return it->second.idx + cluster * n_actions + action;
     }
   
     // Double-lock pattern: acquire the lock and re-check.
     std::unique_lock<std::mutex> lock(_grow_mutex);
     auto it = _history_map.find(history);
-    if (it == _history_map.end()) {
+    if(it == _history_map.end()) {
       // First thread to handle this history.
       size_t history_idx = _data.size();
       HistoryEntry new_entry(history_idx, false);
@@ -109,7 +109,8 @@ public:
       inserted_it->second.ready.store(true, std::memory_order_release);
       _grow_cv.notify_all();
       return history_idx + cluster * n_actions + action;
-    } else {
+    } 
+    else {
       // Another thread is handling allocation; wait until it's done.
       _grow_cv.wait(lock, [&]() {
         return it->second.ready.load(std::memory_order_acquire);
