@@ -102,50 +102,9 @@ std::string action_str(const std::vector<Action>& actions) {
   return str;
 }
 
-BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config, bool enable_wandb) 
+BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config) 
     : _regrets{config.action_profile, 200}, _phi{config.action_profile, 169}, _config{config}, _t{1} {
   if(_config.init_state.get_players().size() != config.poker.n_players) throw std::runtime_error("Player number mismatch");
-  if(enable_wandb) {
-    _wb = std::unique_ptr<wandb::Session>{new wandb::Session()};
-    wandb::Config wb_config = {
-      {"n_players", _config.poker.n_players},
-      {"n_chips", _config.poker.n_chips},
-      {"ante", _config.poker.ante},
-      {"strategy_interval", static_cast<int>(_config.strategy_interval)},
-      {"preflop_threshold (M)", static_cast<int>(_config.preflop_threshold / 1'000'000)},
-      {"snapshot_interval (M)", static_cast<int>(_config.snapshot_interval / 1'000'000)},
-      {"prune_thresh (M)", static_cast<int>(_config.prune_thresh / 1'000'000)},
-      {"lcfr_thresh (M)", static_cast<int>(_config.lcfr_thresh / 1'000'000)},
-      {"discount_interval (M)", static_cast<int>(_config.discount_interval / 1'000'000)},
-      {"log_interval (M)", static_cast<int>(_config.log_interval / 1'000'000)},
-      {"prune_cutoff", _config.prune_cutoff},
-      {"regret_floor", _config.regret_floor},
-      {"init_board", cards_to_str(_config.init_board.data(), _config.init_board.size())},
-      {"init_state_round", _config.init_state.get_round()},
-      {"init_state_pot", _config.init_state.get_pot()},
-      {"init_state_active", _config.init_state.get_active()}
-    };
-    for(int r = 0; r < 4; ++r) {
-      for(int b = 0; b < _config.action_profile.n_bet_levels(r); ++b) {
-        for(int p = 0; p < _config.poker.n_players; ++p) {
-          std::string prof_str = action_str(_config.action_profile.get_actions(r, b, p, 150));
-          wb_config["action_profile_r" + std::to_string(r) + "_b" + std::to_string(b) + "_p" + std::to_string(p)] = prof_str;
-        }
-      }
-    }
-    std::string prof_str = action_str(_config.action_profile.get_actions(0, 1, 1, 250));
-    wb_config["action_profile_iso_actions"] = prof_str;
-    for(int p = 0; p < _config.poker.n_players; ++p) {
-      wb_config["init_range_combos_p" + std::to_string(p)] = _config.init_ranges[p].n_combos();
-    }
-    std::ostringstream run_name;
-    run_name << _config.poker.n_players << "p_" << _config.poker.n_chips / 100 << "bb_" << _config.poker.ante << "ante_" << date_time_str();
-    _wb_run = _wb->initRun({
-        wandb::run::WithConfig(wb_config), wandb::run::WithProject("Pluribus"),
-        wandb::run::WithRunName(run_name.str()),
-        // wandb::run::WithRunID("myrunid"),
-    });
-  }
 }
 
 bool are_full_ranges(const std::vector<PokerRange>& ranges) {
@@ -502,16 +461,6 @@ void BlueprintTrainer::log_metrics(long t) {
   std::ostringstream metrics_fn;
   metrics_fn << std::setprecision(1) << std::fixed << t / 1'000'000.0 << ".json";
   write_to_file(_metrics_dir / metrics_fn.str(), metrics.dump());
-
-  if(_wb) {
-    wandb::History wb_data;
-    for(const auto& el : metrics.items()) {
-      if(el.value().is_number_integer()) wb_data[el.key()] = el.value().get<int>();
-      else if(el.value().is_number_float()) wb_data[el.key()] = el.value().get<float>();
-      else if(el.value().is_string()) wb_data[el.key()] = el.value().get<std::string>();
-    }
-    _wb_run.log(wb_data);
-  } 
 }
 
 bool BlueprintTrainer::operator==(const BlueprintTrainer& other) const {

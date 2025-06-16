@@ -123,7 +123,7 @@ enum class BlueprintLogLevel : int {
 
 class BlueprintTrainer : public Strategy<int> {
 public:
-  BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{}, bool enable_wandb = false);
+  BlueprintTrainer(const BlueprintTrainerConfig& config = BlueprintTrainerConfig{});
   void mccfr_p(long t_plus);
   bool operator==(const BlueprintTrainer& other) const;
   const StrategyStorage<int>& get_strategy() const { return _regrets; }
@@ -165,8 +165,6 @@ private:
   std::filesystem::path _snapshot_dir = "snapshots";
   std::filesystem::path _metrics_dir = "metrics";
   std::filesystem::path _log_dir = "logs";
-  std::unique_ptr<wandb::Session> _wb;
-  wandb::Run _wb_run;
   long _t;
   BlueprintLogLevel _log_level = BlueprintLogLevel::ERRORS;
 };
