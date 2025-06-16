@@ -35,6 +35,11 @@ private:
 
 class Logger {
 public:
+  static void dump(std::ostringstream& buf) {
+    instance()->log(buf.str());
+    buf.str("");
+  }
+
   static void log(const std::string& msg, int debug = 0) {
     instance()->log(msg, debug);
   }

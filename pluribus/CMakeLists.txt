@@ -25,6 +25,7 @@ add_library(
   sampling.cpp
   util.cpp
   debug.cpp
+  logging.cpp
 )
 target_link_libraries(PluribusLib PUBLIC 
   ${SDL2_IMAGE_LIBRARIES} 
