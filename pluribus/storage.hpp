@@ -63,7 +63,8 @@ public:
         _action_profile(std::move(other._action_profile)), 
         _n_clusters(other._n_clusters) {
   }
-
+  inline const std::atomic<T>& get(const PokerState& state, int cluster, int action = 0) const { return (*this)[index(state, cluster, action)]; }
+  inline std::atomic<T>& get(const PokerState& state, int cluster, int action = 0) { return (*this)[index(state, cluster, action)]; }
   inline const tbb::concurrent_vector<std::atomic<T>>& data() const { return _data; }
   inline tbb::concurrent_vector<std::atomic<T>>& data() { return _data; }
   inline const tbb::concurrent_unordered_map<ActionHistory, HistoryEntry>& history_map() const { return _history_map; }

@@ -53,6 +53,7 @@ public:
   size_t size() const { return _history.size(); }
   std::string to_string() const;
   ActionHistory slice(int start, int end = -1) const; 
+  bool is_consistent(const ActionHistory& other) const;
 
   bool operator==(const ActionHistory& other) const = default;
 

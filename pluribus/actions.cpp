@@ -37,6 +37,13 @@ ActionHistory ActionHistory::slice(int start, int end) const {
   return ActionHistory{std::vector<Action>{_history.begin() + start, end != -1 ? _history.begin() + end : _history.end()}}; 
 }
 
+bool ActionHistory::is_consistent(const ActionHistory& other) const {
+  for(int i = 0; i < std::min(size(), other.size()); ++i) {
+    if(get(i) != other.get(i)) return false;
+  }
+  return true;
+}
+
 std::string ActionHistory::to_string() const {
   std::string str = "";
   for(int i = 0; i < _history.size(); ++i) {

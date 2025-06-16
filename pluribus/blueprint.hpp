@@ -77,16 +77,16 @@ double _monte_carlo_ev(int n, const PokerState& init_state, int i, const std::ve
     uint64_t mask = 0L;
     std::vector<Hand> hands = sampler.sample(mask, init_board, &init_state.get_players());
 
-    auto board_cards = init_board;
-    while(board_cards.size() < 5) {
+    Board board{init_board};
+    int board_idx = init_board.size();
+    while(board_idx < 5) {
       uint8_t next_card = gsl_rng_uniform_int(GSLGlobalRNG::instance(), 52);
       uint64_t curr_mask = 1L << next_card;
       if(!(mask & curr_mask)) {
-        board_cards.push_back(next_card);
+        board.cards()[board_idx++] = next_card;
         mask |= curr_mask;
       }
     }
-    Board board{board_cards};
 
     std::vector<CachedIndexer> indexers(ranges.size(), CachedIndexer{});
     PokerState state = init_state;

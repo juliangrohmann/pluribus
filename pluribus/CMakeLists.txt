@@ -17,6 +17,7 @@ add_library(
   history_index.cpp
   indexing.cpp
   mccfr.cpp
+  solver.cpp
   blueprint.cpp
   traverse.cpp
   range.cpp

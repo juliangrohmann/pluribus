@@ -16,7 +16,7 @@ namespace pluribus {
 long long get_free_ram();
 bool create_dir(const std::filesystem::path& path);
 std::vector<std::string> get_filepaths(std::string path);
-void write_to_file(const std::filesystem::path& file_path, const std::string& content);
+void write_to_file(const std::filesystem::path& file_path, const std::string& content, bool append = false);
 std::string date_time_str();
 uint8_t card_to_idx(const std::string& card);
 std::string idx_to_card(int idx);

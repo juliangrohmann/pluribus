@@ -46,8 +46,9 @@ std::vector<std::string> get_filepaths(std::string path) {
   return fns;
 }
 
-void write_to_file(const std::filesystem::path& file_path, const std::string& content) {
-  std::ofstream out_file(file_path, std::ios::out | std::ios::trunc);
+void write_to_file(const std::filesystem::path& file_path, const std::string& content, bool append) {
+  auto mode = std::ios::out | (append ? std::ios::app : std::ios::trunc);
+  std::ofstream out_file(file_path, mode);
   if(!out_file.is_open()) throw std::runtime_error("Failed to open or create file: " + file_path.string());
   out_file << content;
   out_file.close();
