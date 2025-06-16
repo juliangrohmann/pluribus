@@ -19,7 +19,7 @@
 #include <pluribus/cluster.hpp>
 #include <pluribus/actions.hpp>
 #include <pluribus/traverse.hpp>
-#include <pluribus/debug.hpp>
+#include <pluribus/logging.hpp>
 #include <pluribus/mccfr.hpp>
 
 namespace pluribus {
@@ -59,7 +59,8 @@ int utility(const PokerState& state, int i, const Board& board, const std::vecto
     return state.get_players()[i].get_chips() - stack_size + showdown_payoff(state, i, board, hands, eval);
   }
   else {
-    throw std::runtime_error("Non-terminal state does not have utility.");
+    Logger::error("Non-terminal state does not have utility.");
+    return -1;
   }
 }
 
@@ -88,7 +89,7 @@ std::string BlueprintTrainerConfig::to_string() const {
   oss << "Initial board: " << cards_to_str(init_board.data(), init_board.size()) << "\n";
   oss << "Initial state:\n" << init_state.to_string() << "\n";
   oss << "Initial ranges:\n";
-  for(int i = 0; i < init_ranges.size(); ++ i) std::cout << "Player " << i << ": " << init_ranges[i].n_combos() << " combos\n";
+  for(int i = 0; i < init_ranges.size(); ++ i) oss << "Player " << i << ": " << init_ranges[i].n_combos() << " combos\n";
   oss << "Action profile:\n" << action_profile.to_string();
   oss << "----------------------------------------------------------\n";
   return oss.str();
@@ -104,7 +105,7 @@ std::string action_str(const std::vector<Action>& actions) {
 
 BlueprintTrainer::BlueprintTrainer(const BlueprintTrainerConfig& config) 
     : _regrets{config.action_profile, 200}, _phi{config.action_profile, 169}, _config{config}, _t{1} {
-  if(_config.init_state.get_players().size() != config.poker.n_players) throw std::runtime_error("Player number mismatch");
+  if(_config.init_state.get_players().size() != config.poker.n_players) Logger::error("Player number mismatch");
 }
 
 bool are_full_ranges(const std::vector<PokerRange>& ranges) {
@@ -116,25 +117,29 @@ bool are_full_ranges(const std::vector<PokerRange>& ranges) {
 }
 
 void BlueprintTrainer::mccfr_p(long t_plus) {
-  if(!create_dir(_snapshot_dir)) throw std::runtime_error("Failed to create snapshot dir: " + _snapshot_dir.string());
-  if(!create_dir(_metrics_dir)) throw std::runtime_error("Failed to create metrics dir: " + _metrics_dir.string());
-  if(!create_dir(_log_dir)) throw std::runtime_error("Failed to create log dir: " + _log_dir.string());
+  if(!create_dir(_snapshot_dir)) Logger::error("Failed to create snapshot dir: " + _snapshot_dir.string());
+  if(!create_dir(_metrics_dir)) Logger::error("Failed to create metrics dir: " + _metrics_dir.string());
+  if(!create_dir(_log_dir)) Logger::error("Failed to create log dir: " + _log_dir.string());
 
   long T = _t + t_plus;
-  std::cout << "BlueprintTrainer --- Initializing HandIndexer... " << std::flush << (HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
-  std::cout << "BlueprintTrainer --- Initializing FlatClusterMap... " << std::flush << (FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
-  std::cout << _config.to_string() << "\n";
+  Logger::log("BlueprintTrainer --- Initializing HandIndexer...");
+  Logger::log(HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
+  Logger::log("BlueprintTrainer --- Initializing FlatClusterMap...");
+  Logger::log(FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
+  Logger::log(_config.to_string());
 
   bool full_ranges = are_full_ranges(_config.init_ranges);
-  std::cout << "Full ranges: " << (full_ranges ? "true" : "false") << "\n";
-  std::cout << "Training blueprint from " << _t << " to " << std::to_string(T) << "\n";
+  Logger::log("Full ranges: " + std::string{full_ranges ? "true" : "false"});
+  Logger::log("Training blueprint from " + std::to_string(_t) + " to " + std::to_string(T));
+  std::ostringstream buf;
   while(_t < T) {
     long init_t = _t;
     long next_discount = _config.next_discount_step(_t, T);
     long next_snapshot = _config.next_snapshot_step(_t, T);
     _t = std::min(std::min(next_discount, next_snapshot), T);
     auto interval_start = std::chrono::high_resolution_clock::now();
-    std::cout << std::setprecision(1) << std::fixed << "Next step: " << _t / 1'000'000.0 << "M\n";
+    buf << std::setprecision(1) << std::fixed << "Next step: " << _t / 1'000'000.0 << "M\n"; 
+    Logger::dump(buf);
     #pragma omp parallel for schedule(dynamic, 1)
     for(long t = init_t; t < _t; ++t) {
       thread_local omp::HandEvaluator eval;
@@ -155,7 +160,7 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
           std::unordered_set<uint8_t> dead_cards;
           std::copy(board.cards().begin(), board.cards().end(), std::inserter(dead_cards, dead_cards.end()));
           for(int p_idx = 0; p_idx < _config.poker.n_players; ++p_idx) {
-            throw std::runtime_error("Biased MCCFR sampling not implemented.");
+            Logger::error("Biased MCCFR sampling not implemented.");
             // hands[p_idx] = _config.init_ranges[p_idx].sample(dead_cards);
             dead_cards.insert(hands[p_idx].cards()[0]);
             dead_cards.insert(hands[p_idx].cards()[1]);
@@ -190,30 +195,32 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
     }
     
     auto interval_end = std::chrono::high_resolution_clock::now();
-    std::cout << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
+    buf << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
+    Logger::dump(buf);
     if(_t == next_discount) {
-      std::cout << "============== Discounting ==============\n";
+      Logger::log("============== Discounting ==============");
       long discount_interval = _config.discount_interval;
       double d = static_cast<double>(_t / discount_interval) / (_t / discount_interval + 1);
-      std::cout << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
+      buf << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
+      Logger::dump(buf);
       lcfr_discount(_regrets, d);
       lcfr_discount(_phi, d);
     }
     if(_t == next_snapshot) {
       std::ostringstream fn_stream;
       if(_t == _config.preflop_threshold) {
-        std::cout << "============== Saving & freezing preflop strategy ==============\n";
+        Logger::log("============== Saving & freezing preflop strategy ==============");
         fn_stream << date_time_str() << "_preflop.bin";
       }
       else {
-        std::cout << "============== Saving snapshot ==============\n";
+        Logger::log("============== Saving snapshot ==============");
         fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
       }
       cereal_save(*this, (_snapshot_dir / fn_stream.str()).string());
     }
   }
 
-  std::cout << "============== Blueprint training complete ==============\n";
+  Logger::log("============== Blueprint training complete ==============");
   std::ostringstream oss;
   oss << date_time_str() << _config.poker.n_players << "p_" << _config.poker.n_chips / 100 << "bb_" << _config.poker.ante << "ante_"
       << std::setprecision(1) << std::fixed << T / 1'000'000'000.0 << "B.bin";
@@ -235,7 +242,7 @@ void BlueprintTrainer::error(const std::string& msg, const std::ostringstream& d
     write_to_file(debug_dir, debug.str() + "\nRUNTIME ERROR: " + msg);
     error_msg += "\nDebug logs written to " + debug_dir.string();
   }
-  throw std::runtime_error(error_msg);
+  Logger::error(error_msg);
 }
 
 int BlueprintTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
@@ -450,7 +457,9 @@ void BlueprintTrainer::log_metrics(long t) {
   long avg_regret = 0;
   for(auto& r : _regrets.data()) avg_regret += std::max(r.load(), 0); // should be sum of the maximum regret at each infoset, not sum of all regrets
   avg_regret /= t;
-  std::cout << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    " << "avg_regret=" << avg_regret << "\n";
+  std::ostringstream buf;
+  buf << std::setprecision(1) << std::fixed << "t=" << t / 1'000'000.0 << "M    " << "avg_regret=" << avg_regret << "\n";
+  Logger::dump(buf);
 
   nlohmann::json metrics = {
     {"avg_regret", static_cast<int>(avg_regret)},
