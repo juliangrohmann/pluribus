@@ -50,6 +50,26 @@ void PokerRange::remove_cards(const std::vector<uint8_t>& cards) {
   }
 }
 
+PokerRange PokerRange::bayesian_update(const PokerRange& prior_range, const PokerRange& action_range) const {
+  PokerRange updated = *this;
+  double p_a = 0.0;
+  PokerRange post_range = prior_range * action_range;
+  for(int i = 0; i < updated._weights.size(); ++i) {
+    Hand hand = HoleCardIndexer::get_instance()->hand(i);
+    auto blocked_post = post_range;
+    std::vector<uint8_t> blocked = {hand.cards().begin(), hand.cards().end()};
+    blocked_post.remove_cards(blocked);
+    auto a_given_h = blocked_post.n_combos() / prior_range.n_combos();
+    p_a += a_given_h * _weights[i];
+    // std::cout << "P(fold|" << hand.to_string() << ")=" << a_given_h <<"\n";
+    updated._weights[i] *= a_given_h;
+  }
+  p_a /= n_combos();
+  // std::cout << "P(a)=" << p_a << "\n";
+  for(auto& w : updated._weights) w /= p_a;
+  return updated;
+}
+
 PokerRange& PokerRange::operator+=(const PokerRange& other) { 
   for(int i = 0; i < _weights.size(); ++i) _weights[i] += other._weights[i];
   return *this; 

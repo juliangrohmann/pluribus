@@ -44,8 +44,14 @@ std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const B
   PokerState curr_state = strat.get_config().init_state;
   std::vector<PokerRange> ranges = strat.get_config().init_ranges;
   for(int aidx = 0; aidx < actions.size(); ++aidx) {
-    ranges[curr_state.get_active()] *= build_action_range(ranges[curr_state.get_active()], actions[aidx], curr_state, board, 
-                                                          strat.get_strategy(), strat.get_config().action_profile);
+    auto action_range = build_action_range(ranges[curr_state.get_active()], actions[aidx], curr_state, board, 
+                                      strat.get_strategy(), strat.get_config().action_profile);
+    for(int ridx = 0; ridx < ranges.size(); ++ridx) {
+      if(ridx != curr_state.get_active()) {
+        ranges[ridx] = ranges[ridx].bayesian_update(ranges[curr_state.get_active()], action_range);
+      }
+    }
+    ranges[curr_state.get_active()] *= action_range;
     if(aidx != actions.size() - 1) {
       curr_state = curr_state.apply(actions[aidx]); // don't apply last action to avoid incrementing the round before card removal
     }

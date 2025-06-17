@@ -49,6 +49,7 @@ public:
   double frequency(const Hand& hand) const { return _weights[HoleCardIndexer::get_instance()->index(hand)]; }
   const std::vector<double>& weights() const { return _weights; }
   void remove_cards(const std::vector<uint8_t>& cards);
+  PokerRange bayesian_update(const PokerRange& prior_range, const PokerRange& action_range) const;
   std::vector<Hand> hands() const;
   double n_combos() const;
 

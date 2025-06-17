@@ -11,6 +11,7 @@
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/debug.hpp>
+#include <pluribus/logging.hpp>
 #include <pluribus/indexing.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/range_viewer.hpp>
@@ -208,48 +209,53 @@ void _validate_ev_inputs(const PokerState& state, int i, const std::vector<Poker
   if(board.size() > n_board_cards(round)) throw std::runtime_error("Too many board cards!");
 }
 
-double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const {
-  _validate_ev_inputs(state, i, ranges, board);
+double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& init_board) const {
+  _validate_ev_inputs(state, i, ranges, init_board);
+
+  std::vector<Board> boards;
+  if(init_board.size() == 4) {
+    for(uint8_t c = 0; c < 52; ++c) {
+      if(collides(c, init_board)) continue;
+      auto next_board = init_board;
+      next_board.push_back(c);
+      boards.push_back(Board{next_board});
+    }
+  }
+  else if(init_board.size() == 5) {
+    boards.push_back(Board{init_board});
+  }
+  else {
+    Logger::error("Enumerate EV only supported for Turn/River.");
+  }
 
   int pos_v = villain_pos(state, i);
   omp::HandEvaluator eval;
   std::vector<Hand> hands(ranges.size());
   double ev = 0.0;
   double total = 0.0;
-  double max_combos = 1.0;
+  double max_combos = boards.size();
   for(const auto& r : ranges) max_combos *= r.n_combos();
-  for(const auto& hh : ranges[i].hands()) {
-    if(collides(hh, board)) continue;
+  for(const auto& board : boards) {
     std::cout << "Enumerate EV: " << std::fixed << std::setprecision(1) << total / max_combos * 100 << "%\n";
-    for(const auto& vh : ranges[pos_v].hands()) {
-      if(collides(hh, vh) || collides(vh, board)) continue;
-      hands[i] = hh;
-      hands[pos_v] = vh;
-      std::vector<CachedIndexer> indexers;
-      for(int i = 0; i < hands.size(); ++i) indexers.push_back(CachedIndexer{});
-      double freq = ranges[i].frequency(hh) * ranges[pos_v].frequency(vh);
-      ev += freq * node_ev(state, i, hands, board, get_config().poker.n_chips, indexers, eval);
-      total += freq;
+    for(const auto& hh : ranges[i].hands()) {
+      if(collides(hh, board)) continue;
+      for(const auto& vh : ranges[pos_v].hands()) {
+        if(collides(hh, vh) || collides(vh, board)) continue;
+        hands[i] = hh;
+        hands[pos_v] = vh;
+        std::vector<CachedIndexer> indexers;
+        for(int i = 0; i < hands.size(); ++i) indexers.push_back(CachedIndexer{});
+        double freq = ranges[i].frequency(hh) * ranges[pos_v].frequency(vh);
+        ev += freq * node_ev(state, i, hands, board, get_config().poker.n_chips, indexers, eval);
+        total += freq;
+      }
     }
   }
   return ev / total;
 }
 
-double LosslessBlueprint::node_ev(const PokerState& state, int i, const std::vector<Hand>& hands, const std::vector<uint8_t>& board, int stack_size, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
-  if(board.size() < n_board_cards(state.get_round())) {
-    double ev = 0.0;
-    int total = 0;
-    for(uint8_t card = 0; card < 52; ++card) {
-      if(any_collision(card, hands, board)) continue;
-      auto next_board = board;
-      next_board.push_back(card);
-      auto indexers_copy = indexers;
-      ev += node_ev(state, i, hands, next_board, stack_size, indexers_copy, eval);
-      ++total;
-    }
-    return ev / total;
-  }
-  else if(state.is_terminal()) {
+double LosslessBlueprint::node_ev(const PokerState& state, int i, const std::vector<Hand>& hands, const Board& board, int stack_size, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
+  if(state.is_terminal()) {
     int hu = utility(state, i, Board{board}, hands, stack_size, eval);
     return hu;
   }
