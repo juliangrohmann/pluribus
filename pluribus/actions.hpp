@@ -28,14 +28,14 @@ public:
     ar(_bet_type);
   }
 
-  static Action UNDEFINED;
-  static Action BIAS_FOLD;
-  static Action BIAS_CALL;
-  static Action BIAS_RAISE;
-  static Action BIAS_NONE;
-  static Action ALL_IN;
-  static Action FOLD;
-  static Action CHECK_CALL;
+  static const Action UNDEFINED;
+  static const Action BIAS_FOLD;
+  static const Action BIAS_CALL;
+  static const Action BIAS_RAISE;
+  static const Action BIAS_NONE;
+  static const Action ALL_IN;
+  static const Action FOLD;
+  static const Action CHECK_CALL;
 
 private:
   float _bet_type;

@@ -23,6 +23,7 @@ add_library(
   range.cpp
   range_viewer.cpp
   sampling.cpp
+  dist.cpp
   util.cpp
   debug.cpp
   logging.cpp
@@ -34,7 +35,6 @@ target_link_libraries(PluribusLib PUBLIC
   ${GSL_LIBRARIES}
   TBB::tbb 
   OpenMP::OpenMP_CXX 
-  
   cnpy 
   HandIsoLib 
   OMPEvalLib

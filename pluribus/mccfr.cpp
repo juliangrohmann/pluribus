@@ -409,7 +409,7 @@ void log_preflop_strategy(const StrategyStorage<T>& strat, const BlueprintTraine
     
     auto ranges = build_renderable_ranges(strat, config.action_profile, state, board, range_copy);
     for(Action a : actions) {
-      double freq = ranges.at(a).get_range().n_combos() / 1326.0;
+      double freq = ranges.at(a).get_range().n_combos() / MAX_COMBOS;
       std::string data_label = pos_to_str(state.get_active(), config.poker.n_players) + " " + a.to_string() + (!phi ? " (regrets)" : " (phi)");
       metrics[data_label] = freq;
     }

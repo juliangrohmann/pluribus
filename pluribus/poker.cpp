@@ -36,6 +36,14 @@ void Deck::shuffle() {
   _current = 0;
 }
 
+uint64_t card_mask(const std::vector<uint8_t>& cards) {
+  uint64_t mask = 0L;
+  for(uint8_t c : cards) mask |= card_mask(c);
+  return mask;
+}
+
+const Hand Hand::PLACEHOLDER = Hand{MAX_CARDS, MAX_CARDS};
+
 bool collides(uint8_t card, const Hand& hand) {
   return hand.cards()[0] == card || hand.cards()[1] == card;
 }

@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <cereal/cereal.hpp>
 #include <cereal/types/vector.hpp>
+#include <pluribus/constants.hpp>
 #include <pluribus/poker.hpp>
 
 namespace pluribus {
@@ -35,7 +36,7 @@ private:
 
 class PokerRange {
 public:
-  PokerRange(double freq = 0.0f) : _weights(1326, freq) { HoleCardIndexer::get_instance(); }
+  PokerRange(double freq = 0.0f) : _weights(MAX_COMBOS, freq) { HoleCardIndexer::get_instance(); }
 
   void add_hand(const Hand& hand, double freq = 1.0f) { 
     int idx = HoleCardIndexer::get_instance()->index(hand);

@@ -24,14 +24,14 @@ std::string Action::to_string() const {
   return oss.str();
 }
 
-Action Action::UNDEFINED{-7.0f};
-Action Action::BIAS_FOLD{-6.0f};
-Action Action::BIAS_CALL{-5.0f};
-Action Action::BIAS_RAISE{-4.0f};
-Action Action::BIAS_NONE{-3.0f};
-Action Action::ALL_IN{-2.0f};
-Action Action::FOLD{-1.0f};
-Action Action::CHECK_CALL{0.0f};
+const Action Action::UNDEFINED{-7.0f};
+const Action Action::BIAS_FOLD{-6.0f};
+const Action Action::BIAS_CALL{-5.0f};
+const Action Action::BIAS_RAISE{-4.0f};
+const Action Action::BIAS_NONE{-3.0f};
+const Action Action::ALL_IN{-2.0f};
+const Action Action::FOLD{-1.0f};
+const Action Action::CHECK_CALL{0.0f};
 
 ActionHistory ActionHistory::slice(int start, int end) const { 
   return ActionHistory{std::vector<Action>{_history.begin() + start, end != -1 ? _history.begin() + end : _history.end()}}; 

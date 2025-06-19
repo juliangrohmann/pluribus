@@ -21,7 +21,7 @@ public:
     }
   }
 
-  void error(const std::string& msg) { 
+  [[noreturn]] void error(const std::string& msg) { 
     log("Error: " + msg);
     throw std::runtime_error(msg);
   }
@@ -44,7 +44,7 @@ public:
     instance()->log(msg, debug);
   }
 
-  static void error(const std::string& msg) {
+  [[noreturn]] static void error(const std::string& msg) {
     instance()->error(msg);
   }
 

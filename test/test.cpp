@@ -24,6 +24,7 @@
 #include <pluribus/blueprint.hpp>
 #include <pluribus/traverse.hpp>
 #include <pluribus/sampling.hpp>
+#include <pluribus/dist.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
@@ -117,7 +118,7 @@ TEST_CASE("Hand contains", "[hand]") {
       hand += omp::Hand(idx);
     }
     std::vector<int> matches;
-    for(int i = 0; i < 52; ++i) {
+    for(int i = 0; i < MAX_CARDS; ++i) {
       bool match_proper = hand.contains(omp::Hand::empty() + omp::Hand(i));
       bool match_improper = hand.contains(omp::Hand(i));
       bool should_match = (std::find(idx_hand.data(), idx_hand.data() + idx_hand.size(), i) != idx_hand.data() + idx_hand.size());
@@ -233,20 +234,20 @@ void test_hand_distribution(const PokerRange& range, std::function<Hand()>sample
 //   }
 // }
 
-void test_hand_sampler(const PokerRange& range, bool sparse, long n, double thresh) {
-  HandSampler sampler{range, sparse};
-  test_hand_distribution(range, [&]() -> Hand { return sampler.sample(); }, n, thresh);
-}
+// void test_hand_sampler(const PokerRange& range, bool sparse, long n, double thresh) {
+//   HandSampler sampler{range, sparse};
+//   test_hand_distribution(range, [&]() -> Hand { return sampler.sample(); }, n, thresh);
+// }
 
-TEST_CASE("Sample hands with HandSampler", "[sampler]") {
-  auto sparse_range = PokerRange();
-  sparse_range.add_hand({"AcAh"}, 0.5);
-  sparse_range.add_hand({"AcKh"}, 1.0);
-  sparse_range.add_hand({"2c2h"}, 0.25);
-  test_hand_sampler(sparse_range, false, 1'000'000, 0.01);
-  test_hand_sampler(sparse_range, true, 1'000'000, 0.01);
-  test_hand_sampler(PokerRange::random(), false, 10'000'000, 0.04);
-}
+// TEST_CASE("Sample hands with HandSampler", "[sampler]") {
+//   auto sparse_range = PokerRange();
+//   sparse_range.add_hand({"AcAh"}, 0.5);
+//   sparse_range.add_hand({"AcKh"}, 1.0);
+//   sparse_range.add_hand({"2c2h"}, 0.25);
+//   test_hand_sampler(sparse_range, false, 1'000'000, 0.01);
+//   test_hand_sampler(sparse_range, true, 1'000'000, 0.01);
+//   test_hand_sampler(PokerRange::random(), false, 10'000'000, 0.04);
+// }
 
 void test_biased_freq(std::vector<Action> actions, std::vector<float> freq, Action bias, float factor, std::vector<int> biased_idxs) {
   auto b_freq = biased_freq(actions, freq, bias, factor);
@@ -326,6 +327,39 @@ TEST_CASE("Cached indexing", "[index]") {
   }
 }
 
+void test_sampler_mask(RoundSampler& sampler, SamplingMode mode, const std::vector<uint8_t> dead_cards) {
+  sampler.set_mode(mode);
+  auto sample = sampler.sample();
+  auto mask = card_mask(dead_cards);
+  for(const auto& hand : sample.hands) mask |= hand.mask();
+  REQUIRE(sample.mask == mask);
+}
+
+TEST_CASE("Round sampler", "[sampling][slow]") {
+  int n_samples = 10'000'000;
+  auto dead_cards = str_to_cards("AcTh3d2s");
+  std::vector<PokerRange> ranges;
+  for(int i = 0; i < 2; ++i) ranges.push_back(PokerRange::random());
+  RoundSampler sampler{ranges, dead_cards};
+  auto sample_fun = [&sampler](auto& dist) {  
+    auto sample = sampler.sample();
+    dist[sample.hands[0]] += sample.weight;
+  };
+  sampler.set_mode(SamplingMode::MARGINAL_REJECTION);
+  auto marginal_rejection_1 = build_distribution(n_samples, sample_fun, false);
+  auto marginal_rejection_2 = build_distribution(n_samples, sample_fun, false);
+  sampler.set_mode(SamplingMode::IMPORTANCE_REJECTION);
+  auto importance_rejection = build_distribution(n_samples, sample_fun, false);
+  sampler.set_mode(SamplingMode::IMPORTANCE_RANDOM_WALK);
+  auto importance_walk = build_distribution(n_samples, sample_fun, false);
+  REQUIRE(distribution_rmse(marginal_rejection_1, marginal_rejection_2) < 0.0006);
+  REQUIRE(distribution_rmse(marginal_rejection_1, importance_rejection) < 0.00075);
+  REQUIRE(distribution_rmse(marginal_rejection_1, importance_walk) < 0.00075);
+  test_sampler_mask(sampler, SamplingMode::MARGINAL_REJECTION, dead_cards);
+  test_sampler_mask(sampler, SamplingMode::IMPORTANCE_REJECTION, dead_cards);
+  test_sampler_mask(sampler, SamplingMode::IMPORTANCE_RANDOM_WALK, dead_cards);
+}
+
 TEST_CASE("Lossless monte carlo EV", "[ev][slow][dependency]") {
   auto bp = cereal_load<LosslessBlueprint>("lossless_bp_2p_100bb_0ante");
   std::vector<uint8_t> board = str_to_cards("AcTd3c2s");
@@ -335,7 +369,7 @@ TEST_CASE("Lossless monte carlo EV", "[ev][slow][dependency]") {
   auto ranges = build_ranges(state.get_action_history().get_history(), board, bp);
   double ev_enum = bp.enumerate_ev(state, 0, ranges, board);
   double ev_mc = bp.monte_carlo_ev(10'000'000, state, 0, ranges, board);
-  REQUIRE(abs(ev_enum - ev_mc) / ev_enum < 0.05);
+  REQUIRE(abs(ev_enum - ev_mc) / ev_enum < 0.03);
 }
 
 TEST_CASE("Serialize Hand", "[serialize]") {

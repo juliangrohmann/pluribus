@@ -214,7 +214,7 @@ double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std
 
   std::vector<Board> boards;
   if(init_board.size() == 4) {
-    for(uint8_t c = 0; c < 52; ++c) {
+    for(uint8_t c = 0; c < MAX_CARDS; ++c) {
       if(collides(c, init_board)) continue;
       auto next_board = init_board;
       next_board.push_back(c);
@@ -299,12 +299,12 @@ private:
   std::vector<int> _bias_offsets;
 };
 
-double LosslessBlueprint::monte_carlo_ev(int n, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board, bool verbose) const {
+double LosslessBlueprint::monte_carlo_ev(long n, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board, bool verbose) const {
   LosslessActionProvider action_provider;
   return _monte_carlo_ev(n, state, i, ranges, board, get_config().poker.n_chips, action_provider, *this, verbose);
 }
 
-double SampledBlueprint::monte_carlo_ev(int n, const std::vector<Action>& biases, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board, bool verbose) const {
+double SampledBlueprint::monte_carlo_ev(long n, const std::vector<Action>& biases, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board, bool verbose) const {
   BiasActionProfile bias_profile;
   const std::vector<Action>& all_biases = bias_profile.get_actions(0, 0, 0, 0);
   std::vector<int> bias_offsets;

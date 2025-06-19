@@ -11,6 +11,7 @@
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
 #include <cereal/types/array.hpp>
+#include <pluribus/constants.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/actions.hpp>
 
@@ -35,27 +36,57 @@ public:
   void shuffle();
 
 private:
-    std::array<uint8_t, 52> _cards;
+    std::array<uint8_t, MAX_CARDS> _cards;
     std::unordered_set<uint8_t> _dead_cards;
     uint8_t _current = 0;
 };
 
+inline uint64_t card_mask(uint8_t card) { return 1L << card; }
+uint64_t card_mask(const std::vector<uint8_t>& cards);
+
 template<int N>
 class CardSet {
 public:
-  CardSet() { _cards.fill(0); }
-  CardSet(const std::array<uint8_t, N>& cards) : _cards{cards} {}
-  CardSet(const std::vector<uint8_t>& cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
-  CardSet(const std::initializer_list<uint8_t>& cards) { std::copy(cards.begin(), cards.end(), _cards.begin()); }
-  CardSet(const std::string& card_str) { str_to_cards(card_str, cards().data()); }
-  CardSet(Deck& deck, const std::vector<uint8_t> init_cards = {}) { deal(deck, init_cards); }
+  CardSet() { 
+    _cards.fill(0); 
+    update_mask();
+  }
+  CardSet(const std::array<uint8_t, N>& cards) : _cards{cards} { 
+    update_mask(); 
+  }
+  CardSet(const std::vector<uint8_t>& cards) { 
+    std::copy(cards.begin(), cards.end(), _cards.begin()); 
+    update_mask(cards.size()); 
+  }
+  CardSet(const std::initializer_list<uint8_t>& cards) { 
+    std::copy(cards.begin(), cards.end(), _cards.begin()); 
+    update_mask(cards.size()); 
+  }
+  CardSet(const std::string& card_str) { 
+    str_to_cards(card_str, _cards.data()); 
+    update_mask(card_str.size() / 2); 
+  }
+  CardSet(Deck& deck, const std::vector<uint8_t> init_cards = {}) { 
+    deal(deck, init_cards); 
+    update_mask();
+  }
+
+  void set_card(int i, uint8_t card) {
+    _cards[i] = card;
+    update_mask();
+  }
+
+  bool collides(const CardSet<N>& other) const {
+    return _mask & other._mask;
+  }
 
   void deal(Deck& deck, std::vector<uint8_t> init_cards = {}) { 
     for(int i = 0; i < init_cards.size(); ++i) _cards[i] = init_cards[i];
     for(int i = init_cards.size(); i < N; ++i) _cards[i] = deck.draw(); 
+    update_mask();
   }
 
-  std::array<uint8_t, N>& cards() { return _cards; }
+  uint64_t mask() const { return _mask; }
   const std::array<uint8_t, N>& cards() const { return _cards; }
   std::vector<uint8_t> as_vector(int n = -1) const { 
     return std::vector<uint8_t>{_cards.data(), _cards.data() + (n == -1 ? _cards.size() : n)}; 
@@ -65,7 +96,13 @@ public:
   bool operator==(const CardSet<N>&) const = default;
 
 protected:
+  void update_mask(int n = N) {
+    _mask = 0L;
+    for(int i = 0; i < n; ++i) _mask |= card_mask(_cards[i]);
+  }
+
   std::array<uint8_t, N> _cards;
+  uint64_t _mask;
 };
 
 class Board : public CardSet<5> {
@@ -89,9 +126,12 @@ public:
   Hand(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : CardSet<2>{deck, init_cards} {};
   bool operator==(const Hand&) const = default;
 
+  static const Hand PLACEHOLDER;
+
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_cards);
+    update_mask(); // TODO: serialize mask instead
   }
 };
 

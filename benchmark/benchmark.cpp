@@ -9,8 +9,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
+#include <omp/Random.h>
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
+#include <omp/EquityCalculator.h>
 #include <hand_isomorphism/hand_index.h>
 #include <pluribus/poker.hpp>
 #include <pluribus/rng.hpp>
@@ -172,32 +174,43 @@ TEST_CASE("GSL discrete sampling", "[sampling]") {
   };
 }
 
-TEST_CASE("Hand sampling", "[sampling]") {
-  auto sparse_range = PokerRange();
-  sparse_range.add_hand({"AcAh"}, 0.5);
-  sparse_range.add_hand({"AcKh"}, 1.0);
-  sparse_range.add_hand({"2c2h"}, 0.25);
-  HandSampler sparse_sampler{sparse_range, true};
-  HandSampler full_sampler{PokerRange::random()};
+TEST_CASE("Round sampling", "[sampling]") {
+  std::vector<int> n_players = {3, 6, 9};
+  std::vector<uint8_t> dead_cards = {42, 10, 33, 22};
+  std::vector<std::vector<PokerRange>> ranges(n_players.size());
+  std::vector<RoundSampler> samplers;
+  for(int ni = 0; ni < n_players.size(); ++ni) {
+    for(int i = 0; i < n_players[ni]; ++i) ranges[ni].push_back(PokerRange::random());
+    samplers.push_back(RoundSampler{ranges[ni], dead_cards});
+  }
+  
+  for(int ni = 0; ni < n_players.size(); ++ni) {
+    std::string title = std::to_string(n_players[ni]) + " players, " + std::to_string(dead_cards.size()) + " dead cards";
+    samplers[ni].set_mode(SamplingMode::MARGINAL_REJECTION);
+    BENCHMARK(title + ", rejection sampling") {
+      samplers[ni].sample();
+    };
+    samplers[ni].set_mode(SamplingMode::IMPORTANCE_REJECTION);
+    BENCHMARK(title + ", importance rejection sampling") {
+      samplers[ni].sample();
+    };
+    samplers[ni].set_mode(SamplingMode::IMPORTANCE_RANDOM_WALK);
+    BENCHMARK(title + ", importance random-walk sampling") {
+      samplers[ni].sample();
+    };
 
-  BENCHMARK("Random range") {
-    full_sampler.sample();
-  };
-  BENCHMARK("Sparse range") {
-    sparse_sampler.sample();
-  };
+    auto sample = samplers[ni].sample();
+    BENCHMARK(title + ", importance random-walk sampling (in-place)") {
+      samplers[ni].next_sample(sample);
+    };
+  }
 }
 
-TEST_CASE("Round sampling", "[sampling]") {
-  std::vector<PokerRange> ranges;
-  for(int i = 0; i < 3; ++i) ranges.push_back(PokerRange::random());
-  RoundSampler sampler{ranges};
-  std::vector<uint8_t> dead_cards = {42, 10, 33, 22};
-  BENCHMARK("3 players, 0 dead cards") {
-    sampler.sample();
-  };
-  BENCHMARK("3 players, 4 dead cards") {
-    sampler.sample(dead_cards);
+TEST_CASE("Fast uniform int sampling (OMP)", "[sampling]") {
+  omp::XoroShiro128Plus rng{std::random_device{}()};
+  omp::FastUniformIntDistribution<unsigned,21> dist(0, MAX_COMBOS - 1);
+  BENCHMARK("Sample") {
+    dist(rng);
   };
 }
 

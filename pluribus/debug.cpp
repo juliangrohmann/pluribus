@@ -70,8 +70,8 @@ void print_similar_boards(std::string board, int n_clusters) {
 
 std::string strategy_str(const BlueprintTrainer& trainer, const PokerState& state, Action action, const Board& board) {
   std::ostringstream oss;
-  for(uint8_t i = 0; i < 52; ++i) {
-    for(uint8_t j = i + 1; j < 52; ++j) {
+  for(uint8_t i = 0; i < MAX_CARDS; ++i) {
+    for(uint8_t j = i + 1; j < MAX_CARDS; ++j) {
       Hand hand{j, i};
       auto actions = valid_actions(state, trainer.get_config().action_profile);
       int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);

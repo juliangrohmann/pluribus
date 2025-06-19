@@ -1,4 +1,5 @@
 #include <numeric>
+#include <pluribus/constants.hpp>
 #include <pluribus/rng.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/mccfr.hpp>
@@ -7,9 +8,9 @@
 namespace pluribus {
 
 HoleCardIndexer::HoleCardIndexer() {
-  _idx_to_hand.resize(1326);
+  _idx_to_hand.resize(MAX_COMBOS);
   int idx = 0;
-  for(uint8_t c1 = 0; c1 < 52; ++c1) {
+  for(uint8_t c1 = 0; c1 < MAX_CARDS; ++c1) {
     for(uint8_t c2 = 0; c2 < c1; ++c2) {
       Hand hand = canonicalize(Hand{c1, c2});
       // std::cout << "Initialized: " << hand.to_string() << "\n";
@@ -29,7 +30,7 @@ std::unique_ptr<HoleCardIndexer> HoleCardIndexer::_instance = nullptr;
 
 std::vector<Hand> PokerRange::hands() const {
   std::vector<Hand> ret;
-  for(uint8_t c1 = 0; c1 < 52; ++c1) {
+  for(uint8_t c1 = 0; c1 < MAX_CARDS; ++c1) {
     for(uint8_t c2 = 0; c2 < c1; ++c2) {
       Hand hand = canonicalize(Hand{c1, c2});
       if(frequency(hand) > 0) ret.push_back(hand);
@@ -94,8 +95,8 @@ PokerRange PokerRange::operator*(const PokerRange& other) const {
 
 PokerRange PokerRange::random() {
   PokerRange range{0.0};
-  for(uint8_t i = 0; i < 52; ++i) {
-    for(uint8_t j = i + 1; j < 52; ++j) {
+  for(uint8_t i = 0; i < MAX_CARDS; ++i) {
+    for(uint8_t j = i + 1; j < MAX_CARDS; ++j) {
       range.add_hand(Hand{j, i}, GlobalRNG::uniform());
     }
   }

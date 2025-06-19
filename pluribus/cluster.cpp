@@ -13,6 +13,7 @@
 #include <hand_isomorphism/hand_index.h>
 #include <omp/EquityCalculator.h>
 #include <omp/CardRange.h>
+#include <pluribus/constants.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/indexing.hpp>
 #include <pluribus/poker.hpp>
@@ -55,7 +56,7 @@ std::array<double, 2> enumerate(const omp::Hand& hero, const omp::CardRange vill
   }
   else {
     std::array<double, 2> results = {0, 0};
-    for(int idx = 0; idx < 52; ++idx) {
+    for(int idx = 0; idx < MAX_CARDS; ++idx) {
       omp::Hand card = omp::Hand(idx);
       if(hero.contains(card) || board.contains(card)) continue;
       auto tmp_res = enumerate(hero, villain, board + card);
