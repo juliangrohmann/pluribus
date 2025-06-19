@@ -456,4 +456,13 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   std::cout << "Sampled blueprint built.\n";
 }
 
+void update_stats(int x, double w, double& mean, double& w_sum, double& w_sum2, double& S) {
+  // Welford's algorithm with weights: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+  w_sum += w;
+  w_sum2 += pow(w, 2);
+  double mean_old = mean;
+  mean = mean_old + (w / w_sum) * (x - mean_old);
+  S = S + w * (x - mean_old) * (x - mean);
+}
+
 }

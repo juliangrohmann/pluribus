@@ -65,14 +65,14 @@ public:
   virtual Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<T>& bp) const = 0;
 };
 
+void update_stats(int x, double w, double& mean, double& w_sum, double& w_sum2, double& S); 
+
 template <class T>
 double _monte_carlo_ev(long n, const PokerState& init_state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& init_board, int stack_size, const _ActionProvider<T>& action_provider, const Blueprint<T>& bp, bool verbose) {
   _validate_ev_inputs(init_state, i, ranges, init_board);
-  // std::vector<long> samples(MAX_COMBOS, 0L);
   RoundSampler sampler{ranges, init_board};
   omp::HandEvaluator eval;
-  double value = 0.0;
-  double total_weight = 0.0;
+  double mean = 0.0, w_sum = 0.0, w_sum2 = 0.0, S = 0.0;
   auto sample = sampler.sample();
   auto t_0 = std::chrono::high_resolution_clock::now();
   for(long t = 0; t < n; ++t) {
@@ -93,29 +93,21 @@ double _monte_carlo_ev(long n, const PokerState& init_state, int i, const std::v
     PokerState state = init_state;
     while(!state.is_terminal()) {
       state = state.apply(action_provider.next_action(indexers[state.get_active()], state, sample.hands, board, bp));
-      // if(state.get_action_history().size() == 1 && state.get_action_history().get(0) == Action::FOLD) {
-        // ++samples[HoleCardIndexer::get_instance()->index(sample.hands[0])];
-      // }
     }
     int u = utility(state, i, board, sample.hands, stack_size, eval);
-    value += sample.weight * u;
-    total_weight += sample.weight;
+    update_stats(u, sample.weight, mean, w_sum, w_sum2, S);
     if(verbose && t > 0 && t % 100'000 == 0) {
+      double std_err = pow(S / (pow(w_sum, 2) - w_sum2), 0.5);
       auto t_i = std::chrono::high_resolution_clock::now();
       auto dt = std::chrono::duration_cast<std::chrono::microseconds>(t_i - t_0).count();
       std::cout << std::fixed << std::setprecision(1) << "t=" << t / 1'000'000.0 << "M, " 
-                << std::setprecision(2) << "EV=" << value / t + 1 << ", "
+                << std::setprecision(2) << "EV=" << mean << ", "
+                << "stdDev=" << pow(S / w_sum, 0.5) << ", "
+                << "stdErr=" << std_err << " ("
                 << std::setprecision(1) << static_cast<double>(t + 1) / (dt / 1'000.0) << "k it/sec)\n";
     }
   }
-
-  // long sum = 0L;
-  // for(long n : samples) sum += n;
-  // std::cout << "Sum=" << sum << "\n";
-  // for(int hidx = 0; hidx < samples.size(); ++hidx) {
-  //   std::cout << HoleCardIndexer::get_instance()->hand(hidx).to_string() << ": " << std::setprecision(4) << static_cast<double>(samples[hidx]) / sum * MAX_COMBOS << "\n";
-  // }
-  return value / total_weight;
+  return mean;
 }
 
 }
