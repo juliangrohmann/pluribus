@@ -39,21 +39,24 @@ struct LosslessBuffer {
 };
 
 LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir) {
-  std::cout << "Building lossless buffers...\n";
+  Logger::log("Building lossless buffers...\n");
+  std::ostringstream buf;
   LosslessMetadata meta;
   std::filesystem::path buffer_dir = buf_dir;
   
   int buf_idx = 0;
   for(int bp_idx = 0; bp_idx < postflop_fns.size(); ++bp_idx) {
+    Logger::log("Loading blueprint " + std::to_string(bp_idx) + "...");
     auto bp = cereal_load<BlueprintTrainer>(postflop_fns[bp_idx]);
+    Logger::log("Loaded blueprint " + std::to_string(bp_idx) + " successfully.");
     const auto& regrets = bp.get_strategy();
     if(bp_idx == 0) {
       meta.config = bp.get_config();
       meta.n_clusters = regrets.n_clusters();
-      std::cout << "Initialized blueprint config:\n";
-      std::cout << "n_clusters=" << meta.n_clusters << "\n";
-      std::cout << "max_actions=" << meta.config.action_profile.max_actions() << "\n";
-      std::cout << meta.config.to_string();
+      Logger::log("Initialized blueprint config:\n");
+      Logger::log("n_clusters=" + std::to_string(meta.n_clusters) + "\n");
+      Logger::log("max_actions=" + std::to_string(meta.config.action_profile.max_actions()) + "\n");
+      Logger::log(meta.config.to_string());
     }
 
     std::vector<size_t> base_idxs;
@@ -66,16 +69,17 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
 
     size_t free_ram = get_free_ram();
     if(free_ram < 8 * pow(1024, 3)) {
-      throw std::runtime_error("At least 8G free RAM required to build blueprint. Available (bytes): " + std::to_string(free_ram));
+      Logger::error("At least 8G free RAM required to build blueprint. Available (bytes): " + std::to_string(free_ram));
     }
     size_t buf_sz = static_cast<size_t>((free_ram - 8 * pow(1024, 3)) / sizeof(float));
-    std::cout << "Blueprint " << bp_idx << " buffer: " << std::setprecision(2) << std::fixed << buf_sz << " elements\n";
+    buf << "Blueprint " << bp_idx << " buffer: " << std::setprecision(2) << std::fixed << buf_sz << " elements\n";
+    Logger::dump(buf);
 
     if(regrets.data().size() > meta.max_regrets) {
       meta.max_regrets = regrets.data().size();
-      std::cout << "New max regrets: " << meta.max_regrets << "\n";
+      Logger::log("New max regrets: " + std::to_string(meta.max_regrets) + "\n");
       meta.history_map = regrets.history_map();
-      std::cout << "New history map size: " << meta.history_map.size() << "\n";
+      Logger::log("New history map size: " + std::to_string(meta.history_map.size()) + "\n");
     }
 
     size_t bidx_start = 0;
@@ -90,15 +94,15 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       buffer.offset = base_idxs[bidx_start];
       buffer.freqs.resize(base_idxs[bidx_end] - base_idxs[bidx_start]);
 
-      std::cout << "Storing buffer: base_idxs[" << bidx_start << ", " << bidx_end << "), indeces: [" 
-                << base_idxs[bidx_start] << ", " << base_idxs[bidx_end] << ")\n";
+      Logger::log("Storing buffer: base_idxs[" + std::to_string(bidx_start) + ", " + std::to_string(bidx_end) + "), indeces: [" 
+                + std::to_string(base_idxs[bidx_start]) + ", " + std::to_string(base_idxs[bidx_end]) + ")\n");
       #pragma omp parallel for schedule(dynamic)
       for(size_t curr_idx = bidx_start; curr_idx < bidx_end; ++curr_idx) {
-        if(curr_idx + 1 >= base_idxs.size()) throw std::runtime_error("Buffering: Indexing base indeces out of range!");
+        if(curr_idx + 1 >= base_idxs.size()) Logger::error("Buffering: Indexing base indeces out of range!");
         size_t n_entries = base_idxs[curr_idx + 1] - base_idxs[curr_idx];
-        if(n_entries % meta.n_clusters != 0) throw std::runtime_error("Buffering: Indivisible regret section!");
+        if(n_entries % meta.n_clusters != 0) Logger::error("Buffering: Indivisible regret section!");
         size_t n_actions = n_entries / meta.n_clusters;
-        if(n_actions > meta.config.action_profile.max_actions()) throw std::runtime_error("Buffering: Too many actions in storage section:" + 
+        if(n_actions > meta.config.action_profile.max_actions()) Logger::error("Buffering: Too many actions in storage section:" + 
             std::to_string(n_actions) + " > " + std::to_string(meta.config.action_profile.max_actions()));
 
         for(int c = 0; c < meta.n_clusters; ++c) {
@@ -111,15 +115,20 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       }
       bidx_start = bidx_end;
 
+      Logger::log("Saving buffer " + std::to_string(buf_idx) + "...");
       std::string fn = "lossless_buf_" + std::to_string(buf_idx++) + ".bin";
       meta.buffer_fns.push_back(fn);
       cereal_save(buffer, (buffer_dir / fn).string());
+      Logger::log("Saved buffer " + std::to_string(buf_idx) + " successfully.");
     }
   }
   return meta;
 }
 
 void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir) {
+  std::cout << "1\n";
+  Logger::log("Building lossless blueprint...");
+  std::cout << "2\n";
   std::filesystem::path buffer_dir = buf_dir;
   LosslessMetadata meta = build_lossless_buffers(preflop_fn, postflop_fns, buf_dir);
   set_config(meta.config);
@@ -127,19 +136,19 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
   get_freq()->data().resize(meta.max_regrets);
   for(std::string buf_fn : meta.buffer_fns) {
     auto buf = cereal_load<LosslessBuffer>((buffer_dir / buf_fn).string());
-    std::cout << "Accumulating " << buf_fn << ": [" << buf.offset << ", " << buf.offset + buf.freqs.size() << ")\n";
+    Logger::log("Accumulating " + buf_fn + ": [" + std::to_string(buf.offset) + ", " + std::to_string(buf.offset + buf.freqs.size()) + ")\n");
     #pragma omp parallel for schedule(static)
     for(size_t idx = 0; idx < buf.freqs.size(); ++idx) {
       get_freq()->operator[](buf.offset + idx).store(get_freq()->operator[](buf.offset + idx).load() + buf.freqs[idx]);
     }
   }
 
-  std::cout << "Inserting histories...\n";
+  Logger::log("Inserting histories...\n");
   for(const auto& entry : meta.history_map) {
     get_freq()->history_map()[entry.first] = entry.second;
   }
 
-  std::cout << "Normalizing frequencies...\n";
+  Logger::log("Normalizing frequencies...\n");
   std::vector<size_t> base_idxs;
   base_idxs.reserve(meta.history_map.size());
   for(const auto& entry : meta.history_map) {
@@ -172,7 +181,7 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
       }
     }
   }
-  std::cout << "Lossless blueprint built.\n";
+  Logger::log("Lossless blueprint built.\n");
 }
 
 bool any_collision(uint8_t card, const std::vector<Hand>& hands, const std::vector<uint8_t>& board) {
