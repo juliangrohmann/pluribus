@@ -53,9 +53,8 @@ void load(Archive& ar, tbb::concurrent_vector<T>& vec) {
   ar(size);
   vec.clear();
 
-  const size_t CHUNK = 10'000'000;  // ~80MB if T = double
+  const size_t CHUNK = 10 * pow(1024, 3) / sizeof(T);
   size_t remaining = size;
-
   while(remaining > 0) {
     size_t this_chunk = std::min(CHUNK, remaining);
     auto it = vec.grow_by(this_chunk);
@@ -64,12 +63,6 @@ void load(Archive& ar, tbb::concurrent_vector<T>& vec) {
     }
     remaining -= this_chunk;
   }
-
-  // auto it = vec.grow_by(size);
-  // for(size_t i = 0; i < size; ++i) {
-  //   ar(*it);
-  //   ++it;
-  // }
 }
 
 template<class Archive, class Key, class T>
