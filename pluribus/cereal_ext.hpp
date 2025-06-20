@@ -47,21 +47,39 @@ void save(Archive& ar, const tbb::concurrent_vector<T>& vec) {
   }
 }
 
+// template<class Archive, class T>
+// void load(Archive& ar, tbb::concurrent_vector<T>& vec) {
+//   size_t size;
+//   ar(size);
+//   vec.clear();
+
+//   const size_t CHUNK = 10UL * 1024 * 1024 * 1024 / sizeof(T);
+//   size_t remaining = size;
+//   while(remaining > 0) {
+//     size_t this_chunk = std::min(CHUNK, remaining);
+//     auto it = vec.grow_by(this_chunk);
+//     for(size_t i = 0; i < this_chunk; ++i, ++it) {
+//       ar(*it);
+//     }
+//     remaining -= this_chunk;
+//   }
+// }
+
 template<class Archive, class T>
 void load(Archive& ar, tbb::concurrent_vector<T>& vec) {
   size_t size;
   ar(size);
   vec.clear();
 
-  const size_t CHUNK = 10 * pow(1024, 3) / sizeof(T);
-  size_t remaining = size;
-  while(remaining > 0) {
-    size_t this_chunk = std::min(CHUNK, remaining);
-    auto it = vec.grow_by(this_chunk);
-    for(size_t i = 0; i < this_chunk; ++i, ++it) {
-      ar(*it);
+  const size_t CHUNK = (size_t(1) * 1024 * 1024 * 1024) / sizeof(T);
+  size_t loaded = 0;
+  while(loaded < size) {
+    size_t this_chunk = std::min(CHUNK, size - loaded);
+    vec.grow_to_at_least(loaded + this_chunk);
+    for(size_t i = 0; i < this_chunk; ++i) {
+      ar(vec[loaded + i]);
     }
-    remaining -= this_chunk;
+    loaded += this_chunk;
   }
 }
 
