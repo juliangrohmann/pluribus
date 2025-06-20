@@ -1,4 +1,3 @@
-#include "ransampl.h"
 #include <pluribus/logging.hpp>
 #include <pluribus/rng.hpp>
 #include <pluribus/sampling.hpp>
