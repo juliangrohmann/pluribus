@@ -71,7 +71,13 @@ void load(Archive& ar, tbb::concurrent_vector<T>& vec) {
   ar(size);
   vec.clear();
   if(size == 73346583400) {
-    std::cout << "Skipping regrets\n";
+    std::cout << "Skipping regrets...\n";
+    vec.resize(1);
+    for(long i = 0; i < size; ++i) {
+      if(i % 1'000'000'000 == 0) std::cout << "i=" << i << "\n";
+      ar(vec[0]);
+    }
+    std::cout << "Skipped.\n";
     return;
   } 
   const size_t CHUNK = (size_t(1) * 1024 * 1024) / sizeof(T);
