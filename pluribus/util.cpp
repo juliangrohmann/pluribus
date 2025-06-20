@@ -15,13 +15,26 @@
 namespace pluribus {
 
 long long get_free_ram() {
-  struct sysinfo info;
-  if(sysinfo(&info) != 0) {
-    std::cerr << "getFreeRAM --- sysinfo failed" << std::endl;
-    return -1; // Error
+  std::ifstream meminfo("/proc/meminfo");
+  if(!meminfo.is_open()) {
+    std::cerr << "get_free_ram --- Failed to open /proc/meminfo" << std::endl;
+    return -1;
   }
-  // freeram is in bytes, adjusted by mem_unit
-  return static_cast<long long>(info.freeram) * info.mem_unit;
+
+  std::string line;
+  while(std::getline(meminfo, line)) {
+    if(line.find("MemAvailable:") == 0) {
+      std::istringstream iss(line);
+      std::string label;
+      long long kb;
+      std::string unit;
+      iss >> label >> kb >> unit;
+      return kb * 1024;
+    }
+  }
+
+  std::cerr << "get_free_ram --- MemAvailable not found in /proc/meminfo" << std::endl;
+  return -1;
 }
 
 bool create_dir(const std::filesystem::path& path) {
