@@ -41,6 +41,7 @@ struct LosslessBuffer {
 
 LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir) {
   Logger::log("Building lossless buffers...");
+  Logger::log("Preflop filename: " + preflop_fn);
   std::ostringstream buf;
   LosslessMetadata meta;
   std::filesystem::path buffer_dir = buf_dir;
