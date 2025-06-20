@@ -88,8 +88,10 @@ struct BlueprintTrainerConfig {
 
   template <class Archive>
   void serialize(Archive& ar) {
+    std::cout << "Deserializing config...\n";
     ar(poker, action_profile, init_ranges, init_board, init_state, strategy_interval, preflop_threshold, snapshot_interval, 
        prune_thresh, lcfr_thresh, discount_interval, log_interval, prune_cutoff, regret_floor);
+    std::cout << "Deserialized config successfully.\n";
   }
 
   PokerConfig poker;
