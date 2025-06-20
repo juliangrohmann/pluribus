@@ -137,7 +137,10 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
     Logger::log("Accumulating " + buf_fn + ": [" + std::to_string(buf.offset) + ", " + std::to_string(buf.offset + buf.freqs.size()) + ")");
     #pragma omp parallel for schedule(static)
     for(size_t idx = 0; idx < buf.freqs.size(); ++idx) {
-      get_freq()->operator[](buf.offset + idx).store(get_freq()->operator[](buf.offset + idx).load() + buf.freqs[idx]);
+      auto& entry = get_freq()->operator[](buf.offset + idx);
+      auto regret = entry.load();
+      if(regret >= 1'000'000'000) Logger::error("Lossless blueprint reget accumulation overflow! Regret=" + std::to_string(regret));
+      entry.store(regret + buf.freqs[idx]);
     }
   }
 
@@ -216,6 +219,7 @@ void _validate_ev_inputs(const PokerState& state, int i, const std::vector<Poker
   if(board.size() > n_board_cards(round)) throw std::runtime_error("Too many board cards!");
 }
 
+// TODO: make free function and move to ev.cpp
 double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& init_board) const {
   _validate_ev_inputs(state, i, ranges, init_board);
 
