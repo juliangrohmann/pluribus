@@ -273,48 +273,6 @@ double LosslessBlueprint::node_ev(const PokerState& state, int i, const std::vec
   }
 }
 
-class LosslessActionProvider : public _ActionProvider<float> {
-public:
-  Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<float>& bp) const override {
-    auto actions = valid_actions(state, bp.get_config().action_profile);
-    hand_index_t hand_idx = indexer.index(board, hands[state.get_active()], static_cast<int>(state.get_round()));
-    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
-    size_t base_idx = bp.get_strategy().index(state, cluster);
-    auto freq = calculate_strategy(bp.get_strategy(), base_idx, actions.size());
-    return actions[sample_action_idx(freq)];
-  }
-};
-
-class SampledActionProvider : public _ActionProvider<Action> {
-public:
-  SampledActionProvider(const std::vector<int>& bias_offsets) : _bias_offsets{bias_offsets} {}
-
-  Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<Action>& bp) const override {
-    hand_index_t hand_idx = indexer.index(board, hands[state.get_active()], static_cast<int>(state.get_round()));
-    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
-    size_t base_idx = bp.get_strategy().index(state, cluster);
-    return bp.get_strategy()[base_idx + _bias_offsets[state.get_active()]];
-  }
-private:
-  std::vector<int> _bias_offsets;
-};
-
-double LosslessBlueprint::monte_carlo_ev(long n, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board, bool verbose) const {
-  LosslessActionProvider action_provider;
-  return _monte_carlo_ev(n, state, i, ranges, board, get_config().poker.n_chips, action_provider, *this, verbose);
-}
-
-double SampledBlueprint::monte_carlo_ev(long n, const std::vector<Action>& biases, const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board, bool verbose) const {
-  BiasActionProfile bias_profile;
-  const std::vector<Action>& all_biases = bias_profile.get_actions(0, 0, 0, 0);
-  std::vector<int> bias_offsets;
-  for(const auto& bias : biases) {
-    bias_offsets.push_back(std::distance(all_biases.begin(), std::find(all_biases.begin(), all_biases.end(), bias)));
-  }
-  SampledActionProvider action_provider{bias_offsets};
-  return _monte_carlo_ev(n, state, i, ranges, board, get_config().poker.n_chips, action_provider, *this, verbose);
-}
-
 struct SampledMetadata {
   BlueprintTrainerConfig config;
   std::vector<std::string> buffer_fns;
@@ -454,15 +412,6 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   std::cout << "Stored histories: " << get_freq()->history_map().size() << "\n";
   std::cout << "Data size: " << get_freq()->data().size() << "\n";
   std::cout << "Sampled blueprint built.\n";
-}
-
-void update_stats(int x, double w, double& mean, double& w_sum, double& w_sum2, double& S) {
-  // Welford's algorithm with weights: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
-  w_sum += w;
-  w_sum2 += pow(w, 2);
-  double mean_old = mean;
-  mean = mean_old + (w / w_sum) * (x - mean_old);
-  S = S + w * (x - mean_old) * (x - mean);
 }
 
 }

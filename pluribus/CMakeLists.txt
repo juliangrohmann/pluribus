@@ -23,6 +23,7 @@ add_library(
   range.cpp
   range_viewer.cpp
   sampling.cpp
+  ev.cpp
   dist.cpp
   util.cpp
   debug.cpp

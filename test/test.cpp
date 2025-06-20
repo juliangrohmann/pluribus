@@ -25,6 +25,7 @@
 #include <pluribus/traverse.hpp>
 #include <pluribus/sampling.hpp>
 #include <pluribus/dist.hpp>
+#include <pluribus/ev.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
@@ -361,15 +362,19 @@ TEST_CASE("Round sampler", "[sampling][slow]") {
 }
 
 TEST_CASE("Lossless monte carlo EV", "[ev][slow][dependency]") {
+  long N = 10'000'000;
   auto bp = cereal_load<LosslessBlueprint>("lossless_bp_2p_100bb_0ante");
   std::vector<uint8_t> board = str_to_cards("AcTd3c2s");
   PokerState state{bp.get_config().poker};
   std::vector<Action> actions = {Action{0.75f}, Action::CHECK_CALL, Action::CHECK_CALL, Action{0.50f}, Action::CHECK_CALL, Action::CHECK_CALL, Action::CHECK_CALL};
   state = state.apply(actions);
   auto ranges = build_ranges(state.get_action_history().get_history(), board, bp);
-  double ev_enum = bp.enumerate_ev(state, 0, ranges, board);
-  double ev_mc = bp.monte_carlo_ev(10'000'000, state, 0, ranges, board);
-  REQUIRE(abs(ev_enum - ev_mc) / ev_enum < 0.03);
+  MonteCarloEV ev_solver{};
+  double enum_ev = bp.enumerate_ev(state, 0, ranges, board);
+  ResultEV mc_result = ev_solver.set_max_iterations(N)
+      ->set_min_iterations(N)
+      ->lossless(&bp, state, 0, ranges, board);
+  REQUIRE(abs(enum_ev - mc_result.ev) / enum_ev < 0.03);
 }
 
 TEST_CASE("Serialize Hand", "[serialize]") {
