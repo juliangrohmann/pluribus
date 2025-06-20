@@ -57,4 +57,16 @@ public:
   void build(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor = 5.0f);
 };
 
+template<class T>
+std::vector<size_t> _collect_base_indexes(const StrategyStorage<T>& strategy) {
+  std::vector<size_t> base_idxs;
+  base_idxs.reserve(strategy.history_map().size());
+  for(const auto& entry : strategy.history_map()) {
+    base_idxs.push_back(entry.second.idx);
+  }
+  base_idxs.push_back(strategy.data().size());
+  std::sort(base_idxs.begin(), base_idxs.end());
+  return base_idxs;
+}
+
 }

@@ -7,8 +7,11 @@ namespace pluribus {
 
 using Duration = std::chrono::high_resolution_clock::duration;
 
+void _validate_ev_inputs(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board);
 inline double standard_deviation(double S, double w_sum) { return pow(S / w_sum, 0.5); }
 void update_stats(int x, double w, double& mean, double& w_sum, double& w_sum2, double& S); 
+double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, int i, const std::vector<PokerRange>& ranges, 
+    const std::vector<uint8_t>& init_board);
 
 template <class T>
 class _ActionProvider {

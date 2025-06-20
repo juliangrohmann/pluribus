@@ -370,7 +370,7 @@ TEST_CASE("Lossless monte carlo EV", "[ev][slow][dependency]") {
   state = state.apply(actions);
   auto ranges = build_ranges(state.get_action_history().get_history(), board, bp);
   MonteCarloEV ev_solver{};
-  double enum_ev = bp.enumerate_ev(state, 0, ranges, board);
+  double enum_ev = enumerate_ev(bp, state, 0, ranges, board);
   ResultEV mc_result = ev_solver.set_max_iterations(N)
       ->set_min_iterations(N)
       ->lossless(&bp, state, 0, ranges, board);

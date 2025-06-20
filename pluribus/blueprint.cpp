@@ -59,14 +59,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       Logger::log(meta.config.to_string());
     }
 
-    std::vector<size_t> base_idxs;
-    base_idxs.reserve(regrets.history_map().size());
-    for(const auto& entry : regrets.history_map()) {
-      base_idxs.push_back(entry.second.idx);
-    }
-    base_idxs.push_back(regrets.data().size());
-    std::sort(base_idxs.begin(), base_idxs.end());
-
+    std::vector<size_t> base_idxs = _collect_base_indexes(regrets);
     size_t free_ram = get_free_ram();
     if(free_ram < 8 * pow(1024, 3)) {
       Logger::error("At least 8G free RAM required to build blueprint. Available (bytes): " + std::to_string(free_ram));
@@ -88,7 +81,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       for(; bidx_end < base_idxs.size() - 1; ++bidx_end) {
         if(base_idxs[bidx_end] - base_idxs[bidx_start] > buf_sz) break;
       }
-      if(bidx_end == bidx_start) throw std::runtime_error("Failed to increase bidx_end");
+      if(bidx_end == bidx_start) Logger::error("Failed to increase bidx_end");
 
       LosslessBuffer buffer;
       buffer.offset = base_idxs[bidx_start];
@@ -139,7 +132,7 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
     for(size_t idx = 0; idx < buf.freqs.size(); ++idx) {
       auto& entry = get_freq()->operator[](buf.offset + idx);
       auto regret = entry.load();
-      if(regret >= 1'000'000'000) Logger::error("Lossless blueprint reget accumulation overflow! Regret=" + std::to_string(regret));
+      if(regret >= 1'000'000'000) Logger::error("Lossless blueprint regret accumulation overflow! Regret=" + std::to_string(regret));
       entry.store(regret + buf.freqs[idx]);
     }
   }
@@ -150,20 +143,13 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
   }
 
   Logger::log("Normalizing frequencies...");
-  std::vector<size_t> base_idxs;
-  base_idxs.reserve(meta.history_map.size());
-  for(const auto& entry : meta.history_map) {
-    base_idxs.push_back(entry.second.idx);
-  }
-  base_idxs.push_back(get_freq()->data().size());
-  std::sort(base_idxs.begin(), base_idxs.end());
-
+  std::vector<size_t> base_idxs = _collect_base_indexes(*get_freq());
   for(size_t curr_idx = 0; curr_idx < base_idxs.size() - 1; ++curr_idx) {
-    if(curr_idx + 1 >= base_idxs.size()) throw std::runtime_error("Renorm: Indexing base indeces out of range!");
+    if(curr_idx + 1 >= base_idxs.size()) Logger::error("Renorm: Indexing base indeces out of range!");
     size_t n_entries = base_idxs[curr_idx + 1] - base_idxs[curr_idx];
-    if(n_entries % meta.n_clusters != 0) throw std::runtime_error("Renorm: Indivisible storage section!");
+    if(n_entries % meta.n_clusters != 0) Logger::error("Renorm: Indivisible storage section!");
     size_t n_actions = n_entries / meta.n_clusters;
-    if(n_actions > get_config().action_profile.max_actions()) throw std::runtime_error("Renorm: Too many actions in storage section!");
+    if(n_actions > get_config().action_profile.max_actions()) Logger::error("Renorm: Too many actions in storage section!");
     for(int c = 0; c < meta.n_clusters; ++c) {
       size_t base_idx = base_idxs[curr_idx] + c * n_actions;
       float total = 0.0f;
@@ -183,105 +169,6 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
     }
   }
   Logger::log("Lossless blueprint built.");
-}
-
-bool any_collision(uint8_t card, const std::vector<Hand>& hands, const std::vector<uint8_t>& board) {
-  for(const auto& hand : hands) {
-    if(card == hand.cards()[0] || card == hand.cards()[1]) return true;
-  }
-  return std::find(board.begin(), board.end(), card) != board.end();
-}
-
-int villain_pos(const PokerState& state, int i) {
-  for(int p = 0; p < state.get_players().size(); ++p) {
-    if(p != i && !state.get_players()[p].has_folded()) return p;
-  }
-  throw std::runtime_error("Villain doesn't exist in state.");
-}
-
-void _validate_ev_inputs(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) {
-  int round = round_of_last_action(state);
-  int n_cards = n_board_cards(round);
-  std::vector<uint8_t> real_board = board.size() > n_cards ? std::vector<uint8_t>{board.begin(), board.begin() + n_cards} : board;
-  std::cout << "Real round: " << round_to_str(round) << "\n";
-  std::cout << "Real board: " << cards_to_str(real_board) << "\n";
-  std::cout << "Hero pos: " << i << " (" << pos_to_str(i, state.get_players().size()) << ")\n";
-  int ridx = 0;
-  for(int p = 0; p < state.get_players().size(); ++p) {
-    if(!state.get_players()[p].has_folded()) {
-      std::cout << pos_to_str(p, state.get_players().size()) << ": " << ranges[ridx].n_combos() << " combos  ";
-      ++ridx;
-      if(ridx >= ranges.size()) break;
-    }
-  }
-  std::cout << "\nHero combos: " << ranges[i].n_combos() << "\n"; 
-  if(state.active_players() != 2) throw std::runtime_error("Expected value is only possible with two remaining players.");
-  if(board.size() > n_board_cards(round)) throw std::runtime_error("Too many board cards!");
-}
-
-// TODO: make free function and move to ev.cpp
-double LosslessBlueprint::enumerate_ev(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& init_board) const {
-  _validate_ev_inputs(state, i, ranges, init_board);
-
-  std::vector<Board> boards;
-  if(init_board.size() == 4) {
-    for(uint8_t c = 0; c < MAX_CARDS; ++c) {
-      if(collides(c, init_board)) continue;
-      auto next_board = init_board;
-      next_board.push_back(c);
-      boards.push_back(Board{next_board});
-    }
-  }
-  else if(init_board.size() == 5) {
-    boards.push_back(Board{init_board});
-  }
-  else {
-    Logger::error("Enumerate EV only supported for Turn/River.");
-  }
-
-  int pos_v = villain_pos(state, i);
-  omp::HandEvaluator eval;
-  std::vector<Hand> hands(ranges.size());
-  double ev = 0.0;
-  double total = 0.0;
-  double max_combos = boards.size();
-  for(const auto& r : ranges) max_combos *= r.n_combos();
-  for(const auto& board : boards) {
-    std::cout << "Enumerate EV: " << std::fixed << std::setprecision(1) << total / max_combos * 100 << "%\n";
-    for(const auto& hh : ranges[i].hands()) {
-      if(collides(hh, board)) continue;
-      for(const auto& vh : ranges[pos_v].hands()) {
-        if(collides(hh, vh) || collides(vh, board)) continue;
-        hands[i] = hh;
-        hands[pos_v] = vh;
-        std::vector<CachedIndexer> indexers;
-        for(int i = 0; i < hands.size(); ++i) indexers.push_back(CachedIndexer{});
-        double freq = ranges[i].frequency(hh) * ranges[pos_v].frequency(vh);
-        ev += freq * node_ev(state, i, hands, board, get_config().poker.n_chips, indexers, eval);
-        total += freq;
-      }
-    }
-  }
-  return ev / total;
-}
-
-double LosslessBlueprint::node_ev(const PokerState& state, int i, const std::vector<Hand>& hands, const Board& board, int stack_size, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
-  if(state.is_terminal()) {
-    int hu = utility(state, i, Board{board}, hands, stack_size, eval);
-    return hu;
-  }
-  else {
-    const auto& strat = get_strategy();
-    hand_index_t cached_idx = indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round());
-    int cached_cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), cached_idx);
-    int base_idx = strat.index(state, cached_cluster);
-    auto actions = valid_actions(state, get_config().action_profile);
-    double ev = 0.0;
-    for(int aidx = 0; aidx < actions.size(); ++aidx) {
-      ev += strat[base_idx + aidx] * node_ev(state.apply(actions[aidx]), i, hands, board, stack_size, indexers, eval);
-    }
-    return ev;
-  }
 }
 
 struct SampledMetadata {
@@ -316,7 +203,7 @@ std::vector<float> biased_freq(const std::vector<Action>& actions, const std::ve
     biased_freq = freq;
   }
   else {
-    throw std::runtime_error("Unknown bias: " + bias.to_string());
+    Logger::error("Unknown bias: " + bias.to_string());
   }
   float sum = 0.0f;
   for(float f : biased_freq) sum += f;
@@ -350,7 +237,7 @@ SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const s
       meta.histories.push_back(entry.first);
     }
     else {
-      throw std::runtime_error("Found terminal state.");
+      Logger::error("Found terminal state.");
     }
     // auto actions = valid_actions(state, bp.get_config().action_profile);
     // int bets = 0;
@@ -389,7 +276,7 @@ SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const s
 
     if(get_free_ram() < min_ram || hidx == meta.histories.size() - 1) {
       std::cout << "Buffered " << buffer.size() << " histories.\n";
-      if(buffer.size() == 0) throw std::runtime_error("Out of RAM but buffer is empty.");
+      if(buffer.size() == 0) Logger::error("Out of RAM but buffer is empty.");
       std::string fn = "sampled_buf_" + std::to_string(buf_idx++) + ".bin";
       meta.buffer_fns.push_back(fn);
       cereal_save(buffer, (buffer_dir / fn).string());
