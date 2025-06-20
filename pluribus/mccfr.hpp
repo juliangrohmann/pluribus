@@ -131,6 +131,7 @@ public:
   const StrategyStorage<float>& get_phi() const { return _phi; }
   const BlueprintTrainerConfig& get_config() const { return _config; }
   BlueprintTrainerConfig& get_config() { return _config; }
+  long get_iteration() const { return _t; }
   void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
   void set_metrics_dir(std::string metrics_dir) { _metrics_dir = metrics_dir; }
   void set_log_dir(std::string log_dir) { _log_dir = log_dir; }
