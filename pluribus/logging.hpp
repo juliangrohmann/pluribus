@@ -36,16 +36,16 @@ private:
 class Logger {
 public:
   static void dump(std::ostringstream& buf) {
-    instance()->log(buf.str());
+    instance()->_log.log(buf.str());
     buf.str("");
   }
 
   static void log(const std::string& msg, int debug = 0) {
-    instance()->log(msg, debug);
+    instance()->_log.log(msg, debug);
   }
 
   [[noreturn]] static void error(const std::string& msg) {
-    instance()->error(msg);
+    instance()->_log.error(msg);
   }
 
   static void set_directory(const std::filesystem::path dir) {

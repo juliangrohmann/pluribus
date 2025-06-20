@@ -39,7 +39,7 @@ struct LosslessBuffer {
 };
 
 LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir) {
-  Logger::log("Building lossless buffers...\n");
+  Logger::log("Building lossless buffers...");
   std::ostringstream buf;
   LosslessMetadata meta;
   std::filesystem::path buffer_dir = buf_dir;
@@ -53,9 +53,9 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
     if(bp_idx == 0) {
       meta.config = bp.get_config();
       meta.n_clusters = regrets.n_clusters();
-      Logger::log("Initialized blueprint config:\n");
-      Logger::log("n_clusters=" + std::to_string(meta.n_clusters) + "\n");
-      Logger::log("max_actions=" + std::to_string(meta.config.action_profile.max_actions()) + "\n");
+      Logger::log("Initialized blueprint config:");
+      Logger::log("n_clusters=" + std::to_string(meta.n_clusters));
+      Logger::log("max_actions=" + std::to_string(meta.config.action_profile.max_actions()));
       Logger::log(meta.config.to_string());
     }
 
@@ -72,14 +72,14 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       Logger::error("At least 8G free RAM required to build blueprint. Available (bytes): " + std::to_string(free_ram));
     }
     size_t buf_sz = static_cast<size_t>((free_ram - 8 * pow(1024, 3)) / sizeof(float));
-    buf << "Blueprint " << bp_idx << " buffer: " << std::setprecision(2) << std::fixed << buf_sz << " elements\n";
+    buf << "Blueprint " << bp_idx << " buffer: " << std::setprecision(2) << std::fixed << buf_sz << " elements";
     Logger::dump(buf);
 
     if(regrets.data().size() > meta.max_regrets) {
       meta.max_regrets = regrets.data().size();
-      Logger::log("New max regrets: " + std::to_string(meta.max_regrets) + "\n");
+      Logger::log("New max regrets: " + std::to_string(meta.max_regrets));
       meta.history_map = regrets.history_map();
-      Logger::log("New history map size: " + std::to_string(meta.history_map.size()) + "\n");
+      Logger::log("New history map size: " + std::to_string(meta.history_map.size()));
     }
 
     size_t bidx_start = 0;
@@ -95,7 +95,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       buffer.freqs.resize(base_idxs[bidx_end] - base_idxs[bidx_start]);
 
       Logger::log("Storing buffer: base_idxs[" + std::to_string(bidx_start) + ", " + std::to_string(bidx_end) + "), indeces: [" 
-                + std::to_string(base_idxs[bidx_start]) + ", " + std::to_string(base_idxs[bidx_end]) + ")\n");
+                + std::to_string(base_idxs[bidx_start]) + ", " + std::to_string(base_idxs[bidx_end]) + ")");
       #pragma omp parallel for schedule(dynamic)
       for(size_t curr_idx = bidx_start; curr_idx < bidx_end; ++curr_idx) {
         if(curr_idx + 1 >= base_idxs.size()) Logger::error("Buffering: Indexing base indeces out of range!");
@@ -126,9 +126,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
 }
 
 void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir) {
-  std::cout << "1\n";
   Logger::log("Building lossless blueprint...");
-  std::cout << "2\n";
   std::filesystem::path buffer_dir = buf_dir;
   LosslessMetadata meta = build_lossless_buffers(preflop_fn, postflop_fns, buf_dir);
   set_config(meta.config);
@@ -136,19 +134,19 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
   get_freq()->data().resize(meta.max_regrets);
   for(std::string buf_fn : meta.buffer_fns) {
     auto buf = cereal_load<LosslessBuffer>((buffer_dir / buf_fn).string());
-    Logger::log("Accumulating " + buf_fn + ": [" + std::to_string(buf.offset) + ", " + std::to_string(buf.offset + buf.freqs.size()) + ")\n");
+    Logger::log("Accumulating " + buf_fn + ": [" + std::to_string(buf.offset) + ", " + std::to_string(buf.offset + buf.freqs.size()) + ")");
     #pragma omp parallel for schedule(static)
     for(size_t idx = 0; idx < buf.freqs.size(); ++idx) {
       get_freq()->operator[](buf.offset + idx).store(get_freq()->operator[](buf.offset + idx).load() + buf.freqs[idx]);
     }
   }
 
-  Logger::log("Inserting histories...\n");
+  Logger::log("Inserting histories...");
   for(const auto& entry : meta.history_map) {
     get_freq()->history_map()[entry.first] = entry.second;
   }
 
-  Logger::log("Normalizing frequencies...\n");
+  Logger::log("Normalizing frequencies...");
   std::vector<size_t> base_idxs;
   base_idxs.reserve(meta.history_map.size());
   for(const auto& entry : meta.history_map) {
@@ -181,7 +179,7 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
       }
     }
   }
-  Logger::log("Lossless blueprint built.\n");
+  Logger::log("Lossless blueprint built.");
 }
 
 bool any_collision(uint8_t card, const std::vector<Hand>& hands, const std::vector<uint8_t>& board) {
