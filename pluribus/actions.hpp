@@ -81,6 +81,7 @@ public:
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_profile);
+    set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{2.00f}, Action::ALL_IN}); // TODO: compatibility, remove
   }
 
 private:
