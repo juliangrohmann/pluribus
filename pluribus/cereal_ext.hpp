@@ -16,13 +16,11 @@ void cereal_save(const T& data, const std::string& fn) {
 }
 
 template <class T>
-T cereal_load(const std::string& fn) {
+void cereal_load(T& data, const std::string& fn) {
   std::cout << "Loading from " << fn << '\n';
   std::ifstream is(fn, std::ios::binary);
   cereal::BinaryInputArchive iarchive(is);
-  T data;
   iarchive(data);
-  return data;
 }
 
 }
@@ -70,33 +68,14 @@ void load(Archive& ar, tbb::concurrent_vector<T>& vec) {
   size_t size;
   ar(size);
   vec.clear();
-  if(size == 73346583400) {
-    std::cout << "Skipping regrets...\n";
-    vec.resize(1);
-    for(long i = 0; i < size; ++i) {
-      if(i % 1'000'000'000 == 0) std::cout << "i=" << i << "\n";
-      ar(vec[0]);
-    }
-    std::cout << "Skipped.\n";
-    return;
-  } 
-  const size_t CHUNK = (size_t(1) * 1024 * 1024) / sizeof(T);
+  const size_t CHUNK = (size_t(1) * 1024 * 1024 * 1024) / sizeof(T);
   size_t loaded = 0;
   while(loaded < size) {
     size_t this_chunk = std::min(CHUNK, size - loaded);
-    std::cout << "Size (bef)=" << vec.size() << "\n";
-    std::cout << "Growing to " << loaded + this_chunk << "\n";
     vec.grow_to_at_least(loaded + this_chunk);
-    std::cout << "Grew to    " << loaded + this_chunk << "\n";
-    std::cout << "Size (aft)=" << vec.size() << "\n";
-    std::cout << "Loaded (before) = " << loaded << '\n';
-    if(loaded + this_chunk - 1 >= vec.size()) throw std::runtime_error("Overflow. Size=" + std::to_string(vec.size()) + ", Idx=" + std::to_string(loaded + this_chunk - 1));
     for(size_t i = 0; i < this_chunk; ++i) {
       ar(vec[loaded + i]);
     }
-    std::cout << "Loaded (after)  = " << loaded << '\n';
-    std::cout << "Final size=" << size << "\n";
-    std::cout << "-----------------------------\n";
     loaded += this_chunk;
   }
   std::cout << "Successful concurrent vector load.\n";

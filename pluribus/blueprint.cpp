@@ -47,7 +47,8 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
   int buf_idx = 0;
   for(int bp_idx = 0; bp_idx < postflop_fns.size(); ++bp_idx) {
     Logger::log("Loading blueprint " + std::to_string(bp_idx) + "...");
-    auto bp = cereal_load<BlueprintTrainer>(postflop_fns[bp_idx]);
+    BlueprintTrainer bp;
+    cereal_load(bp, postflop_fns[bp_idx]);
     Logger::log("Loaded blueprint " + std::to_string(bp_idx) + " successfully.");
     const auto& regrets = bp.get_strategy();
     if(bp_idx == 0) {
@@ -126,7 +127,8 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
   assign_freq(new StrategyStorage<float>{meta.config.action_profile, meta.n_clusters});
   get_freq()->data().resize(meta.max_regrets);
   for(std::string buf_fn : meta.buffer_fns) {
-    auto buf = cereal_load<LosslessBuffer>((buffer_dir / buf_fn).string());
+    LosslessBuffer buf;
+    cereal_load(buf, (buffer_dir / buf_fn).string());
     Logger::log("Accumulating " + buf_fn + ": [" + std::to_string(buf.offset) + ", " + std::to_string(buf.offset + buf.freqs.size()) + ")");
     #pragma omp parallel for schedule(static)
     for(size_t idx = 0; idx < buf.freqs.size(); ++idx) {
@@ -221,7 +223,8 @@ SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const s
   std::cout << "Building sampled buffers...\n";
   SampledMetadata meta;
   std::filesystem::path buffer_dir = buf_dir;
-  LosslessBlueprint bp = cereal_load<LosslessBlueprint>(lossless_bp_fn);
+  LosslessBlueprint bp;
+  cereal_load(bp, lossless_bp_fn);
   meta.config = bp.get_config();
   BiasActionProfile bias_profile;
   meta.biases = bias_profile.get_actions(0, 0, 0, 150);
@@ -288,15 +291,12 @@ SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const s
 }
 
 void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor) {
-  {
-    LosslessBlueprint bp = cereal_load<LosslessBlueprint>(lossless_bp_fn);
-    std::cout << "Lossless data size: " << bp.get_strategy().data().size() << "\n";
-  }
   SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, bias_factor);
   std::filesystem::path buffer_dir = buf_dir;
   assign_freq(new StrategyStorage<Action>(BiasActionProfile{}, meta.n_clusters));
   for(const auto& fn : meta.buffer_fns) {
-    auto buffer = cereal_load<std::unordered_map<ActionHistory, std::vector<Action>>>((buffer_dir / fn).string());
+    std::unordered_map<ActionHistory, std::vector<Action>> buffer;
+    cereal_load(buffer, (buffer_dir / fn).string());
     for(size_t hidx = 0; hidx < meta.histories.size(); ++hidx) {
       PokerState state{meta.config.poker};
       state = state.apply(meta.histories[hidx]);

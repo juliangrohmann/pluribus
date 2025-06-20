@@ -93,7 +93,8 @@ template <class T>
 bool test_serialization(const T& obj) {
   std::string fn = "test_serialization.bin";
   cereal_save(obj, fn);
-  auto loaded_obj = cereal_load<T>(fn);
+  T loaded_obj;
+  cereal_load(loaded_obj, fn);
   bool match = (obj == loaded_obj);
   unlink(fn.c_str());
   return match;
@@ -363,7 +364,8 @@ TEST_CASE("Round sampler", "[sampling][slow]") {
 
 TEST_CASE("Lossless monte carlo EV", "[ev][slow][dependency]") {
   long N = 10'000'000;
-  auto bp = cereal_load<LosslessBlueprint>("lossless_bp_2p_100bb_0ante");
+  LosslessBlueprint bp;
+  cereal_load(bp, "lossless_bp_2p_100bb_0ante");
   std::vector<uint8_t> board = str_to_cards("AcTd3c2s");
   PokerState state{bp.get_config().poker};
   std::vector<Action> actions = {Action{0.75f}, Action::CHECK_CALL, Action::CHECK_CALL, Action{0.50f}, Action::CHECK_CALL, Action::CHECK_CALL, Action::CHECK_CALL};
