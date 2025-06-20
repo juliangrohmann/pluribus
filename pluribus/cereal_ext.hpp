@@ -4,23 +4,26 @@
 #include <cereal/cereal.hpp>
 #include <tbb/concurrent_vector.h>
 #include <tbb/concurrent_unordered_map.h>
+#include <pluribus/logging.hpp>
 
 namespace pluribus {
   
 template <class T>
 void cereal_save(const T& data, const std::string& fn) {
-  std::cout << "Saving to " << fn << '\n';
+  Logger::log("Saving to " + fn + '\n');
   std::ofstream os(fn, std::ios::binary);
   cereal::BinaryOutputArchive oarchive(os);
   oarchive(data);
+  Logger::log("Saved successfully.");
 }
 
 template <class T>
 void cereal_load(T& data, const std::string& fn) {
-  std::cout << "Loading from " << fn << '\n';
+  Logger::log("Loading from " + fn + '\n');
   std::ifstream is(fn, std::ios::binary);
   cereal::BinaryInputArchive iarchive(is);
   iarchive(data);
+  Logger::log("Loaded successfully.");
 }
 
 }

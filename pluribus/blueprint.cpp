@@ -24,6 +24,7 @@ struct LosslessMetadata {
   BlueprintTrainerConfig config;
   tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map;
   std::vector<std::string> buffer_fns;
+  std::string preflop_buf_fn;
   size_t max_regrets = 0;
   int n_clusters = -1;
 };
@@ -38,18 +39,19 @@ struct LosslessBuffer {
   }
 };
 
-LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir) {
+LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir) {
   Logger::log("Building lossless buffers...");
   std::ostringstream buf;
   LosslessMetadata meta;
   std::filesystem::path buffer_dir = buf_dir;
-  
+  bool found_preflop = false;
+  meta.preflop_buf_fn = (buffer_dir / "preflop_phi.bin").string();
+
   int buf_idx = 0;
-  for(int bp_idx = 0; bp_idx < postflop_fns.size(); ++bp_idx) {
+  for(int bp_idx = 0; bp_idx < all_fns.size(); ++bp_idx) {
     Logger::log("Loading blueprint " + std::to_string(bp_idx) + "...");
     BlueprintTrainer bp;
-    cereal_load(bp, postflop_fns[bp_idx]);
-    Logger::log("Loaded blueprint " + std::to_string(bp_idx) + " successfully.");
+    cereal_load(bp, all_fns[bp_idx]);
     const auto& regrets = bp.get_strategy();
     if(bp_idx == 0) {
       meta.config = bp.get_config();
@@ -60,6 +62,19 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       Logger::log(meta.config.to_string());
     }
 
+    if(regrets.data().size() > meta.max_regrets) {
+      meta.max_regrets = regrets.data().size();
+      Logger::log("New max regrets: " + std::to_string(meta.max_regrets));
+      meta.history_map = regrets.history_map();
+      Logger::log("New history map size: " + std::to_string(meta.history_map.size()));
+    }
+
+    if(all_fns[bp_idx] == preflop_fn) {
+      Logger::log("Found preflop blueprint.");
+      found_preflop = true;
+      cereal_save(bp.get_phi(), meta.preflop_buf_fn);
+    }
+
     std::vector<size_t> base_idxs = _collect_base_indexes(regrets);
     size_t free_ram = get_free_ram();
     if(free_ram < 8 * pow(1024, 3)) {
@@ -68,13 +83,6 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
     size_t buf_sz = static_cast<size_t>((free_ram - 8 * pow(1024, 3)) / sizeof(float));
     buf << "Blueprint " << bp_idx << " buffer: " << std::setprecision(2) << std::fixed << buf_sz << " elements";
     Logger::dump(buf);
-
-    if(regrets.data().size() > meta.max_regrets) {
-      meta.max_regrets = regrets.data().size();
-      Logger::log("New max regrets: " + std::to_string(meta.max_regrets));
-      meta.history_map = regrets.history_map();
-      Logger::log("New history map size: " + std::to_string(meta.history_map.size()));
-    }
 
     size_t bidx_start = 0;
     size_t bidx_end = 0;
@@ -116,13 +124,20 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       Logger::log("Saved buffer " + std::to_string(buf_idx) + " successfully.");
     }
   }
+
+  if(!found_preflop) {
+    Logger::log("Warning: Did not find preflop blueprint. Loading explicitly...");
+    BlueprintTrainer bp;
+    cereal_load(bp, preflop_fn);
+    cereal_save(bp.get_phi(), meta.preflop_buf_fn);
+  }
   return meta;
 }
 
-void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir) {
+void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir) {
   Logger::log("Building lossless blueprint...");
   std::filesystem::path buffer_dir = buf_dir;
-  LosslessMetadata meta = build_lossless_buffers(preflop_fn, postflop_fns, buf_dir);
+  LosslessMetadata meta = build_lossless_buffers(preflop_fn, all_fns, buf_dir);
   set_config(meta.config);
   assign_freq(new StrategyStorage<float>{meta.config.action_profile, meta.n_clusters});
   get_freq()->data().resize(meta.max_regrets);
@@ -133,9 +148,7 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
     #pragma omp parallel for schedule(static)
     for(size_t idx = 0; idx < buf.freqs.size(); ++idx) {
       auto& entry = get_freq()->operator[](buf.offset + idx);
-      auto regret = entry.load();
-      if(regret >= 1'000'000'000) Logger::error("Lossless blueprint regret accumulation overflow! Regret=" + std::to_string(regret));
-      entry.store(regret + buf.freqs[idx]);
+      entry.store(entry.load() + buf.freqs[idx]);
     }
   }
 
@@ -144,10 +157,25 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
     get_freq()->history_map()[entry.first] = entry.second;
   }
 
+  Logger::log("Setting preflop strategy to phi...");
+  StrategyStorage<float> phi;
+  cereal_load(phi, meta.preflop_buf_fn);
+  for(auto entry : phi.history_map()) {
+    PokerState state = meta.config.init_state;
+    state.apply(entry.first);
+    int n_actions = valid_actions(state, meta.config.action_profile).size();
+    for(int c = 0; c < meta.n_clusters; ++c) {
+      size_t phi_base_idx = phi.index(state, c);
+      size_t freq_base_idx = get_freq()->index(state, c);
+      for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
+        get_freq()->operator[](freq_base_idx + a_idx).store(phi[phi_base_idx].load());
+      }
+    }
+  }
+
   Logger::log("Normalizing frequencies...");
   std::vector<size_t> base_idxs = _collect_base_indexes(*get_freq());
   for(size_t curr_idx = 0; curr_idx < base_idxs.size() - 1; ++curr_idx) {
-    if(curr_idx + 1 >= base_idxs.size()) Logger::error("Renorm: Indexing base indeces out of range!");
     size_t n_entries = base_idxs[curr_idx + 1] - base_idxs[curr_idx];
     if(n_entries % meta.n_clusters != 0) Logger::error("Renorm: Indivisible storage section!");
     size_t n_actions = n_entries / meta.n_clusters;
@@ -160,7 +188,8 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
       }
       if(total > 0) {
         for(size_t aidx = 0; aidx < n_actions; ++aidx) {
-          get_freq()->operator[](base_idx + aidx).store(get_freq()->operator[](base_idx + aidx).load() / total);
+          auto& entry = get_freq()->operator[](base_idx + aidx);
+          entry.store(entry.load() / total);
         }
       }
       else {
