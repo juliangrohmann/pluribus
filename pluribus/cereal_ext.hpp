@@ -10,7 +10,7 @@ namespace pluribus {
   
 template <class T>
 void cereal_save(const T& data, const std::string& fn) {
-  Logger::log("Saving to " + fn + '\n');
+  Logger::log("Saving to " + fn);
   std::ofstream os(fn, std::ios::binary);
   cereal::BinaryOutputArchive oarchive(os);
   oarchive(data);
@@ -19,7 +19,7 @@ void cereal_save(const T& data, const std::string& fn) {
 
 template <class T>
 void cereal_load(T& data, const std::string& fn) {
-  Logger::log("Loading from " + fn + '\n');
+  Logger::log("Loading from " + fn);
   std::ifstream is(fn, std::ios::binary);
   cereal::BinaryInputArchive iarchive(is);
   iarchive(data);

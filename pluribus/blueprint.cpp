@@ -81,8 +81,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       Logger::error("At least 8G free RAM required to build blueprint. Available (bytes): " + std::to_string(free_ram));
     }
     size_t buf_sz = static_cast<size_t>((free_ram - 8 * pow(1024, 3)) / sizeof(float));
-    buf << "Blueprint " << bp_idx << " buffer: " << std::setprecision(2) << std::fixed << buf_sz << " elements";
-    Logger::dump(buf);
+    Logger::log("Buffer element cutoff: " + std::to_string(buf_sz));
 
     size_t bidx_start = 0;
     size_t bidx_end = 0;
@@ -121,7 +120,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       std::string fn = "lossless_buf_" + std::to_string(buf_idx++) + ".bin";
       meta.buffer_fns.push_back(fn);
       cereal_save(buffer, (buffer_dir / fn).string());
-      Logger::log("Saved buffer " + std::to_string(buf_idx) + " successfully.");
+      Logger::log("Saved buffer " + std::to_string(buf_idx - 1) + " successfully.");
     }
   }
 
