@@ -48,24 +48,6 @@ void save(Archive& ar, const tbb::concurrent_vector<T>& vec) {
   }
 }
 
-// template<class Archive, class T>
-// void load(Archive& ar, tbb::concurrent_vector<T>& vec) {
-//   size_t size;
-//   ar(size);
-//   vec.clear();
-
-//   const size_t CHUNK = 10UL * 1024 * 1024 * 1024 / sizeof(T);
-//   size_t remaining = size;
-//   while(remaining > 0) {
-//     size_t this_chunk = std::min(CHUNK, remaining);
-//     auto it = vec.grow_by(this_chunk);
-//     for(size_t i = 0; i < this_chunk; ++i, ++it) {
-//       ar(*it);
-//     }
-//     remaining -= this_chunk;
-//   }
-// }
-
 template<class Archive, class T>
 void load(Archive& ar, tbb::concurrent_vector<T>& vec) {
   size_t size;
