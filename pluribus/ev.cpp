@@ -44,7 +44,7 @@ private:
 
 std::string ResultEV::to_string(int precision) {
   std::ostringstream oss;
-  oss << std::fixed << std::setprecision(precision) << "EV=" << ev << ", stdDev=" << std_dev << ", stdErr" << std_err 
+  oss << std::fixed << std::setprecision(precision) << "EV=" << ev << ", stdDev=" << std_dev << ", stdErr=" << std_err 
       << ", iterations=" << iterations << ", time=" << milliseconds << " ms\n";
   return oss.str();
 }
