@@ -39,13 +39,22 @@ struct LosslessBuffer {
   }
 };
 
+bool validate_preflop_fn(const std::string& preflop_fn, const std::vector<std::string>& all_fns) {
+  for(const auto& fn : all_fns) {
+    if(fn == preflop_fn) return true;
+  }
+  return false;
+}
+
 LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir) {
   Logger::log("Building lossless buffers...");
   Logger::log("Preflop filename: " + preflop_fn);
+  if(!validate_preflop_fn(preflop_fn, all_fns)) Logger::error("Preflop filename not found in all filenames.");
+
   std::ostringstream buf;
   LosslessMetadata meta;
   std::filesystem::path buffer_dir = buf_dir;
-  bool found_preflop = false;
+  
   meta.preflop_buf_fn = (buffer_dir / "preflop_phi.bin").string();
 
   int buf_idx = 0;
@@ -71,8 +80,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
     }
 
     if(all_fns[bp_idx] == preflop_fn) {
-      Logger::log("Found preflop blueprint.");
-      found_preflop = true;
+      Logger::log("Found preflop blueprint. Storing phi...");
       cereal_save(bp.get_phi(), meta.preflop_buf_fn);
     }
 
@@ -123,13 +131,6 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       cereal_save(buffer, (buffer_dir / fn).string());
       Logger::log("Saved buffer " + std::to_string(buf_idx - 1) + " successfully.");
     }
-  }
-
-  if(!found_preflop) {
-    Logger::log("Warning: Did not find preflop blueprint. Loading explicitly...");
-    BlueprintTrainer bp;
-    cereal_load(bp, preflop_fn);
-    cereal_save(bp.get_phi(), meta.preflop_buf_fn);
   }
   return meta;
 }
