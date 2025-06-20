@@ -54,7 +54,7 @@ void write_to_file(const std::filesystem::path& file_path, const std::string& co
   out_file.close();
 }
 
-std::string date_time_str() {
+std::string date_time_str(const std::string& format) {
     std::time_t t = std::time(nullptr);
     std::tm tm;
 #ifdef _WIN32
@@ -63,7 +63,7 @@ std::string date_time_str() {
     localtime_r(&t, &tm);
 #endif
     std::ostringstream oss;
-    oss << std::put_time(&tm, "%Y-%m-%d_%H-%M-%S");
+    oss << std::put_time(&tm, format.c_str());
     return oss.str();
 }
 

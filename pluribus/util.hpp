@@ -17,7 +17,7 @@ long long get_free_ram();
 bool create_dir(const std::filesystem::path& path);
 std::vector<std::string> get_filepaths(std::string path);
 void write_to_file(const std::filesystem::path& file_path, const std::string& content, bool append = false);
-std::string date_time_str();
+std::string date_time_str(const std::string& format = "%Y-%m-%d_%H-%M-%S");
 uint8_t card_to_idx(const std::string& card);
 std::string idx_to_card(int idx);
 void str_to_cards(std::string card_str, uint8_t cards[]);
