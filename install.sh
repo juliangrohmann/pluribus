@@ -1,9 +1,5 @@
-apt update
-apt upgrade
-apt install g++ cmake libsdl2-dev libsdl2-image-dev python3.10-venv
-apt-get install libboost-all-dev
-apt-get install libtbb-dev
-apt-get install libsdl2-ttf-dev
+apt-get update && apt-get upgrade
+apt-get install -y g++ cmake libsdl2-dev libsdl2-image-dev python3.10-venv libboost-all-dev libtbb-dev libsdl2-ttf-dev libgsl-dev
 
 git clone https://github.com/catchorg/Catch2.git
 cd Catch2
