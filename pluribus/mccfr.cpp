@@ -221,10 +221,6 @@ void BlueprintTrainer::mccfr_p(long t_plus) {
   }
 
   Logger::log("============== Blueprint training complete ==============");
-  std::ostringstream oss;
-  oss << date_time_str() << _config.poker.n_players << "p_" << _config.poker.n_chips / 100 << "bb_" << _config.poker.ante << "ante_"
-      << std::setprecision(1) << std::fixed << T / 1'000'000'000.0 << "B.bin";
-  cereal_save(*this, oss.str());
 }
 
 std::string info_str(const PokerState& state, int prev_r, int d_r, long t, const Board& board, const std::vector<Hand>& hands) {
