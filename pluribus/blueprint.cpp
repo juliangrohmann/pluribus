@@ -165,11 +165,11 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
     PokerState state = meta.config.init_state;
     state.apply(entry.first);
     int n_actions = valid_actions(state, meta.config.action_profile).size();
-    for(int c = 0; c < meta.n_clusters; ++c) {
+    for(int c = 0; c < phi.n_clusters(); ++c) {
       size_t phi_base_idx = phi.index(state, c);
       size_t freq_base_idx = get_freq()->index(state, c);
       for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-        get_freq()->operator[](freq_base_idx + a_idx).store(phi[phi_base_idx].load());
+        get_freq()->operator[](freq_base_idx + a_idx).store(phi[phi_base_idx + a_idx].load());
       }
     }
   }
