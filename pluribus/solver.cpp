@@ -22,21 +22,11 @@ float RealTimeMCCFR::frequency(const PokerState& state, const Hand& hand, Action
   return _regrets->get(state, HoleCardIndexer::get_instance()->index(hand), a_idx).load();
 }
 
-RealTimeSolver::RealTimeSolver(const std::string& bp_fn, const std::filesystem::path& log_dir) {
-  if(!create_dir(log_dir)) throw std::runtime_error("Failed to create log directory at " + log_dir.string());
-  _log_file = std::filesystem::path{log_dir} / (date_time_str() + "_solver.log");
-  std::cout << "Logging to " << _log_file.string();
-  Logger::log("Loading from real time solver's blueprint from " + bp_fn + " ...");
-  _bp = std::make_shared<SampledBlueprint>();
-  std::ifstream is(bp_fn, std::ios::binary);
-  cereal::BinaryInputArchive iarchive(is);
-  iarchive(*_bp);
-  Logger::log("Blueprint loaded.");
-}
+RealTimeSolver::RealTimeSolver(const std::shared_ptr<SampledBlueprint> bp) : _bp{bp} {}
 
 void RealTimeSolver::new_game(int hero_pos) {
   Logger::log("================================ New Game ================================");
-  Logger::log("Game idx=" + std::to_string(_game_idx++));
+  Logger::log("Game idx=" + std::to_string(++_game_idx));
   _real_state = _bp->get_config().init_state; // TODO: supply state with real stack sizes and keep seperate bp state with in-abstraction stack sizes
   _root_state = _real_state;
   Logger::log("Hero position: " + pos_to_str(hero_pos, _root_state.get_players().size()));

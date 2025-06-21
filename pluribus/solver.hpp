@@ -46,7 +46,7 @@ private:
 
 class RealTimeSolver {
 public:
-  RealTimeSolver(const std::string& bp_fn, const std::filesystem::path& log_dir = "logs");
+  RealTimeSolver(const std::shared_ptr<SampledBlueprint> bp);
   void new_game(int hero_pos);
   void update_state(const PokerState& state);
   void update_board(const std::vector<uint8_t> board);
@@ -58,7 +58,7 @@ private:
 
   std::shared_ptr<SampledBlueprint> _bp = nullptr;
   std::unique_ptr<Solver> _solver = nullptr;
-  PokerState _root_state;
+  PokerState _root_state; // root state has real stack/bet sizes and is not in abstraction 
   PokerState _real_state;
   ActionProfile _live_profile;
   std::vector<PokerRange> _ranges;
