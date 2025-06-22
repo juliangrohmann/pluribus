@@ -2,6 +2,7 @@ build
 venv
 temp
 snapshots
+wandb
 .vscode
 __pycache__
 *.o

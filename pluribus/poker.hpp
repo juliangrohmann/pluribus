@@ -19,8 +19,8 @@ namespace pluribus {
 
 class Deck {
 public:
-  Deck(std::unordered_set<uint8_t> dead_cards = {}) : _dead_cards{dead_cards} { reset(); }
-  Deck(std::vector<uint8_t> dead_cards) {
+  Deck(const std::unordered_set<uint8_t>& dead_cards = {}) : _dead_cards{dead_cards} { reset(); }
+  Deck(const std::vector<uint8_t>& dead_cards) {
     std::copy(dead_cards.begin(), dead_cards.end(), std::inserter(_dead_cards, _dead_cards.end()));
     reset();
   }

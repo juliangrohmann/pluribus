@@ -29,6 +29,10 @@ private:
   const BlueprintTrainer* _trainer_p;
 };
 
+void evaluate_agents(const std::vector<Agent*>& agents, const PokerConfig& config, long n_iter);
+void evaluate_strategies(const std::vector<BlueprintTrainer*>& strategies, long n_iter);
+void evaluate_vs_random(const BlueprintTrainer* hero, long n_iter);
+
 // class SampledBlueprintAgent : public Agent {
 // public:
 //   SampledBlueprintAgent(const BlueprintTrainer& trainer);

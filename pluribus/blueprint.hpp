@@ -23,8 +23,8 @@ public:
     if(_freq) return *_freq;
     throw std::runtime_error("Blueprint strategy is null.");
   }
-  const BlueprintTrainerConfig& get_config() const { return _config; }
-  void set_config(BlueprintTrainerConfig config) { _config = config; }
+  const MCCFRConfig& get_config() const { return _config; }
+  void set_config(MCCFRConfig config) { _config = config; }
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -37,7 +37,7 @@ protected:
 
 private:
   std::unique_ptr<StrategyStorage<T>> _freq;
-  BlueprintTrainerConfig _config;
+  MCCFRConfig _config;
 };
 
 class LosslessBlueprint : public Blueprint<float> {

@@ -21,7 +21,7 @@
 namespace pluribus {
 
 struct LosslessMetadata {
-  BlueprintTrainerConfig config;
+  MCCFRConfig config;
   tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map;
   std::vector<std::string> buffer_fns;
   std::string preflop_buf_fn;
@@ -204,7 +204,7 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
 }
 
 struct SampledMetadata {
-  BlueprintTrainerConfig config;
+  MCCFRConfig config;
   std::vector<std::string> buffer_fns;
   std::vector<ActionHistory> histories;
   std::vector<Action> biases;
