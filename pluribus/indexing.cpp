@@ -40,7 +40,7 @@ uint64_t CachedIndexer::index(const uint8_t cards[], int round) {
 }
 
 uint64_t CachedIndexer::index(const Board& board, const Hand& hand, int round) {
-  return index(collect_cards(board, hand, round).data(), round);
+  return _indices.size() > round ? _indices[round] : index(collect_cards(board, hand, round).data(), round);
 }
 
 long count(const PokerState& state, const ActionProfile& action_profile, int max_round, bool infosets) {

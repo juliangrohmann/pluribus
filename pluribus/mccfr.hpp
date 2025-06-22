@@ -57,8 +57,8 @@ void lcfr_discount(StrategyStorage<T>* regrets, double d) {
 
 template <class T>
 std::vector<float> state_to_freq(const PokerState& state, const Board& board, const Hand& hand, 
-                            int n_actions, StrategyStorage<T>& strategy) {
-  int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
+                            int n_actions, std::vector<CachedIndexer>& indexers, StrategyStorage<T>& strategy) {
+  int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hand, state.get_round()));
   size_t base_idx = strategy.index(state, cluster);
   return calculate_strategy(strategy, base_idx, n_actions);
 }
@@ -140,6 +140,7 @@ public:
   MCCFRTrainer(const MCCFRConfig& mccfr_config);
   
   void mccfr_p(long t_plus);
+  void allocate_all();
 
   const MCCFRConfig& get_config() const { return _mccfr_config; }
   void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
@@ -178,9 +179,10 @@ protected:
 
 private:
   int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-                       const omp::HandEvaluator& eval, std::ostringstream& debug);
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug);
   int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-                     const omp::HandEvaluator& eval, std::ostringstream& debug);
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug);
+  void _allocate_state(const PokerState& state);
 
   void log_utility(int utility, const PokerState& state, const std::vector<Hand>& hands, std::ostringstream& debug) const;
   void log_action_ev(Action a, float freq, int ev, const PokerState& state, std::ostringstream& debug) const;
@@ -189,8 +191,8 @@ private:
   void log_external_sampling(Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq,
                              const PokerState& state, std::ostringstream& debug) const;
 #ifdef UNIT_TEST
-  friend int call_traverse_mccfr(MCCFRTrainer* trainer, const PokerState& state, int i, const Board& board,
-                                 const std::vector<Hand>& hands, const omp::HandEvaluator& eval, std::ostringstream& debug);
+  friend int call_traverse_mccfr(MCCFRTrainer* trainer, const PokerState& state, int i, const Board& board, 
+      const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug);
 #endif
 
   MCCFRConfig _mccfr_config;
@@ -208,7 +210,7 @@ public:
   const StrategyStorage<int>& get_strategy() const { return _regrets; }
   const StrategyStorage<float>& get_phi() const { return _phi; }
   const BlueprintTrainerConfig& get_blueprint_config() const { return _bp_config; }
-  
+
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_regrets, _phi, _bp_config, cereal::base_class<MCCFRTrainer>(this));

@@ -177,8 +177,12 @@ void MCCFRTrainer::mccfr_p(long t_plus) {
         if(_log_level == BlueprintLogLevel::DEBUG) debug << "============== i = " << i << " ==============\n";
         deck.shuffle();
         board.deal(deck, _mccfr_config.init_board);
+        std::vector<CachedIndexer> indexers(_mccfr_config.poker.n_players);
         if(full_ranges) {
-          for(auto& hand : hands) hand.deal(deck);
+          for(int h_idx = 0; h_idx < hands.size(); ++h_idx) { 
+            hands[h_idx].deal(deck);
+            indexers[h_idx].index(board, hands[h_idx], 3); // cache indexes
+          }
         }
         else {
           std::unordered_set<uint8_t> dead_cards;
@@ -195,11 +199,11 @@ void MCCFRTrainer::mccfr_p(long t_plus) {
         // if(t > _config.prune_thresh) {
         if(should_prune(t)) {
           if(_log_level == BlueprintLogLevel::DEBUG) debug << "============== Traverse MCCFR-P ==============\n";
-          traverse_mccfr_p(_mccfr_config.init_state, t, i, board, hands, eval, debug);
+          traverse_mccfr_p(_mccfr_config.init_state, t, i, board, hands, indexers, eval, debug);
         }
         else {
           if(_log_level == BlueprintLogLevel::DEBUG) debug << "============== Traverse MCCFR ==============\n";
-          traverse_mccfr(_mccfr_config.init_state, t, i, board, hands, eval, debug);
+          traverse_mccfr(_mccfr_config.init_state, t, i, board, hands, indexers, eval, debug);
         }
       }
       if(_log_level == BlueprintLogLevel::DEBUG) {
@@ -233,6 +237,21 @@ void MCCFRTrainer::mccfr_p(long t_plus) {
   Logger::log("============== Blueprint training complete ==============");
 }
 
+void MCCFRTrainer::_allocate_state(const PokerState& state) {
+  if(state.is_terminal()) return;
+  size_t idx = get_regrets()->index(state, 0);
+  (*get_regrets())[idx] = 0;
+  for(Action a : valid_actions(state, _mccfr_config.action_profile)) {
+    _allocate_state(state.apply(a));
+  }
+}
+
+void MCCFRTrainer::allocate_all() {
+  Logger::log("Allocating all MCCFR regrets...");
+  _allocate_state(_mccfr_config.init_state);
+  Logger::log("Allocated successfully");
+}
+
 std::string info_str(const PokerState& state, int prev_r, int d_r, long t, const Board& board, const std::vector<Hand>& hands) {
   std::string str = "r=" + std::to_string(prev_r) + " + " + std::to_string(d_r) + "\nt=" + 
          std::to_string(t) + "\nBoard=" + board.to_string() + "\nHands=";
@@ -252,7 +271,7 @@ void MCCFRTrainer::error(const std::string& msg, const std::ostringstream& debug
 }
 
 int MCCFRTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-                                       const omp::HandEvaluator& eval, std::ostringstream& debug) {
+    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
     int u = utility(state, i, board, hands, _mccfr_config.poker.n_chips, eval);
     if(_log_level == BlueprintLogLevel::DEBUG) log_utility(u, state, hands, debug);
@@ -260,7 +279,7 @@ int MCCFRTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const
   }
   else if(state.get_active() == i) {
     auto actions = valid_actions(state, _mccfr_config.action_profile);
-    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     if(_log_level == BlueprintLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
     size_t base_idx = get_regrets()->index(state, cluster);
     auto freq = calculate_strategy(*get_regrets(), base_idx, actions.size());
@@ -270,7 +289,7 @@ int MCCFRTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       if((*get_regrets())[base_idx + a_idx].load() > PRUNE_CUTOFF) {
-        int v_a = traverse_mccfr_p(state.apply(a), t, i, board, hands, eval, debug);
+        int v_a = traverse_mccfr_p(state.apply(a), t, i, board, hands, indexers, eval, debug);
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
         if(_log_level == BlueprintLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, debug);
@@ -297,13 +316,13 @@ int MCCFRTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const
     auto actions = valid_actions(state, _mccfr_config.action_profile);
     std::vector<float> freq;
     if(state.get_round() == 0 && t > is_preflop_frozen(t)) {
-      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), *get_avg_strategy());
+      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), indexers, *get_avg_strategy());
     }
     else {
-      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), *get_regrets());
+      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), indexers, *get_regrets());
     }
     Action a = actions[sample_action_idx(freq)];
-    return traverse_mccfr_p(state.apply(a), t, i, board, hands, eval, debug);
+    return traverse_mccfr_p(state.apply(a), t, i, board, hands, indexers, eval, debug);
   }
 }
 
@@ -312,7 +331,7 @@ std::string relative_history_str(const PokerState& state, const PokerState& init
 }
 
 int MCCFRTrainer::traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-                                     const omp::HandEvaluator& eval, std::ostringstream& debug) {
+    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
     int u = utility(state, i, board, hands, _mccfr_config.poker.n_chips, eval);
     if(_log_level == BlueprintLogLevel::DEBUG) log_utility(u, state, hands, debug);
@@ -320,7 +339,7 @@ int MCCFRTrainer::traverse_mccfr(const PokerState& state, long t, int i, const B
   }
   else if(state.get_active() == i) {
     auto actions = valid_actions(state, _mccfr_config.action_profile);
-    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     if(_log_level == BlueprintLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
     size_t base_idx = get_regrets()->index(state, cluster);
     auto freq = calculate_strategy(*get_regrets(), base_idx, actions.size());
@@ -328,7 +347,7 @@ int MCCFRTrainer::traverse_mccfr(const PokerState& state, long t, int i, const B
     float v_exact = 0;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
-      int v_a = traverse_mccfr(state.apply(a), t, i, board, hands, eval, debug);
+      int v_a = traverse_mccfr(state.apply(a), t, i, board, hands, indexers, eval, debug);
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
       if(_log_level == BlueprintLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, debug);
@@ -352,14 +371,14 @@ int MCCFRTrainer::traverse_mccfr(const PokerState& state, long t, int i, const B
     auto actions = valid_actions(state, _mccfr_config.action_profile);
     std::vector<float> freq;
     if(state.get_round() == 0 && t > is_preflop_frozen(t)) {
-      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), *get_avg_strategy());
+      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), indexers, *get_avg_strategy());
     }
     else {
-      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), *get_regrets());
+      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), indexers, *get_regrets());
     }
     Action a = actions[sample_action_idx(freq)];
     if(_log_level == BlueprintLogLevel::DEBUG) log_external_sampling(a, actions, freq, state, debug);
-    return traverse_mccfr(state.apply(a), t, i, board, hands, eval, debug);
+    return traverse_mccfr(state.apply(a), t, i, board, hands, indexers, eval, debug);
   }
 }
 

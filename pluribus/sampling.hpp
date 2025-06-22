@@ -101,4 +101,6 @@ private:
   SamplingMode _mode = SamplingMode::AUTOMATIC;
 };
 
+Board sample_board(const std::vector<uint8_t>& init_board, uint64_t mask);
+
 }

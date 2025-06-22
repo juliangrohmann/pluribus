@@ -138,28 +138,31 @@ void call_update_strategy(BlueprintTrainer* trainer, const PokerState& state, in
   trainer->update_strategy(state, i, board, hands, debug);
 }
 
-int call_traverse_mccfr(MCCFRTrainer* trainer, const PokerState& state, int i, const Board& board, 
-                        const std::vector<Hand>& hands, const omp::HandEvaluator& eval, std::ostringstream& debug) {
-  return trainer->traverse_mccfr(state, 1, i, board, hands, eval, debug);
-}
+// int call_traverse_mccfr(MCCFRTrainer* trainer, const PokerState& state, int i, const Board& board, 
+//                         const std::vector<Hand>& hands, const omp::HandEvaluator& eval, std::ostringstream& debug) {
+//   return trainer->traverse_mccfr(state, 1, i, board, hands, eval, debug);
+// }
 
 }
 
-TEST_CASE("Blueprint trainer", "[mccfr]") {
-  PokerConfig config{6, 10'000, 0};
-  omp::HandEvaluator eval;
-  Board board{"AcTd2h3cQs"};
-  std::vector<Hand> hands{Hand{"AsQs"}, Hand{"5c5h"}, Hand{"Kh5d"}, Hand{"Ah3d"}, Hand{"9s9h"}, Hand{"QhJd"}};
-  BlueprintTrainer trainer{BlueprintTrainerConfig{}, MCCFRConfig{config}};
-  std::ostringstream debug;
+// TEST_CASE("Blueprint trainer", "[mccfr]") {
+//   PokerConfig config{6, 10'000, 0};
+//   omp::HandEvaluator eval;
+//   Board board{"AcTd2h3cQs"};
+//   std::vector<Hand> hands{Hand{"AsQs"}, Hand{"5c5h"}, Hand{"Kh5d"}, Hand{"Ah3d"}, Hand{"9s9h"}, Hand{"QhJd"}};
+//   // std::vector<Hand> hands{Hand{"AsQs"}, Hand{"5c5h"}};
+//   BlueprintTrainer trainer{BlueprintTrainerConfig{}, MCCFRConfig{config}};
+//   trainer.set_log_level(BlueprintLogLevel::NONE);
+//   // trainer.allocate_all();
+//   std::ostringstream debug;
 
-  BENCHMARK("Update strategy") {
-    call_update_strategy(&trainer, PokerState{config}, 0, board, hands, debug);
-  };
-  BENCHMARK("Traverse MCCFR") {
-    call_traverse_mccfr(&trainer, PokerState{config}, 0, board, hands, eval, debug);
-  };
-}
+//   BENCHMARK("Update strategy") {
+//     call_update_strategy(&trainer, PokerState{config}, 0, board, hands, debug);
+//   };
+//   BENCHMARK("Traverse MCCFR") {
+//     call_traverse_mccfr(&trainer, PokerState{config}, 0, board, hands, eval, debug);
+//   };
+// }
 
 TEST_CASE("GSL discrete sampling", "[sampling]") {
   auto sparse_range = PokerRange();

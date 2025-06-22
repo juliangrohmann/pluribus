@@ -147,4 +147,19 @@ void RoundSampler::next_sample(RoundSample& sample) {
   return _importance_walk.next_sample(sample);
 }
 
+Board sample_board(const std::vector<uint8_t>& init_board, uint64_t mask) {
+  Board board{init_board};
+  int board_idx = init_board.size();
+  uint64_t init_mask = mask;
+  while(board_idx < 5) {
+    uint8_t next_card = gsl_rng_uniform_int(GSLGlobalRNG::instance(), MAX_CARDS); // TODO: use Random.h fast uniform int
+    uint64_t curr_mask = card_mask(next_card);
+    if(!(init_mask & curr_mask)) {
+      board.set_card(board_idx++, next_card);
+      init_mask |= curr_mask;
+    }
+  }
+  return board;
+}
+
 }

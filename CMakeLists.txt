@@ -48,3 +48,6 @@ endif()
 
 add_executable(Benchmark benchmark/benchmark.cpp)
 target_link_libraries(Benchmark PRIVATE PluribusLib Catch2::Catch2WithMain)
+
+add_executable(BenchmarkMCCFR benchmark/benchmark_mccfr.cpp)
+target_link_libraries(BenchmarkMCCFR PRIVATE PluribusLib)

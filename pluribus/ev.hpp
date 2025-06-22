@@ -56,17 +56,7 @@ private:
     long t = 0;
     while(!_should_terminate(t, std_err, std::chrono::high_resolution_clock::now() - t_0)) {
       sampler.next_sample(sample);
-      Board board{init_board};
-      int board_idx = init_board.size();
-      uint64_t init_mask = sample.mask;
-      while(board_idx < 5) {
-        uint8_t next_card = gsl_rng_uniform_int(GSLGlobalRNG::instance(), MAX_CARDS);
-        uint64_t curr_mask = card_mask(next_card);
-        if(!(init_mask & curr_mask)) {
-          board.set_card(board_idx++, next_card);
-          init_mask |= curr_mask;
-        }
-      }
+      Board board = sample_board(init_board, sample.mask);
 
       std::vector<CachedIndexer> indexers(ranges.size(), CachedIndexer{});
       PokerState state = init_state;
