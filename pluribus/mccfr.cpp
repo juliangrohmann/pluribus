@@ -58,12 +58,12 @@ void BlueprintTrainerConfig::set_iterations(const BlueprintTimingConfig& timings
 }
 
 long BlueprintTrainerConfig::next_discount_step(long t, long T) const {
-  long next_disc = ((t + 1) / discount_interval + 1) * discount_interval;
+  long next_disc = (t / discount_interval + 1) * discount_interval;
   return next_disc < lcfr_thresh ? next_disc : T + 1;
 }
 
 long BlueprintTrainerConfig::next_snapshot_step(long t, long T) const {
-    long next_snap = std::max((t - preflop_threshold + 1) / snapshot_interval + 1, 0L) * snapshot_interval + preflop_threshold;
+    long next_snap = std::max((t - preflop_threshold) / snapshot_interval + 1, 0L) * snapshot_interval + preflop_threshold;
     return next_snap < T ? next_snap : T;
 }
 
