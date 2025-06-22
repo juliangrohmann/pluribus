@@ -56,24 +56,23 @@ public:
   }
   CardSet(const std::vector<uint8_t>& cards) { 
     std::copy(cards.begin(), cards.end(), _cards.begin()); 
-    update_mask(cards.size()); 
+    update_mask(0, cards.size()); 
   }
   CardSet(const std::initializer_list<uint8_t>& cards) { 
     std::copy(cards.begin(), cards.end(), _cards.begin()); 
-    update_mask(cards.size()); 
+    update_mask(0, cards.size()); 
   }
   CardSet(const std::string& card_str) { 
     str_to_cards(card_str, _cards.data()); 
-    update_mask(card_str.size() / 2); 
+    update_mask(0, card_str.size() / 2); 
   }
   CardSet(Deck& deck, const std::vector<uint8_t> init_cards = {}) { 
     deal(deck, init_cards); 
-    update_mask();
   }
 
   void set_card(int i, uint8_t card) {
     _cards[i] = card;
-    update_mask();
+    update_mask(i, i + 1);
   }
 
   bool collides(const CardSet<N>& other) const {
@@ -96,7 +95,7 @@ public:
   bool operator==(const CardSet<N>&) const = default;
 
 protected:
-  void update_mask(int n = N) {
+  void update_mask(int i = 0, int n = N) {
     _mask = 0L;
     for(int i = 0; i < n; ++i) _mask |= card_mask(_cards[i]);
   }
