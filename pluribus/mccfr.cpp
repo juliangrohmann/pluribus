@@ -143,9 +143,9 @@ void MCCFRTrainer::mccfr_p(long t_plus) {
 
   long T = _t + t_plus;
   Logger::log("MCCFRTrainer --- Initializing HandIndexer...");
-  Logger::log(HandIndexer::get_instance() ? "Success.\n" : "Failure.\n");
+  Logger::log(HandIndexer::get_instance() ? "Success." : "Failure.");
   Logger::log("MCCFRTrainer --- Initializing FlatClusterMap...");
-  Logger::log(FlatClusterMap::get_instance() ? "Success.\n" : "Failure.\n");
+  Logger::log(FlatClusterMap::get_instance() ? "Success." : "Failure.");
   Logger::log(_mccfr_config.to_string());
   on_start();
 
@@ -166,7 +166,7 @@ void MCCFRTrainer::mccfr_p(long t_plus) {
       thread_local Board board;
       thread_local std::vector<Hand> hands{static_cast<size_t>(_mccfr_config.poker.n_players)};
       thread_local std::ostringstream debug;
-      if(_log_level != BlueprintLogLevel::NONE) debug << "============== t = " << t << " ==============\n";
+      if(_log_level == BlueprintLogLevel::DEBUG) debug << "============== t = " << t << " ==============\n";
       // if(t % (_config.log_interval) == 0) log_metrics(t);
       if(should_log(t)) {
         std::ostringstream metrics_fn;
@@ -174,7 +174,7 @@ void MCCFRTrainer::mccfr_p(long t_plus) {
         write_to_file(_metrics_dir / metrics_fn.str(), build_wandb_metrics(t));
       }
       for(int i = 0; i < _mccfr_config.poker.n_players; ++i) {
-        if(_log_level != BlueprintLogLevel::NONE) debug << "============== i = " << i << " ==============\n";
+        if(_log_level == BlueprintLogLevel::DEBUG) debug << "============== i = " << i << " ==============\n";
         deck.shuffle();
         board.deal(deck, _mccfr_config.init_board);
         if(full_ranges) {
@@ -194,11 +194,11 @@ void MCCFRTrainer::mccfr_p(long t_plus) {
         on_step(t, i, hands, debug);
         // if(t > _config.prune_thresh) {
         if(should_prune(t)) {
-          if(_log_level != BlueprintLogLevel::NONE) debug << "============== Traverse MCCFR-P ==============\n";
+          if(_log_level == BlueprintLogLevel::DEBUG) debug << "============== Traverse MCCFR-P ==============\n";
           traverse_mccfr_p(_mccfr_config.init_state, t, i, board, hands, eval, debug);
         }
         else {
-          if(_log_level != BlueprintLogLevel::NONE) debug << "============== Traverse MCCFR ==============\n";
+          if(_log_level == BlueprintLogLevel::DEBUG) debug << "============== Traverse MCCFR ==============\n";
           traverse_mccfr(_mccfr_config.init_state, t, i, board, hands, eval, debug);
         }
       }
@@ -243,7 +243,7 @@ std::string info_str(const PokerState& state, int prev_r, int d_r, long t, const
 
 void MCCFRTrainer::error(const std::string& msg, const std::ostringstream& debug) const {
   std::string error_msg = msg;
-  if(_log_level != BlueprintLogLevel::NONE) {
+  if(_log_level == BlueprintLogLevel::DEBUG) {
     auto debug_dir = _log_dir / ("thread" + std::to_string(omp_get_thread_num()) + ".error");
     write_to_file(debug_dir, debug.str() + "\nRUNTIME ERROR: " + msg);
     error_msg += "\nDebug logs written to " + debug_dir.string();
@@ -255,13 +255,13 @@ int MCCFRTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const
                                        const omp::HandEvaluator& eval, std::ostringstream& debug) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
     int u = utility(state, i, board, hands, _mccfr_config.poker.n_chips, eval);
-    if(_log_level != BlueprintLogLevel::NONE) log_utility(u, state, hands, debug);
+    if(_log_level == BlueprintLogLevel::DEBUG) log_utility(u, state, hands, debug);
     return u;
   }
   else if(state.get_active() == i) {
     auto actions = valid_actions(state, _mccfr_config.action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
-    if(_log_level != BlueprintLogLevel::NONE) debug << "Cluster:" << cluster << "\n";
+    if(_log_level == BlueprintLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
     size_t base_idx = get_regrets()->index(state, cluster);
     auto freq = calculate_strategy(*get_regrets(), base_idx, actions.size());
 
@@ -273,14 +273,11 @@ int MCCFRTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const
         int v_a = traverse_mccfr_p(state.apply(a), t, i, board, hands, eval, debug);
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
-        if(_log_level != BlueprintLogLevel::NONE) log_action_ev(a, freq[a_idx], v_a, state, debug);
+        if(_log_level == BlueprintLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, debug);
       }
     }
     int v = round(v_exact);
-    if(_log_level != BlueprintLogLevel::NONE) log_net_ev(v, v_exact, state, debug);
-    if(abs(v) > (state.get_players().size() - 1) * _mccfr_config.poker.n_chips) {
-      error("EV too large!\nEV=" + std::to_string(v), debug);
-    }
+    if(_log_level == BlueprintLogLevel::DEBUG) log_net_ev(v, v_exact, state, debug);
     if(state.get_round() == 0 && is_preflop_frozen(t)) return v;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
@@ -291,7 +288,7 @@ int MCCFRTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const
         if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
         int total_r = std::max(next_r, REGRET_FLOOR);
         (*get_regrets())[base_idx + a_idx].store(total_r);
-        if(_log_level != BlueprintLogLevel::NONE) log_regret(actions[a_idx], d_r, total_r, debug);
+        if(_log_level == BlueprintLogLevel::DEBUG) log_regret(actions[a_idx], d_r, total_r, debug);
       }
     }
     return v;
@@ -306,7 +303,6 @@ int MCCFRTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const
       freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), *get_regrets());
     }
     Action a = actions[sample_action_idx(freq)];
-    
     return traverse_mccfr_p(state.apply(a), t, i, board, hands, eval, debug);
   }
 }
@@ -319,14 +315,13 @@ int MCCFRTrainer::traverse_mccfr(const PokerState& state, long t, int i, const B
                                      const omp::HandEvaluator& eval, std::ostringstream& debug) {
   if(state.is_terminal() || state.get_players()[i].has_folded()) {
     int u = utility(state, i, board, hands, _mccfr_config.poker.n_chips, eval);
-    if(_log_level != BlueprintLogLevel::NONE) log_utility(u, state, hands, debug);
-    if(abs(u) > (state.get_players().size() - 1) * _mccfr_config.poker.n_chips) error("Utility too large!", debug);
+    if(_log_level == BlueprintLogLevel::DEBUG) log_utility(u, state, hands, debug);
     return u;
   }
   else if(state.get_active() == i) {
     auto actions = valid_actions(state, _mccfr_config.action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
-    if(_log_level != BlueprintLogLevel::NONE) debug << "Cluster:" << cluster << "\n";
+    if(_log_level == BlueprintLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
     size_t base_idx = get_regrets()->index(state, cluster);
     auto freq = calculate_strategy(*get_regrets(), base_idx, actions.size());
     std::unordered_map<Action, int> values;
@@ -336,13 +331,10 @@ int MCCFRTrainer::traverse_mccfr(const PokerState& state, long t, int i, const B
       int v_a = traverse_mccfr(state.apply(a), t, i, board, hands, eval, debug);
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
-      if(_log_level != BlueprintLogLevel::NONE) log_action_ev(a, freq[a_idx], v_a, state, debug);
+      if(_log_level == BlueprintLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, debug);
     }
     int v = round(v_exact);
-    if(_log_level != BlueprintLogLevel::NONE) log_net_ev(v, v_exact, state, debug);
-    if(abs(v) > (state.get_players().size() - 1) * _mccfr_config.poker.n_chips) {
-      error("EV too large!\n" + state.get_action_history().to_string() + "\nEV=" + std::to_string(v), debug);
-    }
+    if(_log_level == BlueprintLogLevel::DEBUG) log_net_ev(v, v_exact, state, debug);
     if(state.get_round() == 0 && t > is_preflop_frozen(t)) return v;
 
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
@@ -352,7 +344,7 @@ int MCCFRTrainer::traverse_mccfr(const PokerState& state, long t, int i, const B
       if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
       int total_r = std::max(next_r, REGRET_FLOOR);
       (*get_regrets())[base_idx + a_idx].store(total_r);
-      if(_log_level != BlueprintLogLevel::NONE) log_regret(actions[a_idx], d_r, total_r, debug);
+      if(_log_level == BlueprintLogLevel::DEBUG) log_regret(actions[a_idx], d_r, total_r, debug);
     }
     return v;
   }
@@ -366,7 +358,7 @@ int MCCFRTrainer::traverse_mccfr(const PokerState& state, long t, int i, const B
       freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), *get_regrets());
     }
     Action a = actions[sample_action_idx(freq)];
-    if(_log_level != BlueprintLogLevel::NONE) log_external_sampling(a, actions, freq, state, debug);
+    if(_log_level == BlueprintLogLevel::DEBUG) log_external_sampling(a, actions, freq, state, debug);
     return traverse_mccfr(state.apply(a), t, i, board, hands, eval, debug);
   }
 }
@@ -417,9 +409,6 @@ void BlueprintTrainer::update_strategy(const PokerState& state, int i, const Boa
   else if(state.get_active() == i) {
     auto actions = valid_actions(state, get_config().action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
-    if(hands[i].cards()[0] % 4 == hands[i].cards()[1] % 4 && cluster < 91) {
-      error("Bad cluster for suited hand: " + hands[i].to_string(), debug);
-    }
     size_t regret_base_idx = _regrets.index(state, cluster);
     auto freq = calculate_strategy(_regrets, regret_base_idx, actions.size());
     int a_idx = sample_action_idx(freq);
