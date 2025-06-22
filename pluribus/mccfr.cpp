@@ -315,7 +315,7 @@ int MCCFRTrainer::traverse_mccfr_p(const PokerState& state, long t, int i, const
   else {
     auto actions = valid_actions(state, _mccfr_config.action_profile);
     std::vector<float> freq;
-    if(state.get_round() == 0 && t > is_preflop_frozen(t)) {
+    if(state.get_round() == 0 && is_preflop_frozen(t)) {
       freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), indexers, *get_avg_strategy());
     }
     else {
@@ -354,7 +354,7 @@ int MCCFRTrainer::traverse_mccfr(const PokerState& state, long t, int i, const B
     }
     int v = round(v_exact);
     if(_log_level == BlueprintLogLevel::DEBUG) log_net_ev(v, v_exact, state, debug);
-    if(state.get_round() == 0 && t > is_preflop_frozen(t)) return v;
+    if(state.get_round() == 0 && is_preflop_frozen(t)) return v;
 
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       int prev_r = (*get_regrets())[base_idx + a_idx].load();
@@ -370,7 +370,7 @@ int MCCFRTrainer::traverse_mccfr(const PokerState& state, long t, int i, const B
   else {
     auto actions = valid_actions(state, _mccfr_config.action_profile);
     std::vector<float> freq;
-    if(state.get_round() == 0 && t > is_preflop_frozen(t)) {
+    if(state.get_round() == 0 && is_preflop_frozen(t)) {
       freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), indexers, *get_avg_strategy());
     }
     else {
@@ -457,7 +457,7 @@ void BlueprintTrainer::on_start() {
 }
 
 void BlueprintTrainer::on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) {
-  if(t % _bp_config.strategy_interval == 0 && t < _bp_config.preflop_threshold) {
+  if(t > 0 && t % _bp_config.strategy_interval == 0 && t < _bp_config.preflop_threshold) {
     if(get_log_level() != BlueprintLogLevel::NONE) debug << "============== Updating strategy ==============\n";
     update_strategy(get_config().init_state, i, get_config().init_board, hands, debug);
   }
@@ -478,7 +478,7 @@ bool BlueprintTrainer::should_snapshot(long t, long T) const {
 }
 
 bool BlueprintTrainer::should_log(long t) const {
-  return t % _bp_config.log_interval == 0;
+  return t > 0 && t % _bp_config.log_interval == 0;
 }
 
 bool BlueprintTrainer::is_preflop_frozen(long t) const {

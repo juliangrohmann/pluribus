@@ -196,7 +196,7 @@ private:
 #endif
 
   MCCFRConfig _mccfr_config;
-  long _t = 1;
+  long _t = 0;
   std::filesystem::path _snapshot_dir = "snapshots";
   std::filesystem::path _metrics_dir = "metrics";
   std::filesystem::path _log_dir = "logs";
