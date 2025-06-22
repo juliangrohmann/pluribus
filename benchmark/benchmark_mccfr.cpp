@@ -46,6 +46,9 @@ int main(int argc, char* argv[]) {
     sampler.next_sample(sample);
     Board board = sample_board(config.init_board, sample.mask);
     std::vector<CachedIndexer> indexers(config.poker.n_players);
+    for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
+      indexers[h_idx].index(board, sample.hands[h_idx], 3);
+    }
     call_traverse_mccfr(&trainer, config.init_state, 0, board, sample.hands, indexers, eval, debug);
   }
 }
