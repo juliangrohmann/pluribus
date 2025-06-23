@@ -71,6 +71,22 @@ int main(int argc, char* argv[]) {
 
     }
   }
+  else if(command == "blueprint-cached") {
+    // ./Pluribus blueprint preflop_buf_fn final_bp_fn buf_dir out_fn
+    if(argc < 6) {
+      std::cout << "Missing arguments to build blueprint from cache.\n";
+    }
+    else {
+      LosslessBlueprint lossless_bp;
+      lossless_bp.build_cached(argv[2], argv[3], get_filepaths(argv[4]));
+      std::string lossless_fn = "lossless_" + std::string{argv[5]};
+      cereal_save(lossless_bp, lossless_fn);
+      SampledBlueprint sampled_bp;
+      sampled_bp.build(lossless_fn, argv[4]);
+      cereal_save(sampled_bp, "sampled_" + std::string{argv[5]});
+
+    }
+  }
   else if(command == "sampled-blueprint") {
     // ./Pluribus sampled-blueprint lossless_bp_fn buf_dir out_fn
     if(argc < 5) {
