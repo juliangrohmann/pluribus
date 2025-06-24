@@ -159,7 +159,7 @@ void LosslessBlueprint::build_cached(const std::string& preflop_buf_fn, const st
 void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
   set_config(meta.config);
   assign_freq(new StrategyStorage<float>{meta.config.action_profile, meta.n_clusters});
-  get_freq()->data().resize(meta.max_regrets);
+  get_freq()->allocate(meta.max_regrets);
   for(std::string buf_fn : meta.buffer_fns) {
     LosslessBuffer buf;
     cereal_load(buf, buf_fn);
