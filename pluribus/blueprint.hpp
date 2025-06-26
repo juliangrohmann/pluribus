@@ -51,7 +51,7 @@ private:
 
 class LosslessBlueprint : public Blueprint<float> {
 public:
-  void build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir = "");
+  void build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir = "", int max_gb = 50);
   void build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns);
 
 private:

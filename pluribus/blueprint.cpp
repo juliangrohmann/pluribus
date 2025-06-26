@@ -53,7 +53,7 @@ void set_meta_strategy_info(LosslessMetadata& meta, const StrategyStorage<int>& 
   Logger::log("New history map size: " + std::to_string(meta.history_map.size()));
 }
 
-LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir) {
+LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, int max_gb) {
   Logger::log("Building lossless buffers...");
   Logger::log("Preflop filename: " + preflop_fn);
   if(!validate_preflop_fn(preflop_fn, all_fns)) Logger::error("Preflop filename not found in all filenames.");
@@ -82,7 +82,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
     }
 
     std::vector<size_t> base_idxs = _collect_base_indexes(regrets);
-    size_t free_ram = get_free_ram();
+    size_t free_ram = std::min(get_free_ram(), max_gb * 1000LL * 1000LL * 1000LL);
     if(free_ram < 8 * pow(1024, 3)) {
       Logger::error("At least 8G free RAM required to build blueprint. Available (bytes): " + std::to_string(free_ram));
     }
@@ -146,9 +146,9 @@ LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std:
   return meta;
 }
 
-void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir) {
+void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, int max_gb) {
   Logger::log("Building lossless blueprint...");
-  build_from_meta_data(build_lossless_buffers(preflop_fn, all_fns, buf_dir));
+  build_from_meta_data(build_lossless_buffers(preflop_fn, all_fns, buf_dir, max_gb));
 }
 
 void LosslessBlueprint::build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns) {
