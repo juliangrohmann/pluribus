@@ -136,6 +136,21 @@ bool are_full_ranges(const std::vector<PokerRange>& ranges) {
   return true;
 }
 
+template <class T>
+void lcfr_discount(StrategyStorage<T>* regrets, double d) {
+  for(auto& e : regrets->data()) {
+    e.store(e.load() * d);
+  }
+}
+
+template <class T>
+std::vector<float> state_to_freq(const PokerState& state, const Board& board, const Hand& hand, 
+                            int n_actions, std::vector<CachedIndexer>& indexers, StrategyStorage<T>& strategy) {
+  int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hand, state.get_round()));
+  size_t base_idx = strategy.index(state, cluster);
+  return calculate_strategy(strategy, base_idx, n_actions);
+}
+
 void MCCFRTrainer::mccfr_p(long t_plus) {
   if(!create_dir(_snapshot_dir)) Logger::error("Failed to create snapshot dir: " + _snapshot_dir.string());
   if(!create_dir(_metrics_dir)) Logger::error("Failed to create metrics dir: " + _metrics_dir.string());

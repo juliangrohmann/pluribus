@@ -48,21 +48,6 @@ std::vector<float> calculate_strategy(const StrategyStorage<T>& data, size_t bas
   return freq;
 }
 
-template <class T>
-void lcfr_discount(StrategyStorage<T>* regrets, double d) {
-  for(auto& e : regrets->data()) {
-    e.store(e.load() * d);
-  }
-}
-
-template <class T>
-std::vector<float> state_to_freq(const PokerState& state, const Board& board, const Hand& hand, 
-                            int n_actions, std::vector<CachedIndexer>& indexers, StrategyStorage<T>& strategy) {
-  int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hand, state.get_round()));
-  size_t base_idx = strategy.index(state, cluster);
-  return calculate_strategy(strategy, base_idx, n_actions);
-}
-
 int sample_action_idx(const std::vector<float>& freq);
 int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, const omp::HandEvaluator& eval);
 
