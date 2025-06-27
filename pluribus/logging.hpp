@@ -13,7 +13,7 @@ public:
 
   void log(const std::string& msg, int debug = 0) const { 
     if(_debug >= debug) {
-      auto dir = _fn.stem();
+      auto dir = _fn.parent_path();
       if(!create_dir(dir)) throw std::runtime_error("Failed to create log directory \"" + dir.string() + "\"");
       std::string line = date_time_str("%m/%d/%Y %H:%M:%S") + ": " + msg + "\n";
       std::cout << line;
