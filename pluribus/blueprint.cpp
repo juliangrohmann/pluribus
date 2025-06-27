@@ -20,15 +20,6 @@
 
 namespace pluribus {
 
-struct LosslessMetadata {
-  MCCFRConfig config;
-  tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map;
-  std::vector<std::string> buffer_fns;
-  std::string preflop_buf_fn;
-  size_t max_regrets = 0;
-  int n_clusters = -1;
-};
-
 struct LosslessBuffer {
   std::vector<float> freqs;
   size_t offset;
@@ -46,7 +37,23 @@ bool validate_preflop_fn(const std::string& preflop_fn, const std::vector<std::s
   return false;
 }
 
-LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir) {
+void set_meta_config(LosslessMetadata& meta, const BlueprintTrainer& bp) {
+  meta.config = bp.get_config();
+  meta.n_clusters = bp.get_strategy().n_clusters();
+  Logger::log("Initialized blueprint config:");
+  Logger::log("n_clusters=" + std::to_string(meta.n_clusters));
+  Logger::log("max_actions=" + std::to_string(meta.config.action_profile.max_actions()));
+  Logger::log(meta.config.to_string());
+}
+
+void set_meta_strategy_info(LosslessMetadata& meta, const StrategyStorage<int>& regrets) {
+  meta.max_regrets = regrets.data().size();
+  Logger::log("New max regrets: " + std::to_string(meta.max_regrets));
+  meta.history_map = regrets.history_map();
+  Logger::log("New history map size: " + std::to_string(meta.history_map.size()));
+}
+
+LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, int max_gb) {
   Logger::log("Building lossless buffers...");
   Logger::log("Preflop filename: " + preflop_fn);
   if(!validate_preflop_fn(preflop_fn, all_fns)) Logger::error("Preflop filename not found in all filenames.");
@@ -64,28 +71,18 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
     cereal_load(bp, all_fns[bp_idx]);
     const auto& regrets = bp.get_strategy();
     if(bp_idx == 0) {
-      meta.config = bp.get_config();
-      meta.n_clusters = regrets.n_clusters();
-      Logger::log("Initialized blueprint config:");
-      Logger::log("n_clusters=" + std::to_string(meta.n_clusters));
-      Logger::log("max_actions=" + std::to_string(meta.config.action_profile.max_actions()));
-      Logger::log(meta.config.to_string());
+      set_meta_config(meta, bp);
     }
-
     if(regrets.data().size() > meta.max_regrets) {
-      meta.max_regrets = regrets.data().size();
-      Logger::log("New max regrets: " + std::to_string(meta.max_regrets));
-      meta.history_map = regrets.history_map();
-      Logger::log("New history map size: " + std::to_string(meta.history_map.size()));
+      set_meta_strategy_info(meta, regrets);
     }
-
     if(all_fns[bp_idx] == preflop_fn) {
       Logger::log("Found preflop blueprint. Storing phi...");
       cereal_save(bp.get_phi(), meta.preflop_buf_fn);
     }
 
     std::vector<size_t> base_idxs = _collect_base_indexes(regrets);
-    size_t free_ram = get_free_ram();
+    size_t free_ram = std::min(get_free_ram(), max_gb * 1000LL * 1000LL * 1000LL);
     if(free_ram < 8 * pow(1024, 3)) {
       Logger::error("At least 8G free RAM required to build blueprint. Available (bytes): " + std::to_string(free_ram));
     }
@@ -126,25 +123,46 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       bidx_start = bidx_end;
 
       Logger::log("Saving buffer " + std::to_string(buf_idx) + "...");
-      std::string fn = "lossless_buf_" + std::to_string(buf_idx++) + ".bin";
+      std::string fn = (buffer_dir / ("lossless_buf_" + std::to_string(buf_idx++) + ".bin")).string();
       meta.buffer_fns.push_back(fn);
-      cereal_save(buffer, (buffer_dir / fn).string());
+      cereal_save(buffer, fn);
       Logger::log("Saved buffer " + std::to_string(buf_idx - 1) + " successfully.");
     }
   }
   return meta;
 }
 
-void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir) {
+LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns) {
+  Logger::log("Collecting lossless meta data...");
+  Logger::log("Preflop buffer file: " + preflop_buf_fn);
+  Logger::log("Final blueprint file: " + final_bp_fn);
+  LosslessMetadata meta;
+  meta.preflop_buf_fn = preflop_buf_fn;
+  meta.buffer_fns = buffer_fns;
+  BlueprintTrainer final_bp;
+  cereal_load(final_bp, final_bp_fn);
+  set_meta_config(meta, final_bp);
+  set_meta_strategy_info(meta, final_bp.get_strategy());
+  return meta;
+}
+
+void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, int max_gb) {
   Logger::log("Building lossless blueprint...");
-  std::filesystem::path buffer_dir = buf_dir;
-  LosslessMetadata meta = build_lossless_buffers(preflop_fn, all_fns, buf_dir);
+  build_from_meta_data(build_lossless_buffers(preflop_fn, all_fns, buf_dir, max_gb));
+}
+
+void LosslessBlueprint::build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns) {
+  Logger::log("Building lossless blueprint from cached buffers...");
+  build_from_meta_data(collect_meta_data(preflop_buf_fn, final_bp_fn, buffer_fns));
+}
+
+void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
   set_config(meta.config);
   assign_freq(new StrategyStorage<float>{meta.config.action_profile, meta.n_clusters});
-  get_freq()->data().resize(meta.max_regrets);
+  get_freq()->allocate(meta.max_regrets);
   for(std::string buf_fn : meta.buffer_fns) {
     LosslessBuffer buf;
-    cereal_load(buf, (buffer_dir / buf_fn).string());
+    cereal_load(buf, buf_fn);
     Logger::log("Accumulating " + buf_fn + ": [" + std::to_string(buf.offset) + ", " + std::to_string(buf.offset + buf.freqs.size()) + ")");
     #pragma omp parallel for schedule(static)
     for(size_t idx = 0; idx < buf.freqs.size(); ++idx) {

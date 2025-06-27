@@ -71,6 +71,16 @@ public:
   inline tbb::concurrent_unordered_map<ActionHistory, HistoryEntry>& history_map() { return _history_map; }
   inline const ActionProfile& action_profile() const { return _action_profile; }
   inline int n_clusters() const { return _n_clusters; }
+  
+  void allocate(size_t size) {
+    std::cout << "Allocating concurrent vector to size " + std::to_string(size);
+    const size_t CHUNK = (size_t(1) * 1024 * 1024 * 1024) / sizeof(T);
+    while(_data.size() < size) {
+      size_t this_chunk = std::min(CHUNK, size - _data.size());
+      _data.grow_to_at_least(_data.size() + this_chunk);
+    }
+    std::cout << "Concurrent vector allocated. New size=" + std::to_string(_data.size());
+  }
 
   std::atomic<T>& operator[](size_t idx) { 
     if(idx >= _data.size()) throw std::runtime_error("Storage access out of bounds.");

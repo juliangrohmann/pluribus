@@ -14,6 +14,15 @@
 
 namespace pluribus {
 
+struct LosslessMetadata {
+  MCCFRConfig config;
+  tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map;
+  std::vector<std::string> buffer_fns;
+  std::string preflop_buf_fn;
+  size_t max_regrets = 0;
+  int n_clusters = -1;
+};
+
 template <class T>
 class Blueprint : public Strategy<T> {
 public:
@@ -42,11 +51,11 @@ private:
 
 class LosslessBlueprint : public Blueprint<float> {
 public:
-  void build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir = "");
-  double enumerate_ev(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) const;
+  void build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir = "", int max_gb = 50);
+  void build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns);
 
 private:
-  double node_ev(const PokerState& state, int i, const std::vector<Hand>& hands, const Board& board, int stack_size, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const;
+  void build_from_meta_data(const LosslessMetadata& meta);
 };
 
 std::vector<float> biased_freq(const std::vector<Action>& actions, const std::vector<float>& freq, Action bias, float factor);
