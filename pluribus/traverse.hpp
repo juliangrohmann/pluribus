@@ -11,6 +11,7 @@
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/range_viewer.hpp>
+#include <pluribus/decision.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/blueprint.hpp>
 
@@ -20,21 +21,11 @@ void traverse_trainer(RangeViewer* viewer_p, const std::string& bp_fn);
 void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn);
 Action str_to_action(const std::string& str);
 void render_ranges(RangeViewer* viewer_p, const PokerRange& base_range, const std::unordered_map<Action, RenderableRange>& action_ranges);
+PokerRange build_action_range(const PokerRange& base_range, const Action& a, const PokerState& state, const Board& board,
+    const DecisionAlgorithm& decision);
+void update_ranges(std::vector<PokerRange>& ranges, Action a, const PokerState& state, const Board& board, 
+    const DecisionAlgorithm& decision); 
 std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const Board& board, const Strategy<float>& strat);
-
-template <class T>
-PokerRange build_action_range(const PokerRange& base_range, const Action& a, const PokerState& state, const Board& board, const StrategyStorage<T>& strat, const ActionProfile& profile) {
-  auto actions = valid_actions(state, profile);
-  PokerRange rel_range;
-  for(const auto& hand : base_range.hands()) {
-    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
-    int base_idx = strat.index(state, cluster);
-    auto freq = calculate_strategy(strat, base_idx, actions.size());
-    int a_idx = std::distance(actions.begin(), std::find(actions.begin(), actions.end(), a));
-    rel_range.add_hand(hand, freq[a_idx]);
-  }
-  return rel_range;
-}
 
 template <class T>
 std::unordered_map<Action, RenderableRange> build_renderable_ranges(const StrategyStorage<T>& strat, const ActionProfile& profile, 
@@ -43,8 +34,9 @@ std::unordered_map<Action, RenderableRange> build_renderable_ranges(const Strate
   auto actions = valid_actions(state, profile);
   auto color_map = map_colors(actions);
   base_range.remove_cards(board.as_vector(n_board_cards(state.get_round())));
+  StrategyDecision decision{strat, profile};
   for(Action a : actions) {
-    PokerRange action_range = build_action_range(base_range, a, state, board, strat, profile);
+    PokerRange action_range = build_action_range(base_range, a, state, board, decision);
     ranges.insert({a, RenderableRange{base_range * action_range, a.to_string(), color_map[a], true}});
   }
   return ranges;

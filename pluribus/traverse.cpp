@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <unordered_map>
 #include <vector>
+#include <functional>
 #include <pluribus/range.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/poker.hpp>
@@ -42,13 +43,27 @@ void render_ranges(RangeViewer* viewer_p, const PokerRange& base_range, const st
   viewer_p->render(ranges);
 }
 
+PokerRange build_action_range(const PokerRange& base_range, const Action& a, const PokerState& state, const Board& board,
+    const DecisionAlgorithm& decision) {
+  PokerRange rel_range;
+  for(const auto& hand : base_range.hands()) {
+    rel_range.add_hand(hand, decision.frequency(a, state, board, hand));
+  }
+  return rel_range;
+}
+
+void update_ranges(std::vector<PokerRange>& ranges, Action a, const PokerState& state, const Board& board, 
+    const DecisionAlgorithm& decision) {
+  auto action_range = build_action_range(ranges[state.get_active()], a, state, board, decision);
+  ranges[state.get_active()] *= action_range;
+}
+
 std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const Board& board, const Strategy<float>& strat) {
   PokerState curr_state = strat.get_config().init_state;
   std::vector<PokerRange> ranges = strat.get_config().init_ranges;
+  StrategyDecision decision{strat.get_strategy(), strat.get_config().action_profile};
   for(int aidx = 0; aidx < actions.size(); ++aidx) {
-    auto action_range = build_action_range(ranges[curr_state.get_active()], actions[aidx], curr_state, board, 
-                                      strat.get_strategy(), strat.get_config().action_profile);
-    ranges[curr_state.get_active()] *= action_range;
+    update_ranges(ranges, actions[aidx], curr_state, board, decision);
     if(aidx != actions.size() - 1) {
       curr_state = curr_state.apply(actions[aidx]); // don't apply last action to avoid incrementing the round before card removal
     }
