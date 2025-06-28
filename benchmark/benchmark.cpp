@@ -133,7 +133,7 @@ TEST_CASE("OCHS features", "[ochs]") {
 
 namespace pluribus {
 
-void call_update_strategy(BlueprintTrainer* trainer, const PokerState& state, int i, const Board& board, 
+void call_update_strategy(BlueprintSolver* trainer, const PokerState& state, int i, const Board& board, 
                           const std::vector<Hand>& hands, std::ostringstream& debug) {
   trainer->update_strategy(state, i, board, hands, debug);
 }
@@ -151,8 +151,8 @@ void call_update_strategy(BlueprintTrainer* trainer, const PokerState& state, in
 //   Board board{"AcTd2h3cQs"};
 //   std::vector<Hand> hands{Hand{"AsQs"}, Hand{"5c5h"}, Hand{"Kh5d"}, Hand{"Ah3d"}, Hand{"9s9h"}, Hand{"QhJd"}};
 //   // std::vector<Hand> hands{Hand{"AsQs"}, Hand{"5c5h"}};
-//   BlueprintTrainer trainer{BlueprintTrainerConfig{}, MCCFRConfig{config}};
-//   trainer.set_log_level(BlueprintLogLevel::NONE);
+//   BlueprintSolver trainer{BlueprintSolverConfig{}, SolverConfig{config}};
+//   trainer.set_log_level(SolverLogLevel::NONE);
 //   // trainer.allocate_all();
 //   std::ostringstream debug;
 

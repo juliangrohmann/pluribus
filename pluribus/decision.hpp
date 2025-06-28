@@ -23,7 +23,9 @@ public:
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
     int base_idx = _strategy.index(state, cluster);
     auto freq = calculate_strategy(_strategy, base_idx, actions.size());
-    int a_idx = std::distance(actions.begin(), std::find(actions.begin(), actions.end(), a));
+    auto a_it = std::find(actions.begin(), actions.end(), a);
+    if(a_it == actions.end()) Logger::error("Action " + a.to_string() + " is not in the action profile or not valid.");
+    int a_idx = std::distance(actions.begin(), a_it);
     return freq[a_idx];
   }
 

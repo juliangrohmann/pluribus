@@ -8,7 +8,7 @@ using namespace pluribus;
 
 namespace pluribus {
 
-int call_traverse_mccfr(MCCFRTrainer* trainer, const PokerState& state, int i, const Board& board, 
+int call_traverse_mccfr(MCCFRSolver* trainer, const PokerState& state, int i, const Board& board, 
     const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug) {
   return trainer->traverse_mccfr(state, 1, i, board, hands, indexers, eval, debug);
 }
@@ -18,10 +18,10 @@ int call_traverse_mccfr(MCCFRTrainer* trainer, const PokerState& state, int i, c
 int main(int argc, char* argv[]) {
   long n = argc > 1 ? atoi(argv[1]) : 1'000'000'000L;
 
-  MCCFRConfig config{2, 10'000, 0};
+  SolverConfig config{2, 10'000, 0};
   omp::HandEvaluator eval;
-  BlueprintTrainer trainer{BlueprintTrainerConfig{}, config};
-  trainer.set_log_level(BlueprintLogLevel::NONE);
+  BlueprintSolver trainer{BlueprintSolverConfig{}, config};
+  trainer.set_log_level(SolverLogLevel::NONE);
   trainer.allocate_all();
   std::ostringstream debug;
 

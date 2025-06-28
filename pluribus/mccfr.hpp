@@ -51,13 +51,13 @@ std::vector<float> calculate_strategy(const StrategyStorage<T>& data, size_t bas
 int sample_action_idx(const std::vector<float>& freq);
 int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, const omp::HandEvaluator& eval);
 
-struct MCCFRConfig {
-  MCCFRConfig(int n_players = 2, int n_chips = 10'000, int ante = 0);
-  MCCFRConfig(const PokerConfig& poker_);
+struct SolverConfig {
+  SolverConfig(int n_players = 2, int n_chips = 10'000, int ante = 0);
+  SolverConfig(const PokerConfig& poker_);
 
   std::string to_string() const;
 
-  bool operator==(const MCCFRConfig& other) const = default;
+  bool operator==(const SolverConfig& other) const = default;
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -71,76 +71,68 @@ struct MCCFRConfig {
   PokerState init_state;
 };
 
-struct BlueprintTimingConfig {
-  long preflop_threshold_m = 800;
-  long snapshot_interval_m = 200;
-  long prune_thresh_m = 200;
-  long lcfr_thresh_m = 400;
-  long discount_interval_m = 10;
-  long log_interval_m = 1;
+enum class SolverState {
+  UNDEFINED, INTERRUPT, SOLVING, SOLVED
 };
 
-struct BlueprintTrainerConfig {
-  BlueprintTrainerConfig();
+class ConfigProvider {
+public:
+  virtual const SolverConfig& get_config() const = 0;
+  virtual ~ConfigProvider() = default;
+};
 
-  std::string to_string() const;
+class Solver : public ConfigProvider {
+public:
+  Solver(const SolverConfig& config);
 
-  void set_iterations(const BlueprintTimingConfig& timings, long it_per_min);
-  long next_discount_step(long t, long T) const;
-  long next_snapshot_step(long t, long T) const;
-  bool is_discount_step(long t) const;
-  bool is_snapshot_step(long t, long T) const;
+  const SolverConfig& get_config() const override { return _config; }
+  SolverState get_state() { return _state; }; 
+  void solve(long t_plus);
+  virtual float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const = 0;
 
-  bool operator==(const BlueprintTrainerConfig& other) const = default;
-
-  template <class Archive>
-  void serialize(Archive& ar) {
-    ar(strategy_interval, preflop_threshold, snapshot_interval, prune_thresh, lcfr_thresh, discount_interval, log_interval);
-  }
-
-  long strategy_interval = 10'000;
-  long preflop_threshold;
-  long snapshot_interval;
-  long prune_thresh;
-  long lcfr_thresh;
-  long discount_interval;
-  long log_interval;
+protected:
+  virtual void _solve(long t_plus) = 0;
+  
+private:
+  SolverState _state = SolverState::UNDEFINED;
+  SolverConfig _config;
 };
 
 template<class T>
-class Strategy {
+class Strategy : public ConfigProvider {
 public:
   virtual const StrategyStorage<T>& get_strategy() const = 0;
-  virtual const MCCFRConfig& get_config() const = 0;
 };
 
-enum class BlueprintLogLevel : int {
+enum class SolverLogLevel : int {
   NONE = 0,
   ERRORS = 1,
   DEBUG = 2
 };
 
-class MCCFRTrainer : public Strategy<int> {
+class MCCFRSolver : public Strategy<int>, public Solver {
 public:
-  MCCFRTrainer(const MCCFRConfig& mccfr_config);
-  
-  void mccfr_p(long t_plus);
+  MCCFRSolver(const SolverConfig& config);
+
   void allocate_all();
 
-  const MCCFRConfig& get_config() const { return _mccfr_config; }
+  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const;
+  const SolverConfig& get_config() const override { return Solver::get_config(); }
   void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
   void set_metrics_dir(std::string metrics_dir) { _metrics_dir = metrics_dir; }
   void set_log_dir(std::string log_dir) { _log_dir = log_dir; }
-  void set_log_level(BlueprintLogLevel log_level) { _log_level = log_level; }
+  void set_log_level(SolverLogLevel log_level) { _log_level = log_level; }
 
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_t);
   }
 
-  virtual ~MCCFRTrainer();
+  virtual ~MCCFRSolver();
   
 protected:
+  void _solve(long t_plus) override;
+
   virtual void on_start() {}
   virtual void on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) {}
 
@@ -160,7 +152,7 @@ protected:
   void error(const std::string& msg, const std::ostringstream& debug) const;
 
   long get_iteration() const { return _t; }
-  BlueprintLogLevel get_log_level() const { return _log_level; }
+  SolverLogLevel get_log_level() const { return _log_level; }
 
 private:
   int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
@@ -176,29 +168,64 @@ private:
   void log_external_sampling(Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq,
                              const PokerState& state, std::ostringstream& debug) const;
 #ifdef UNIT_TEST
-  friend int call_traverse_mccfr(MCCFRTrainer* trainer, const PokerState& state, int i, const Board& board, 
+  friend int call_traverse_mccfr(MCCFRSolver* trainer, const PokerState& state, int i, const Board& board, 
       const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug);
 #endif
 
-  MCCFRConfig _mccfr_config;
   long _t = 0;
   std::filesystem::path _snapshot_dir = "snapshots";
   std::filesystem::path _metrics_dir = "metrics";
   std::filesystem::path _log_dir = "logs";
-  BlueprintLogLevel _log_level = BlueprintLogLevel::ERRORS;
+  SolverLogLevel _log_level = SolverLogLevel::ERRORS;
 };
 
-class BlueprintTrainer : public MCCFRTrainer {
-public:
-  BlueprintTrainer(const BlueprintTrainerConfig& bp_config = BlueprintTrainerConfig{}, const MCCFRConfig& mccfr_config = MCCFRConfig{});
-  bool operator==(const BlueprintTrainer& other) const;
-  const StrategyStorage<int>& get_strategy() const { return _regrets; }
-  const StrategyStorage<float>& get_phi() const { return _phi; }
-  const BlueprintTrainerConfig& get_blueprint_config() const { return _bp_config; }
+struct BlueprintTimingConfig {
+  long preflop_threshold_m = 800;
+  long snapshot_interval_m = 200;
+  long prune_thresh_m = 200;
+  long lcfr_thresh_m = 400;
+  long discount_interval_m = 10;
+  long log_interval_m = 1;
+};
+
+struct BlueprintSolverConfig {
+  BlueprintSolverConfig();
+
+  std::string to_string() const;
+
+  void set_iterations(const BlueprintTimingConfig& timings, long it_per_min);
+  long next_discount_step(long t, long T) const;
+  long next_snapshot_step(long t, long T) const;
+  bool is_discount_step(long t) const;
+  bool is_snapshot_step(long t, long T) const;
+
+  bool operator==(const BlueprintSolverConfig& other) const = default;
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_regrets, _phi, _bp_config, cereal::base_class<MCCFRTrainer>(this));
+    ar(strategy_interval, preflop_threshold, snapshot_interval, prune_thresh, lcfr_thresh, discount_interval, log_interval);
+  }
+
+  long strategy_interval = 10'000;
+  long preflop_threshold;
+  long snapshot_interval;
+  long prune_thresh;
+  long lcfr_thresh;
+  long discount_interval;
+  long log_interval;
+};
+
+class BlueprintSolver : public MCCFRSolver {
+public:
+  BlueprintSolver(const BlueprintSolverConfig& bp_config = BlueprintSolverConfig{}, const SolverConfig& mccfr_config = SolverConfig{});
+  bool operator==(const BlueprintSolver& other) const;
+  const StrategyStorage<int>& get_strategy() const { return _regrets; }
+  const StrategyStorage<float>& get_phi() const { return _phi; }
+  const BlueprintSolverConfig& get_blueprint_config() const { return _bp_config; }
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_regrets, _phi, _bp_config, cereal::base_class<MCCFRSolver>(this));
   }
 
 protected:
@@ -222,13 +249,28 @@ private:
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, std::ostringstream& debug);
 
 #ifdef UNIT_TEST
-  friend void call_update_strategy(BlueprintTrainer* trainer, const PokerState& state, int i, const Board& board,
+  friend void call_update_strategy(BlueprintSolver* trainer, const PokerState& state, int i, const Board& board,
                                    const std::vector<Hand>& hands, std::ostringstream& debug);
 #endif
 
   StrategyStorage<int> _regrets;
   StrategyStorage<float> _phi;
-  BlueprintTrainerConfig _bp_config;
+  BlueprintSolverConfig _bp_config;
+};
+
+class SampledBlueprint;
+
+class RealTimeMCCFR : public Solver {
+public:
+  RealTimeMCCFR(const SolverConfig& config, const std::shared_ptr<const SampledBlueprint> bp) : Solver{config}, _bp{bp} {}
+  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const override;
+
+protected:
+  void _solve(long t_plus) override;
+
+private:
+  const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
+  std::unique_ptr<StrategyStorage<int>> _regrets = nullptr;
 };
 
 }

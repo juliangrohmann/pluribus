@@ -15,7 +15,7 @@ namespace pluribus {
 
 void traverse_trainer(RangeViewer* viewer_p, const std::string& bp_fn) {
   std::cout << "Loading trainer from " << bp_fn << " for traversal... " << std::flush;
-  BlueprintTrainer bp;
+  BlueprintSolver bp;
   cereal_load(bp, bp_fn);
   std::cout << "Success.\n";
   traverse(viewer_p, bp);

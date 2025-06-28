@@ -15,7 +15,7 @@
 namespace pluribus {
 
 struct LosslessMetadata {
-  MCCFRConfig config;
+  SolverConfig config;
   tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map;
   std::vector<std::string> buffer_fns;
   std::string preflop_buf_fn;
@@ -32,8 +32,8 @@ public:
     if(_freq) return *_freq;
     throw std::runtime_error("Blueprint strategy is null.");
   }
-  const MCCFRConfig& get_config() const { return _config; }
-  void set_config(MCCFRConfig config) { _config = config; }
+  const SolverConfig& get_config() const { return _config; }
+  void set_config(SolverConfig config) { _config = config; }
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -46,7 +46,7 @@ protected:
 
 private:
   std::unique_ptr<StrategyStorage<T>> _freq;
-  MCCFRConfig _config;
+  SolverConfig _config;
 };
 
 class LosslessBlueprint : public Blueprint<float> {
