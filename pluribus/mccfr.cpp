@@ -87,6 +87,7 @@ bool are_full_ranges(const std::vector<PokerRange>& ranges) {
 
 template <class T>
 void lcfr_discount(StrategyStorage<T>* regrets, double d) {
+  #pragma omp parallel for schedule(static, 1024)
   for(auto& e : regrets->data()) {
     e.store(e.load() * d);
   }
