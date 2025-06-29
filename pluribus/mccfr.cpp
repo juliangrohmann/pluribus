@@ -543,7 +543,7 @@ std::string RealTimeMCCFR::build_wandb_metrics(long t) const {
   };
   log_strategy(get_strategy(), get_config(), metrics, false);
   auto t_f = std::chrono::high_resolution_clock::now();  
-  auto dt = std::chrono::duration_cast<std::chrono::microseconds>(t_f - t_i);
+  auto dt = std::chrono::duration_cast<std::chrono::microseconds>(t_f - t_i).count();
   buf << std::setw(8) << dt << " us (metrics)";
   Logger::dump(buf);
   return metrics.dump();
