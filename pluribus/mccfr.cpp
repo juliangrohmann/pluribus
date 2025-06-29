@@ -505,7 +505,7 @@ int RealTimeMCCFR::terminal_utility(const PokerState& state, int i, const Board&
   while(!state.is_terminal() && !state.get_players()[i].has_folded()) {
     curr_state = curr_state.apply(_action_provider.next_action(indexers[state.get_active()], state, hands, board, _bp.get()));
   }
-  int u = utility(curr_state, i, board, hands, stack_size, eval);
+  return utility(curr_state, i, board, hands, stack_size, eval);
 }
 
 std::vector<Action> RealTimeMCCFR::available_actions(const PokerState& state, const ActionProfile& profile) const {
