@@ -10,21 +10,8 @@
 
 namespace pluribus {
 
-std::string Action::to_string() const {
-  if(_bet_type == -7.0f) return "Undefined";
-  if(_bet_type == -6.0f) return "Bias: Fold";
-  if(_bet_type == -5.0f) return "Bias: Call";
-  if(_bet_type == -4.0f) return "Bias: Raise";
-  if(_bet_type == -3.0f) return "Bias: None";
-  if(_bet_type == -2.0f) return "All-in";
-  if(_bet_type == -1.0f) return "Fold";
-  if(_bet_type == 0.0f) return "Check/Call";
-  std::ostringstream oss; 
-  oss << "Bet " << std::setprecision(0) << std::fixed << _bet_type * 100.0f << "%";
-  return oss.str();
-}
-
-const Action Action::UNDEFINED{-7.0f};
+const Action Action::UNDEFINED{-8.0f};
+const Action Action::BIAS_DUMMY{-7.0f};
 const Action Action::BIAS_FOLD{-6.0f};
 const Action Action::BIAS_CALL{-5.0f};
 const Action Action::BIAS_RAISE{-4.0f};
@@ -32,6 +19,26 @@ const Action Action::BIAS_NONE{-3.0f};
 const Action Action::ALL_IN{-2.0f};
 const Action Action::FOLD{-1.0f};
 const Action Action::CHECK_CALL{0.0f};
+
+std::string Action::to_string() const {
+  if(_bet_type == Action::UNDEFINED._bet_type) return "Undefined";
+  if(_bet_type == Action::BIAS_DUMMY._bet_type) return "Bias dummy";
+  if(_bet_type == Action::BIAS_FOLD._bet_type) return "Bias: Fold";
+  if(_bet_type == Action::BIAS_CALL._bet_type) return "Bias: Call";
+  if(_bet_type == Action::BIAS_RAISE._bet_type) return "Bias: Raise";
+  if(_bet_type == Action::BIAS_NONE._bet_type) return "Bias: None";
+  if(_bet_type == Action::ALL_IN._bet_type) return "All-in";
+  if(_bet_type == Action::FOLD._bet_type) return "Fold";
+  if(_bet_type == Action::CHECK_CALL._bet_type) return "Check/Call";
+  std::ostringstream oss; 
+  oss << "Bet " << std::setprecision(0) << std::fixed << _bet_type * 100.0f << "%";
+  return oss.str();
+}
+
+bool is_bias(Action a) {
+  return a.get_bet_type() == Action::BIAS_FOLD || a.get_bet_type() == Action::BIAS_CALL || 
+      a.get_bet_type() == Action::BIAS_RAISE || a.get_bet_type() == Action::BIAS_NONE;
+}
 
 ActionHistory ActionHistory::slice(int start, int end) const { 
   return ActionHistory{std::vector<Action>{_history.begin() + start, end != -1 ? _history.begin() + end : _history.end()}}; 
@@ -69,6 +76,20 @@ void ActionProfile::add_action(const Action& action, int round, int bet_level, i
   if(bet_level >= _profile[round].size()) _profile[round].resize(bet_level + 1);
   if(pos >= _profile[round][bet_level].size()) _profile[round][bet_level].resize(pos + 1);
   _profile[round][bet_level][pos].push_back(action);
+}
+
+std::unordered_set<Action> ActionProfile::all_actions() const {
+  std::unordered_set<Action> actions;
+  for(auto& round : _profile) {
+    for(auto& level : round) {
+      for(auto& pos : level) {
+        for(Action a : pos) {
+          actions.insert(a);
+        }
+      }
+    }
+  }
+  return actions;
 }
 
 int ActionProfile::max_actions() const {

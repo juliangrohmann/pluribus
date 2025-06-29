@@ -29,6 +29,7 @@ public:
   }
 
   static const Action UNDEFINED;
+  static const Action BIAS_DUMMY;
   static const Action BIAS_FOLD;
   static const Action BIAS_CALL;
   static const Action BIAS_RAISE;
@@ -40,6 +41,8 @@ public:
 private:
   float _bet_type;
 };
+
+bool is_bias(Action a);
 
 class ActionHistory {
 public:
@@ -73,6 +76,7 @@ public:
   const std::vector<Action>& get_actions(int round, int bet_level, int pos, int pot) const;
   void add_action(const Action& action, int round, int bet_level, int pos);
   int n_bet_levels(int round) const { return _profile[round].size(); }
+  std::unordered_set<Action> all_actions() const;
   int max_actions() const;
   std::string to_string() const;
 

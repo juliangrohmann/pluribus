@@ -118,6 +118,10 @@ Solution Pluribus::solution(const PokerState& state, const Hand& hand) {
   return solution;
 }
 
+int terminal_round(const PokerState& root) { 
+  return root.get_round() >= 2 || (root.get_round() == 1 && root.active_players() == 2) ? 4 : root.get_round() + 1;
+}
+
 void Pluribus::_init_solver() {
   Logger::log("Initializing solver: RealTimeMCCFR");
   SolverConfig config{_sampled_bp->get_config().poker};
@@ -125,7 +129,10 @@ void Pluribus::_init_solver() {
   config.init_board = _board;
   config.init_ranges = _ranges;
   config.action_profile = _live_profile;
-  _solver = std::unique_ptr<Solver>{new RealTimeMCCFR{config, _sampled_bp}};
+  RealTimeSolverConfig rt_config;
+  rt_config.terminal_round = terminal_round(_root_state);
+  rt_config.terminal_bet_level = 999;
+  _solver = std::unique_ptr<Solver>{new RealTimeMCCFR{config, rt_config, _sampled_bp}};
 }
 
 bool can_solve(const PokerState& root) {

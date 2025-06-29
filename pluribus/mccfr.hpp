@@ -18,67 +18,16 @@
 #include <pluribus/poker.hpp>
 #include <pluribus/indexing.hpp>
 #include <pluribus/cluster.hpp>
+#include <pluribus/decision.hpp>
+#include <pluribus/config.hpp>
 #include <pluribus/storage.hpp>
-
 
 namespace pluribus {
 
-template <class T>
-std::vector<float> calculate_strategy(const StrategyStorage<T>& data, size_t base_idx, int n_actions) {
-  std::vector<float> freq;
-  freq.reserve(n_actions);
-  float sum = 0;
-  for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-    float value = std::max(static_cast<float>(data[base_idx + a_idx].load()), 0.0f);
-    freq.push_back(value);
-    sum += value;
-  }
-
-  if(sum > 0) {
-    for(auto& f : freq) {
-      f /= sum;
-    }
-  }
-  else {
-    float uni = 1.0f / n_actions;
-    for(auto& f : freq) {
-      f = uni;
-    }
-  }
-  return freq;
-}
-
-int sample_action_idx(const std::vector<float>& freq);
 int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, const omp::HandEvaluator& eval);
-
-struct SolverConfig {
-  SolverConfig(int n_players = 2, int n_chips = 10'000, int ante = 0);
-  SolverConfig(const PokerConfig& poker_);
-
-  std::string to_string() const;
-
-  bool operator==(const SolverConfig& other) const = default;
-
-  template <class Archive>
-  void serialize(Archive& ar) {
-    ar(poker, action_profile, init_ranges, init_board, init_state);
-  }
-
-  PokerConfig poker;
-  ActionProfile action_profile;
-  std::vector<PokerRange> init_ranges;
-  std::vector<uint8_t> init_board;
-  PokerState init_state;
-};
 
 enum class SolverState {
   UNDEFINED, INTERRUPT, SOLVING, SOLVED
-};
-
-class ConfigProvider {
-public:
-  virtual const SolverConfig& get_config() const = 0;
-  virtual ~ConfigProvider() = default;
 };
 
 class Solver : public ConfigProvider {
@@ -98,12 +47,6 @@ private:
   SolverConfig _config;
 };
 
-template<class T>
-class Strategy : public ConfigProvider {
-public:
-  virtual const StrategyStorage<T>& get_strategy() const = 0;
-};
-
 enum class SolverLogLevel : int {
   NONE = 0,
   ERRORS = 1,
@@ -112,7 +55,7 @@ enum class SolverLogLevel : int {
 
 class MCCFRSolver : public Strategy<int>, public Solver {
 public:
-  MCCFRSolver(const SolverConfig& config);
+  MCCFRSolver(const SolverConfig& config) : Solver{config} {}
 
   void allocate_all();
 
@@ -128,11 +71,16 @@ public:
     ar(_t);
   }
 
-  virtual ~MCCFRSolver();
+  virtual ~MCCFRSolver() = default;
   
 protected:
   void _solve(long t_plus) override;
-
+  
+  virtual int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const { return utility(state, i, board, hands, stack_size, eval); }
+  virtual bool is_terminal(const PokerState& state) const { return state.is_terminal(); }
+  virtual std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const { return valid_actions(state, profile); }
+  
   virtual void on_start() {}
   virtual void on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) {}
 
@@ -150,7 +98,10 @@ protected:
 
   virtual std::string build_wandb_metrics(long t) const = 0;
   void error(const std::string& msg, const std::ostringstream& debug) const;
-
+  
+  template <class T>
+  void log_strategy(const StrategyStorage<T>& strat, const SolverConfig& config, nlohmann::json& metrics, bool phi) const;
+  
   long get_iteration() const { return _t; }
   SolverLogLevel get_log_level() const { return _log_level; }
 
@@ -179,42 +130,6 @@ private:
   SolverLogLevel _log_level = SolverLogLevel::ERRORS;
 };
 
-struct BlueprintTimingConfig {
-  long preflop_threshold_m = 800;
-  long snapshot_interval_m = 200;
-  long prune_thresh_m = 200;
-  long lcfr_thresh_m = 400;
-  long discount_interval_m = 10;
-  long log_interval_m = 1;
-};
-
-struct BlueprintSolverConfig {
-  BlueprintSolverConfig();
-
-  std::string to_string() const;
-
-  void set_iterations(const BlueprintTimingConfig& timings, long it_per_min);
-  long next_discount_step(long t, long T) const;
-  long next_snapshot_step(long t, long T) const;
-  bool is_discount_step(long t) const;
-  bool is_snapshot_step(long t, long T) const;
-
-  bool operator==(const BlueprintSolverConfig& other) const = default;
-
-  template <class Archive>
-  void serialize(Archive& ar) {
-    ar(strategy_interval, preflop_threshold, snapshot_interval, prune_thresh, lcfr_thresh, discount_interval, log_interval);
-  }
-
-  long strategy_interval = 10'000;
-  long preflop_threshold;
-  long snapshot_interval;
-  long prune_thresh;
-  long lcfr_thresh;
-  long discount_interval;
-  long log_interval;
-};
-
 class BlueprintSolver : public MCCFRSolver {
 public:
   BlueprintSolver(const BlueprintSolverConfig& bp_config = BlueprintSolverConfig{}, const SolverConfig& mccfr_config = SolverConfig{});
@@ -229,20 +144,20 @@ public:
   }
 
 protected:
-  void on_start() override;
+  void on_start() override { Logger::log("Blueprint solver config:\n" + _bp_config.to_string()); }
   void on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) override;
 
   bool should_prune(long t) const override;
-  bool should_discount(long t) const override;
-  bool should_snapshot(long t, long T) const override;
-  bool should_log(long t) const override;
-  bool is_preflop_frozen(long t) const override;
+  bool should_discount(long t) const override { return _bp_config.is_discount_step(t); }
+  bool should_snapshot(long t, long T) const override { return _bp_config.is_snapshot_step(t, T); }
+  bool should_log(long t) const override { return t > 0 && t % _bp_config.log_interval == 0; }
+  bool is_preflop_frozen(long t) const override { return t > _bp_config.preflop_threshold; }
   long next_step(long t, long T) const override;
 
   StrategyStorage<int>* get_regrets() override { return &_regrets; }
   StrategyStorage<float>* get_avg_strategy() override { return &_phi; }
 
-  double get_discount_factor(long t) const override;
+  double get_discount_factor(long t) const override { return _bp_config.get_discount_factor(t); }
   std::string build_wandb_metrics(long t) const override;
 
 private:
@@ -260,17 +175,38 @@ private:
 
 class SampledBlueprint;
 
-class RealTimeMCCFR : public Solver {
+class RealTimeMCCFR : public MCCFRSolver {
 public:
-  RealTimeMCCFR(const SolverConfig& config, const std::shared_ptr<const SampledBlueprint> bp) : Solver{config}, _bp{bp} {}
-  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const override;
+  RealTimeMCCFR(const SolverConfig& config, RealTimeSolverConfig rt_config, const std::shared_ptr<const SampledBlueprint> bp);
+  const StrategyStorage<int>& get_strategy() const { return _regrets; }
 
 protected:
-  void _solve(long t_plus) override;
+
+  int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
+    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const override;
+  bool is_terminal(const PokerState& state) const override;
+  std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const override;
+
+  void on_start() override { Logger::log("Real time solver config:\n" + _rt_config.to_string()); }
+  bool should_prune(long t) const override { return false; /* TODO: test pruning */ }
+  bool should_discount(long t) const override { return t % _rt_config.discount_interval == 0; }
+  bool should_snapshot(long t, long T) const override { return false; }
+  bool should_log(long t) const override { return t % _rt_config.log_interval == 0; }
+  bool is_preflop_frozen(long t) const override { return false; }
+  long next_step(long t, long T) const override { return _rt_config.next_discount_step(t, T); }
+  
+  StrategyStorage<int>* get_regrets() override { return &_regrets; };
+  StrategyStorage<float>* get_avg_strategy() override { return nullptr; };
+
+  double get_discount_factor(long t) const override { return _rt_config.get_discount_factor(t); }
+
+  std::string build_wandb_metrics(long t) const override;
 
 private:
   const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
-  std::unique_ptr<StrategyStorage<int>> _regrets = nullptr;
+  StrategyStorage<int> _regrets;
+  RealTimeSolverConfig _rt_config;
+  SampledActionProvider _action_provider;
 };
 
 }

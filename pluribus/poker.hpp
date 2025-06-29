@@ -209,10 +209,13 @@ public:
   inline uint8_t get_round() const { return _round; }
   inline uint8_t get_bet_level() const { return _bet_level; }
   inline int8_t get_winner() const { return _winner; }
+  inline const std::vector<Action> get_biases() const { return _biases; }
   inline bool is_terminal() const { return get_winner() != -1 || get_round() >= 4; };
   int active_players() const;
   PokerState apply(Action action) const;
   PokerState apply(const ActionHistory& action_history) const;
+  PokerState apply_biases(const std::vector<Action>& biases) const;
+  bool has_biases() const { return _biases.size() > _active && _biases[_active] != Action::BIAS_DUMMY; }
   std::string to_string() const;
   
   template <class Archive>
@@ -220,8 +223,11 @@ public:
     ar(_players, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner);
   }
 
+  uint8_t _first_bias; // TODO: remove, just for asserts
+
 private:
   std::vector<Player> _players;
+  std::vector<Action> _biases;
   ActionHistory _actions;
   int _pot;
   int _max_bet;
@@ -234,9 +240,11 @@ private:
   PokerState call() const;
   PokerState check() const;
   PokerState fold() const;
+  PokerState bias(Action bias) const;
   PokerState next_state(Action action) const;
   void next_player();
   void next_round();
+  void next_bias();
 };
 
 int total_bet_size(const PokerState& state, Action action);

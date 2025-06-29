@@ -132,6 +132,7 @@ PokerState PokerState::next_state(Action action) const {
   if(action == Action::ALL_IN) return bet(player.get_chips());
   if(action == Action::FOLD) return fold();
   if(action == Action::CHECK_CALL) return player.get_betsize() == _max_bet ? check() : call();
+  if(is_bias(action)) return bias(action);
   return bet(total_bet_size(*this, action) - player.get_betsize());
 }
 
@@ -154,6 +155,13 @@ PokerState PokerState::apply(const ActionHistory& action_history) const {
   for(int i = 0; i < action_history.size(); ++i) {
     state = state.apply(action_history.get(i));
   }
+  return state;
+}
+
+PokerState PokerState::apply_biases(const std::vector<Action>& biases) const {
+  if(biases.size() != _players.size()) throw std::runtime_error("Number of biases to apply does not match number of players.");
+  PokerState state = *this;
+  state._biases = biases;
   return state;
 }
 
@@ -262,6 +270,17 @@ PokerState PokerState::fold() const {
   return state;
 }
 
+PokerState PokerState::bias(Action bias) const {
+  PokerState state = *this;
+  if(state._biases.size() == 0) {
+    state._first_bias = state._active;
+    state._biases.resize(state._players.size(), Action::BIAS_DUMMY);
+  }
+  state._biases[state.get_active()] = bias;
+  state.next_bias();
+  return state;
+}
+
 uint8_t increment(uint8_t i, uint8_t max_val) {
   return ++i > max_val ? 0 : i;
 }
@@ -289,8 +308,6 @@ int round_of_last_action(const PokerState& state) {
 }
 
 void PokerState::next_player() {
-  uint8_t init_player_idx = _active;
-  bool all_in = false;
   do {
     _active = increment(_active, _players.size() - 1);
     if(is_round_complete(*this)) {
@@ -298,6 +315,13 @@ void PokerState::next_player() {
       return;
     }
   } while((_players[_active].has_folded() || _players[_active].get_chips() == 0));
+}
+
+void PokerState::next_bias() {
+  uint8_t init_player_idx = _active;
+  do {
+    _active = increment(_active, _players.size() - 1);
+  } while(_active != init_player_idx && (_players[_active].has_folded() || _biases[_active] != Action::BIAS_DUMMY));
 }
 
 int total_bet_size(const PokerState& state, Action action) {
@@ -321,7 +345,7 @@ std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& 
   valid.reserve(actions.size());
   const Player& player = state.get_players()[state.get_active()];
   for(Action a : actions) {
-    if(a == Action::CHECK_CALL || a == Action::BIAS_NONE || a == Action::BIAS_FOLD || a == Action::BIAS_CALL || a == Action::BIAS_RAISE) {
+    if(a == Action::CHECK_CALL) {
       valid.push_back(a);
       continue;
     }

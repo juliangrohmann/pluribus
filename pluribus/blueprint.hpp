@@ -10,7 +10,7 @@
 #include <pluribus/sampling.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/storage.hpp>
-#include <pluribus/mccfr.hpp>
+#include <pluribus/config.hpp>
 
 namespace pluribus {
 
@@ -61,21 +61,25 @@ private:
 std::vector<float> biased_freq(const std::vector<Action>& actions, const std::vector<float>& freq, Action bias, float factor);
 void _validate_ev_inputs(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board);
 
+struct SampledMetadata {
+  SolverConfig config;
+  std::vector<std::string> buffer_fns;
+  std::vector<ActionHistory> histories;
+  std::vector<Action> biases;
+  int n_clusters = -1;
+};
+
 class SampledBlueprint : public Blueprint<Action> {
 public:
   void build(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor = 5.0f);
-};
+  Action decompress_action(uint8_t action_idx) const { return _idx_to_action[action_idx]; };
+  int bias_offset(Action bias) const { return _bias_to_offset.at(bias); };
 
-template<class T>
-std::vector<size_t> _collect_base_indexes(const StrategyStorage<T>& strategy) {
-  std::vector<size_t> base_idxs;
-  base_idxs.reserve(strategy.history_map().size());
-  for(const auto& entry : strategy.history_map()) {
-    base_idxs.push_back(entry.second.idx);
-  }
-  base_idxs.push_back(strategy.data().size());
-  std::sort(base_idxs.begin(), base_idxs.end());
-  return base_idxs;
-}
+private:
+  SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, const ActionProfile& bias_profile, float factor);
+
+  std::vector<Action> _idx_to_action;
+  std::unordered_map<Action, int> _bias_to_offset;
+};
 
 }

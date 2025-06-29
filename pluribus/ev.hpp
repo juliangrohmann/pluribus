@@ -3,6 +3,7 @@
 #include <pluribus/poker.hpp>
 #include <pluribus/range.hpp>
 
+
 namespace pluribus {
 
 using Duration = std::chrono::high_resolution_clock::duration;
@@ -12,12 +13,6 @@ inline double standard_deviation(double S, double w_sum) { return pow(S / w_sum,
 void update_stats(int x, double w, double& mean, double& w_sum, double& w_sum2, double& S); 
 double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, int i, const std::vector<PokerRange>& ranges, 
     const std::vector<uint8_t>& init_board);
-
-template <class T>
-class _ActionProvider {
-public:
-  virtual Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board, const Blueprint<T>* bp) const = 0;
-};
 
 struct ResultEV {
   double ev;
@@ -44,9 +39,9 @@ public:
 private:
   bool _should_terminate(long t, double std_err, Duration dt);
   
-  template <class T>
+  template <class BlueprintT>
   ResultEV _monte_carlo_ev(const PokerState& init_state, int i, const std::vector<PokerRange>& ranges, 
-    const std::vector<uint8_t>& init_board, int stack_size, const _ActionProvider<T>& action_provider, const Blueprint<T>* bp) {
+    const std::vector<uint8_t>& init_board, int stack_size, const ActionProvider<BlueprintT>& action_provider, const BlueprintT* bp) {
     _validate_ev_inputs(init_state, i, ranges, init_board);
     RoundSampler sampler{ranges, init_board};
     omp::HandEvaluator eval;
@@ -60,7 +55,7 @@ private:
 
       std::vector<CachedIndexer> indexers(ranges.size(), CachedIndexer{});
       PokerState state = init_state;
-      while(!state.is_terminal()) {
+      while(!state.is_terminal() && !state.get_players()[i].has_folded()) {
         state = state.apply(action_provider.next_action(indexers[state.get_active()], state, sample.hands, board, bp));
       }
       int u = utility(state, i, board, sample.hands, stack_size, eval);

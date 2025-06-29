@@ -53,6 +53,18 @@ void set_meta_strategy_info(LosslessMetadata& meta, const StrategyStorage<int>& 
   Logger::log("New history map size: " + std::to_string(meta.history_map.size()));
 }
 
+template<class T>
+std::vector<size_t> _collect_base_indexes(const StrategyStorage<T>& strategy) {
+  std::vector<size_t> base_idxs;
+  base_idxs.reserve(strategy.history_map().size());
+  for(const auto& entry : strategy.history_map()) {
+    base_idxs.push_back(entry.second.idx);
+  }
+  base_idxs.push_back(strategy.data().size());
+  std::sort(base_idxs.begin(), base_idxs.end());
+  return base_idxs;
+}
+
 LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, int max_gb) {
   Logger::log("Building lossless buffers...");
   Logger::log("Preflop filename: " + preflop_fn);
@@ -221,13 +233,29 @@ void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
   Logger::log("Lossless blueprint built.");
 }
 
-struct SampledMetadata {
-  SolverConfig config;
-  std::vector<std::string> buffer_fns;
-  std::vector<ActionHistory> histories;
-  std::vector<Action> biases;
-  int n_clusters = -1;
-};
+std::unordered_map<Action, uint8_t> build_compression_map(const ActionProfile& profile) {
+  Logger::log("Building action compression map...");
+  std::unordered_map<Action, uint8_t> compression_map;
+  uint8_t idx = 0;
+  for(Action a : profile.all_actions()) {
+    Logger::log(a.to_string() + " -> " + std::to_string(static_cast<int>(idx)));
+    compression_map[a] = idx++;
+  }
+  return compression_map;
+}
+
+std::vector<Action> build_decompression_map(std::unordered_map<Action, uint8_t> compression_map) {
+  Logger::log("Building action decompression map...");
+  std::vector<Action> decompression_map(compression_map.size(), Action::UNDEFINED);
+  for(const auto& entry : compression_map) {
+    Logger::log(std::to_string(static_cast<int>(entry.second)) + " -> " + entry.first.to_string());
+    decompression_map[entry.second] = entry.first;
+  }
+  for(int i = 0; i < decompression_map.size(); ++i) {
+    if(decompression_map[i] == Action::UNDEFINED) Logger::error("Unmapped compressed action idx: " + std::to_string(i));
+  }
+  return decompression_map;
+}
 
 std::vector<float> biased_freq(const std::vector<Action>& actions, const std::vector<float>& freq, Action bias, float factor) {
   std::vector<float> biased_freq;
@@ -267,16 +295,18 @@ Action sample_biased(const std::vector<Action>& actions, const std::vector<float
   return actions[dist(GlobalRNG::instance())];
 }
 
-SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, float factor) {
+SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, 
+    const ActionProfile& bias_profile, float factor) {
   std::cout << "Building sampled buffers...\n";
   SampledMetadata meta;
   std::filesystem::path buffer_dir = buf_dir;
   LosslessBlueprint bp;
   cereal_load(bp, lossless_bp_fn);
   meta.config = bp.get_config();
-  BiasActionProfile bias_profile;
   meta.biases = bias_profile.get_actions(0, 0, 0, 150);
   meta.n_clusters = bp.get_strategy().n_clusters();
+  auto action_to_idx = build_compression_map(bp.get_config().action_profile);
+  _idx_to_action = build_decompression_map(action_to_idx);
 
   std::cout << "Collecting histories... " << std::flush;
   meta.histories.reserve(bp.get_strategy().history_map().size());
@@ -308,11 +338,11 @@ SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const s
 
   std::cout << "Clusters=" << meta.n_clusters << ", Biases=" << meta.biases.size() << "\n";
   std::cout << "Building buffers...\n";
-  std::unordered_map<ActionHistory, std::vector<Action>> buffer;
+  std::unordered_map<ActionHistory, std::vector<uint8_t>> buffer;
   long long min_ram = 4 * pow(1024, 3);
   int buf_idx = 0;
   for(size_t hidx = 0; hidx < meta.histories.size(); ++hidx) {
-    std::vector<Action> sampled;
+    std::vector<uint8_t> sampled;
     sampled.reserve(meta.n_clusters * meta.biases.size());
     for(int c = 0; c < meta.n_clusters; ++c) {
       PokerState state = init_state.apply(meta.histories[hidx]);
@@ -320,7 +350,7 @@ SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const s
       size_t base_idx = bp.get_strategy().index(state, c);
       auto freq = calculate_strategy(bp.get_strategy(), base_idx, actions.size());
       for(Action bias : meta.biases) {
-        sampled.push_back(sample_biased(actions, freq, bias, factor));
+        sampled.push_back(action_to_idx[sample_biased(actions, freq, bias, factor)]);
       }
     }
     buffer[meta.histories[hidx]] = sampled;
@@ -338,10 +368,23 @@ SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const s
   return meta;
 }
 
+std::unordered_map<Action, int> build_bias_offset_map(const ActionProfile& bias_profile) {
+  Logger::log("Building bias offsets...");
+  std::unordered_map<Action, int> bias_offset_map;
+  const std::vector<Action>& all_biases = bias_profile.get_actions(0, 0, 0, 0);
+  for(const auto& bias : all_biases) {
+    bias_offset_map[bias] = std::distance(all_biases.begin(), std::find(all_biases.begin(), all_biases.end(), bias));
+    Logger::log(bias.to_string() + " -> " + std::to_string(bias_offset_map[bias]));
+  }
+  return bias_offset_map;
+}
+
 void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor) {
-  SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, bias_factor);
+  Logger::log("Building sampled blueprint...");
+  BiasActionProfile bias_profile;
+  SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, bias_profile, bias_factor);
   std::filesystem::path buffer_dir = buf_dir;
-  assign_freq(new StrategyStorage<Action>(BiasActionProfile{}, meta.n_clusters));
+  assign_freq(new StrategyStorage<Action>(bias_profile, meta.n_clusters));
   for(const auto& fn : meta.buffer_fns) {
     std::unordered_map<ActionHistory, std::vector<Action>> buffer;
     cereal_load(buffer, (buffer_dir / fn).string());
@@ -358,6 +401,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   std::cout << "Stored histories: " << get_freq()->history_map().size() << "\n";
   std::cout << "Data size: " << get_freq()->data().size() << "\n";
   std::cout << "Sampled blueprint built.\n";
+  _bias_to_offset = build_bias_offset_map(bias_profile);
 }
 
 }

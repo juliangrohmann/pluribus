@@ -15,6 +15,7 @@
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/indexing.hpp>
 #include <pluribus/history_index.hpp>
+#include <pluribus/config.hpp>
 #include <pluribus/actions.hpp>
 
 namespace pluribus {
@@ -155,6 +156,12 @@ private:
   int _n_clusters;
   std::mutex _grow_mutex;
   std::condition_variable _grow_cv;
+};
+
+template<class T>
+class Strategy : public ConfigProvider {
+public:
+  virtual const StrategyStorage<T>& get_strategy() const = 0;
 };
 
 }
