@@ -20,7 +20,7 @@ Action BlueprintAgent::act(const PokerState& state, const Board& board, const Ha
   auto actions = valid_actions(state, _trainer_p->get_config().action_profile);
   int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
   size_t base_idx = _trainer_p->get_strategy().index(state, cluster);
-  auto freq = calculate_strategy(_trainer_p->get_strategy(), base_idx, actions.size());
+  auto freq = calculate_strategy(&_trainer_p->get_strategy()[base_idx], actions.size());
   return actions[sample_action_idx(freq)];
 }
 

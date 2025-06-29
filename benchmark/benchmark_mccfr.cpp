@@ -8,9 +8,10 @@ using namespace pluribus;
 
 namespace pluribus {
 
-int call_traverse_mccfr(MCCFRSolver* trainer, const PokerState& state, int i, const Board& board, 
+template <template<typename> class StorageT>
+int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state, int i, const Board& board, 
     const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug) {
-  return trainer->traverse_mccfr(state, 1, i, board, hands, indexers, eval, debug);
+  return trainer->traverse_mccfr(state, 1, i, board, hands, indexers, eval, trainer->init_regret_storage(), trainer->init_avg_storage(), debug);
 }
 
 }
@@ -22,8 +23,8 @@ int main(int argc, char* argv[]) {
   omp::HandEvaluator eval;
   BlueprintSolver trainer{BlueprintSolverConfig{}, config};
   trainer.set_log_level(SolverLogLevel::NONE);
-  trainer.allocate_all();
   std::ostringstream debug;
+  // TODO: allocate all storage nodes
 
   // preload cache
   HandIndexer::get_instance();

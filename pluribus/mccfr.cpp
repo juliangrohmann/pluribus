@@ -64,11 +64,6 @@ void Solver::solve(long t_plus) {
 // || MCCFRSolver
 // ==========================================================================================
 
-float MCCFRSolver::frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const {
-  StrategyDecision decision{get_strategy(), get_config().action_profile};
-  return decision.frequency(action, state, board, hand);
-}
-
 std::string action_str(const std::vector<Action>& actions) {
   std::string str;
   for(Action a : actions) {
@@ -86,22 +81,12 @@ bool are_full_ranges(const std::vector<PokerRange>& ranges) {
 }
 
 template <class T>
-void lcfr_discount(StrategyStorage<T>* regrets, double d) {
-  #pragma omp parallel for schedule(static, 1024)
-  for(auto& e : regrets->data()) {
-    e.store(e.load() * d);
-  }
+std::vector<float> state_to_freq(std::atomic<T>* base_ptr, int n_actions) {
+  return calculate_strategy(base_ptr, n_actions);
 }
 
-template <class T>
-std::vector<float> state_to_freq(const PokerState& state, const Board& board, const Hand& hand, 
-                            int n_actions, std::vector<CachedIndexer>& indexers, StrategyStorage<T>& strategy) {
-  int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hand, state.get_round()));
-  size_t base_idx = strategy.index(state, cluster);
-  return calculate_strategy(strategy, base_idx, n_actions);
-}
-
-void MCCFRSolver::_solve(long t_plus) {
+template <template<typename> class StorageT>
+void MCCFRSolver<StorageT>::_solve(long t_plus) {
   if(!create_dir(_snapshot_dir)) Logger::error("Failed to create snapshot dir: " + _snapshot_dir.string());
   if(!create_dir(_metrics_dir)) Logger::error("Failed to create metrics dir: " + _metrics_dir.string());
   if(!create_dir(_log_dir)) Logger::error("Failed to create log dir: " + _log_dir.string());
@@ -164,11 +149,11 @@ void MCCFRSolver::_solve(long t_plus) {
         // if(t > _config.prune_thresh) {
         if(should_prune(t)) {
           if(_log_level == SolverLogLevel::DEBUG) debug << "============== Traverse MCCFR-P ==============\n";
-          traverse_mccfr_p(get_config().init_state, t, i, board, hands, indexers, eval, debug);
+          traverse_mccfr_p(get_config().init_state, t, i, board, hands, indexers, eval, init_regret_storage(), init_avg_storage(), debug);
         }
         else {
           if(_log_level == SolverLogLevel::DEBUG) debug << "============== Traverse MCCFR ==============\n";
-          traverse_mccfr(get_config().init_state, t, i, board, hands, indexers, eval, debug);
+          traverse_mccfr(get_config().init_state, t, i, board, hands, indexers, eval, init_regret_storage(), init_avg_storage(), debug);
         }
       }
       if(_log_level == SolverLogLevel::DEBUG) {
@@ -188,8 +173,9 @@ void MCCFRSolver::_solve(long t_plus) {
       double d = get_discount_factor(_t);
       buf << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
       Logger::dump(buf);
-      lcfr_discount(get_regrets(), d);
-      if(get_avg_strategy()) lcfr_discount(get_avg_strategy(), d);
+      init_regret_storage()->lcfr_discount(d);
+      StorageT<float>* init_avg = init_avg_storage();
+      if(init_avg) init_avg->lcfr_discount(d);
     }
     if(should_snapshot(_t, T)) {
       std::ostringstream fn_stream;
@@ -202,21 +188,6 @@ void MCCFRSolver::_solve(long t_plus) {
   Logger::log("============== Blueprint training complete ==============");
 }
 
-void MCCFRSolver::_allocate_state(const PokerState& state) {
-  if(is_terminal(state)) return;
-  size_t idx = get_regrets()->index(state, 0);
-  (*get_regrets())[idx] = 0;
-  for(Action a : available_actions(state, get_config().action_profile)) {
-    _allocate_state(state.apply(a));
-  }
-}
-
-void MCCFRSolver::allocate_all() {
-  Logger::log("Allocating all MCCFR regrets...");
-  _allocate_state(get_config().init_state);
-  Logger::log("Allocated successfully");
-}
-
 std::string info_str(const PokerState& state, int prev_r, int d_r, long t, const Board& board, const std::vector<Hand>& hands) {
   std::string str = "r=" + std::to_string(prev_r) + " + " + std::to_string(d_r) + "\nt=" + 
          std::to_string(t) + "\nBoard=" + board.to_string() + "\nHands=";
@@ -225,7 +196,8 @@ std::string info_str(const PokerState& state, int prev_r, int d_r, long t, const
   return str;
 }
 
-void MCCFRSolver::error(const std::string& msg, const std::ostringstream& debug) const {
+template <template<typename> class StorageT>
+void MCCFRSolver<StorageT>::error(const std::string& msg, const std::ostringstream& debug) const {
   std::string error_msg = msg;
   if(_log_level == SolverLogLevel::DEBUG) {
     auto debug_dir = _log_dir / ("thread" + std::to_string(omp_get_thread_num()) + ".error");
@@ -235,39 +207,81 @@ void MCCFRSolver::error(const std::string& msg, const std::ostringstream& debug)
   Logger::error(error_msg);
 }
 
-int MCCFRSolver::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug) {
+std::string relative_history_str(const PokerState& state, const PokerState& init_state) {
+  return state.get_action_history().slice(init_state.get_action_history().size()).to_string();
+}
+
+void log_utility(int utility, const PokerState& state, const PokerState& init_state, const std::vector<Hand>& hands, std::ostringstream& debug) {
+  debug << "Terminal: " << relative_history_str(state, init_state) << "\n";
+  debug << "\tHands: ";
+  for(int p_idx = 0; p_idx < state.get_players().size(); ++p_idx) {
+    debug << hands[p_idx].to_string() << " ";
+  }
+  debug << "\n";
+  debug << "\tu(z) = " << utility << "\n";
+}
+
+void log_action_ev(Action a, float freq, int ev, const PokerState& state, const PokerState& init_state, std::ostringstream& debug) {
+  debug << "Action EV: " << relative_history_str(state, init_state) << "\n";
+  debug << "\tu(" << a.to_string() << ") @ " << std::setprecision(2) << std::fixed << freq << " = " << ev << "\n";
+}
+
+void log_net_ev(int ev, float ev_exact, const PokerState& state, const PokerState& init_state, std::ostringstream& debug) {
+  debug << "Net EV: " << relative_history_str(state, init_state) << "\n";
+  debug << "\tu(sigma) = " << std::setprecision(2) << std::fixed << ev << " (exact=" << ev_exact << ")\n";
+  if(state.get_round() == 0) debug << "Preflop frozen, skipping regret update.\n";
+}
+
+void log_regret(Action a, int d_r, int next_r, std::ostringstream& debug) {
+  debug << "\tR(" << a.to_string() << ") = " << d_r << "\n";
+  debug << "\tcum R(" << a.to_string() << ") = " << next_r << "\n";
+}
+
+void log_external_sampling(Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq, const PokerState& state, 
+    const PokerState& init_state, std::ostringstream& debug) {
+  debug << "Sampling: " << relative_history_str(state, init_state) << "\n\t";
+  for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
+    debug << std::setprecision(2) << std::fixed << actions[a_idx].to_string() << "=" << freq[a_idx] << " ";
+  }
+  debug << "\n";
+  debug << "\tSampled: " << sampled.to_string() << "\n";
+}
+
+template <template<typename> class StorageT>
+int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
+    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
+    std::ostringstream& debug) {
   if(is_terminal(state) || state.get_players()[i].has_folded()) {
     int u = terminal_utility(state, i, board, hands, get_config().poker.n_chips, indexers, eval);
-    if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, hands, debug);
+    if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, get_config().init_state, hands, debug);
     return u;
   }
   else if(state.get_active() == i) {
     auto actions = available_actions(state, get_config().action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     if(_log_level == SolverLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
-    size_t base_idx = get_regrets()->index(state, cluster);
-    auto freq = calculate_strategy(*get_regrets(), base_idx, actions.size());
+    std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
+    auto freq = calculate_strategy(base_ptr, actions.size());
 
     std::unordered_map<Action, int> values;
     float v_exact = 0;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
-      if((*get_regrets())[base_idx + a_idx].load() > PRUNE_CUTOFF) {
-        int v_a = traverse_mccfr_p(state.apply(a), t, i, board, hands, indexers, eval, debug);
+      if(base_ptr[a_idx].load() > PRUNE_CUTOFF) {
+        int v_a = traverse_mccfr_p(state.apply(a), t, i, board, hands, indexers, eval, regret_storage, avg_storage, debug);
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
-        if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, debug);
+        if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
       }
     }
     int v = round(v_exact);
-    if(_log_level == SolverLogLevel::DEBUG) log_net_ev(v, v_exact, state, debug);
+    if(_log_level == SolverLogLevel::DEBUG) log_net_ev(v, v_exact, state, get_config().init_state, debug);
     if(state.get_round() == 0 && is_preflop_frozen(t)) return v;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       auto it = values.find(a);
       if(it != values.end()) {
-        auto& r_atom = (*get_regrets())[base_idx + a_idx];
+        auto& r_atom = base_ptr[a_idx];
         int prev_r = r_atom.load();
         int d_r = (*it).second - v;
         int next_r = prev_r + d_r;
@@ -281,51 +295,41 @@ int MCCFRSolver::traverse_mccfr_p(const PokerState& state, long t, int i, const 
     return v;
   }
   else {
-    auto actions = available_actions(state, get_config().action_profile);
-    std::vector<float> freq;
-    if(state.get_round() == 0 && is_preflop_frozen(t)) {
-      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), indexers, *get_avg_strategy());
-    }
-    else {
-      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), indexers, *get_regrets());
-    }
-    Action a = actions[sample_action_idx(freq)];
-    return traverse_mccfr_p(state.apply(a), t, i, board, hands, indexers, eval, debug);
+    Action a = external_sampling(state, t, board, hands, indexers, eval, regret_storage, avg_storage, debug);
+    return traverse_mccfr_p(state.apply(a), t, i, board, hands, indexers, eval, regret_storage, avg_storage, debug);
   }
 }
 
-std::string relative_history_str(const PokerState& state, const PokerState& init_state) {
-  return state.get_action_history().slice(init_state.get_action_history().size()).to_string();
-}
-
-int MCCFRSolver::traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug) {
+template <template<typename> class StorageT>
+int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
+    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
+    std::ostringstream& debug) {
   if(is_terminal(state) || state.get_players()[i].has_folded()) {
     int u = terminal_utility(state, i, board, hands, get_config().poker.n_chips, indexers, eval);
-    if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, hands, debug);
+    if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, get_config().init_state, hands, debug);
     return u;
   }
   else if(state.get_active() == i) {
     auto actions = available_actions(state, get_config().action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     if(_log_level == SolverLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
-    size_t base_idx = get_regrets()->index(state, cluster);
-    auto freq = calculate_strategy(*get_regrets(), base_idx, actions.size());
+    std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
+    auto freq = calculate_strategy(base_ptr, actions.size());
     std::unordered_map<Action, int> values;
     float v_exact = 0;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
-      int v_a = traverse_mccfr(state.apply(a), t, i, board, hands, indexers, eval, debug);
+      int v_a = traverse_mccfr(state.apply(a), t, i, board, hands, indexers, eval, regret_storage, avg_storage, debug);
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
-      if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, debug);
+      if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
     }
     int v = round(v_exact);
-    if(_log_level == SolverLogLevel::DEBUG) log_net_ev(v, v_exact, state, debug);
+    if(_log_level == SolverLogLevel::DEBUG) log_net_ev(v, v_exact, state, get_config().init_state, debug);
     if(state.get_round() == 0 && is_preflop_frozen(t)) return v;
 
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-      auto& r_atom = (*get_regrets())[base_idx + a_idx];
+      auto& r_atom = base_ptr[a_idx];
       int prev_r = r_atom.load();
       int d_r = values[actions[a_idx]] - v;
       int next_r = prev_r + d_r;
@@ -338,58 +342,46 @@ int MCCFRSolver::traverse_mccfr(const PokerState& state, long t, int i, const Bo
     return v;
   }
   else {
-    auto actions = available_actions(state, get_config().action_profile);
-    std::vector<float> freq;
-    if(state.get_round() == 0 && is_preflop_frozen(t)) {
-      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), indexers, *get_avg_strategy());
-    }
-    else {
-      freq = state_to_freq(state, board, hands[state.get_active()], actions.size(), indexers, *get_regrets());
-    }
-    Action a = actions[sample_action_idx(freq)];
-    if(_log_level == SolverLogLevel::DEBUG) log_external_sampling(a, actions, freq, state, debug);
-    return traverse_mccfr(state.apply(a), t, i, board, hands, indexers, eval, debug);
+    Action a = external_sampling(state, t, board, hands, indexers, eval, regret_storage, avg_storage, debug);
+    return traverse_mccfr_p(state.apply(a), t, i, board, hands, indexers, eval, regret_storage, avg_storage, debug);
   }
 }
 
-void MCCFRSolver::log_utility(int utility, const PokerState& state, const std::vector<Hand>& hands, std::ostringstream& debug) const {
-  debug << "Terminal: " << relative_history_str(state, get_config().init_state) << "\n";
-  debug << "\tHands: ";
-  for(int p_idx = 0; p_idx < state.get_players().size(); ++p_idx) {
-    debug << hands[p_idx].to_string() << " ";
+template <template<typename> class StorageT>
+Action MCCFRSolver<StorageT>::external_sampling(const PokerState& state, long t, const Board& board, const std::vector<Hand>& hands, 
+    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
+    std::ostringstream& debug) {
+  auto actions = available_actions(state, get_config().action_profile);
+  std::vector<float> freq;
+  int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()], 
+      state.get_round()));
+  if(state.get_round() == 0 && is_preflop_frozen(t)) {
+    std::atomic<float>* base_ptr = get_base_avg_ptr(avg_storage, state, cluster);
+    freq = calculate_strategy(base_ptr, actions.size());
   }
-  debug << "\n";
-  debug << "\tu(z) = " << utility << "\n";
-}
-
-void MCCFRSolver::log_action_ev(Action a, float freq, int ev, const PokerState& state, std::ostringstream& debug) const {
-  debug << "Action EV: " << relative_history_str(state, get_config().init_state) << "\n";
-  debug << "\tu(" << a.to_string() << ") @ " << std::setprecision(2) << std::fixed << freq << " = " << ev << "\n";
-}
-
-void MCCFRSolver::log_net_ev(int ev, float ev_exact, const PokerState& state, std::ostringstream& debug) const {
-  debug << "Net EV: " << relative_history_str(state, get_config().init_state) << "\n";
-  debug << "\tu(sigma) = " << std::setprecision(2) << std::fixed << ev << " (exact=" << ev_exact << ")\n";
-  if(state.get_round() == 0) debug << "Preflop frozen, skipping regret update.\n";
-}
-
-void MCCFRSolver::log_regret(Action a, int d_r, int next_r, std::ostringstream& debug) const {
-  debug << "\tR(" << a.to_string() << ") = " << d_r << "\n";
-  debug << "\tcum R(" << a.to_string() << ") = " << next_r << "\n";
-}
-
-void MCCFRSolver::log_external_sampling(Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq, 
-                                             const PokerState& state, std::ostringstream& debug) const {
-  debug << "Sampling: " << relative_history_str(state, get_config().init_state) << "\n\t";
-  for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-    debug << std::setprecision(2) << std::fixed << actions[a_idx].to_string() << "=" << freq[a_idx] << " ";
+  else {
+    std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
+    freq = calculate_strategy(base_ptr, actions.size());
   }
-  debug << "\n";
-  debug << "\tSampled: " << sampled.to_string() << "\n";
+  Action a = actions[sample_action_idx(freq)];
+  if(_log_level == SolverLogLevel::DEBUG) log_external_sampling(a, actions, freq, state, get_config().init_state, debug);
+  return a;
+}
+
+// to allow use of MCCFRSolver::traverse_mccfr friend in benchmark_mccfr.cpp without moving MCCFRSolver::traverse_mccfr to the header mccfr.hpp 
+// (because it's a template and used in a different translation unit)
+template class pluribus::MCCFRSolver<pluribus::StrategyStorage>; 
+
+// ==========================================================================================
+// || MappedMCCFRSolver
+// ==========================================================================================
+
+std::atomic<int>* MappedMCCFRSolver::get_base_regret_ptr(StrategyStorage<int>* storage, const PokerState& state, int cluster) {
+  return &storage->get(state, cluster);
 }
 
 template <class T>
-void MCCFRSolver::log_strategy(const StrategyStorage<T>& strat, const SolverConfig& config, nlohmann::json& metrics, bool phi) const {
+void MappedMCCFRSolver::log_strategy(const StrategyStorage<T>& strat, const SolverConfig& config, nlohmann::json& metrics, bool phi) const {
   PokerState state = config.init_state;
   for(int p = 0; p < config.poker.n_players; ++p) {
     if(state.active_players() <= 1) return;
@@ -406,14 +398,25 @@ void MCCFRSolver::log_strategy(const StrategyStorage<T>& strat, const SolverConf
   }
 }
 
+float MappedMCCFRSolver::frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const {
+    StrategyDecision decision{get_strategy(), get_config().action_profile};
+    return decision.frequency(action, state, board, hand);
+  }
+
 // ==========================================================================================
 // || BlueprintSolver
 // ==========================================================================================
 
-BlueprintSolver::BlueprintSolver(const BlueprintSolverConfig& bp_config, const SolverConfig& mccfr_config) 
-    : MCCFRSolver{mccfr_config}, _regrets{mccfr_config.action_profile, 200}, _phi{mccfr_config.action_profile, 169}, _bp_config{bp_config} {}
+std::atomic<float>* BlueprintSolver::get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) {
+  return &storage->get(state, cluster);
+}
 
-void BlueprintSolver::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, std::ostringstream& debug) {
+BlueprintSolver::BlueprintSolver(const BlueprintSolverConfig& bp_config, const SolverConfig& solver_config) 
+    : MappedMCCFRSolver{solver_config}, _regrets{solver_config.action_profile, 200}, _phi{solver_config.action_profile, 169}, _bp_config{bp_config} 
+    {}
+
+void BlueprintSolver::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
+    std::ostringstream& debug) {
   if(state.get_winner() != -1 || state.get_round() > 0 || state.get_players()[i].has_folded()) {
     return;
   }
@@ -421,7 +424,7 @@ void BlueprintSolver::update_strategy(const PokerState& state, int i, const Boar
     auto actions = available_actions(state, get_config().action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
     size_t regret_base_idx = _regrets.index(state, cluster);
-    auto freq = calculate_strategy(_regrets, regret_base_idx, actions.size());
+    auto freq = calculate_strategy(&_regrets[regret_base_idx], actions.size());
     int a_idx = sample_action_idx(freq);
     if(get_log_level() != SolverLogLevel::NONE) {
       debug << "Update strategy: " << relative_history_str(state, get_config().init_state) << "\n";
@@ -485,11 +488,11 @@ bool BlueprintSolver::operator==(const BlueprintSolver& other) const {
 }
 
 // ==========================================================================================
-// || RealTimeSolver
+// || RealTimeMCCFR
 // ==========================================================================================
 
 RealTimeMCCFR::RealTimeMCCFR(const SolverConfig& config, RealTimeSolverConfig rt_config, const std::shared_ptr<const SampledBlueprint> bp)
-    : MCCFRSolver{config}, _rt_config{rt_config}, _bp{bp} {
+    : MappedMCCFRSolver{config}, _bp{bp}, _regrets{config.action_profile, MAX_COMBOS}, _rt_config{rt_config}, _action_provider{} {
   if(rt_config.terminal_round < 1 || rt_config.terminal_round > 4) 
     Logger::error("Invalid terminal round: " + std::to_string(rt_config.terminal_round));
   if(rt_config.terminal_bet_level < 1) Logger::error("Invalid terminal bet level: " + std::to_string(rt_config.terminal_bet_level));

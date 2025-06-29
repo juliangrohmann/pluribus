@@ -53,14 +53,11 @@ enum class SolverLogLevel : int {
   DEBUG = 2
 };
 
-class MCCFRSolver : public Strategy<int>, public Solver {
+template <template<typename> class StorageT>
+class MCCFRSolver : public Solver {
 public:
   MCCFRSolver(const SolverConfig& config) : Solver{config} {}
 
-  void allocate_all();
-
-  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const;
-  const SolverConfig& get_config() const override { return Solver::get_config(); }
   void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
   void set_metrics_dir(std::string metrics_dir) { _metrics_dir = metrics_dir; }
   void set_log_dir(std::string log_dir) { _log_dir = log_dir; }
@@ -91,36 +88,35 @@ protected:
   virtual bool is_preflop_frozen(long t) const = 0;
   virtual long next_step(long t, long T) const = 0;
   
-  virtual StrategyStorage<int>* get_regrets() = 0;
-  virtual StrategyStorage<float>* get_avg_strategy() = 0;
+  virtual std::atomic<int>* get_base_regret_ptr(StorageT<int>* storage, const PokerState& state, int cluster) = 0;
+  virtual std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, const PokerState& state, int cluster) = 0;
+  virtual StorageT<int>* init_regret_storage() = 0;
+  virtual StorageT<float>* init_avg_storage() = 0;
+  virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, Action action, const PokerState& next_state) = 0;
+  virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, Action action, const PokerState& next_state) = 0;
 
   virtual double get_discount_factor(long t) const = 0;
 
   virtual std::string build_wandb_metrics(long t) const = 0;
   void error(const std::string& msg, const std::ostringstream& debug) const;
   
-  template <class T>
-  void log_strategy(const StrategyStorage<T>& strat, const SolverConfig& config, nlohmann::json& metrics, bool phi) const;
-  
   long get_iteration() const { return _t; }
   SolverLogLevel get_log_level() const { return _log_level; }
 
 private:
   int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug);
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
+      std::ostringstream& debug);
   int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug);
-  void _allocate_state(const PokerState& state);
-
-  void log_utility(int utility, const PokerState& state, const std::vector<Hand>& hands, std::ostringstream& debug) const;
-  void log_action_ev(Action a, float freq, int ev, const PokerState& state, std::ostringstream& debug) const;
-  void log_net_ev(int ev, float ev_exact, const PokerState& state, std::ostringstream& debug) const;
-  void log_regret(Action a, int d_r, int total_r, std::ostringstream& debug) const;
-  void log_external_sampling(Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq,
-                             const PokerState& state, std::ostringstream& debug) const;
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage,
+      std::ostringstream& debug);
+  Action external_sampling(const PokerState& state, long t, const Board& board, const std::vector<Hand>& hands, 
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
+      std::ostringstream& debug);
 #ifdef UNIT_TEST
-  friend int call_traverse_mccfr(MCCFRSolver* trainer, const PokerState& state, int i, const Board& board, 
-      const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug);
+  template <template<typename> class T>
+  friend int call_traverse_mccfr(MCCFRSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug);
 #endif
 
   long _t = 0;
@@ -130,10 +126,26 @@ private:
   SolverLogLevel _log_level = SolverLogLevel::ERRORS;
 };
 
-class BlueprintSolver : public MCCFRSolver {
+class MappedMCCFRSolver : public MCCFRSolver<StrategyStorage>, public Strategy<int> {
 public:
-  BlueprintSolver(const BlueprintSolverConfig& bp_config = BlueprintSolverConfig{}, const SolverConfig& mccfr_config = SolverConfig{});
+  MappedMCCFRSolver(const SolverConfig& config) : MCCFRSolver{config} {}
+
+  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const;
+  const SolverConfig& get_config() const override { return Solver::get_config(); }
+  
+protected:
+  std::atomic<int>* get_base_regret_ptr(StrategyStorage<int>* storage, const PokerState& state, int cluster) override;
+  StrategyStorage<int>* next_regret_storage(StrategyStorage<int>* storage, Action action, const PokerState& next_state) override { return storage; }
+
+  template <class T>
+  void log_strategy(const StrategyStorage<T>& strat, const SolverConfig& config, nlohmann::json& metrics, bool phi) const;
+};
+
+class BlueprintSolver : public MappedMCCFRSolver {
+public:
+  BlueprintSolver(const BlueprintSolverConfig& bp_config = BlueprintSolverConfig{}, const SolverConfig& solver_config = SolverConfig{});
   bool operator==(const BlueprintSolver& other) const;
+  
   const StrategyStorage<int>& get_strategy() const { return _regrets; }
   const StrategyStorage<float>& get_phi() const { return _phi; }
   const BlueprintSolverConfig& get_blueprint_config() const { return _bp_config; }
@@ -144,6 +156,11 @@ public:
   }
 
 protected:
+  std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override;
+  StrategyStorage<int>* init_regret_storage() override { return &_regrets; }
+  StrategyStorage<float>* init_avg_storage() override { return &_phi; };
+  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, Action action, const PokerState& next_state) override { return storage; }
+
   void on_start() override { Logger::log("Blueprint solver config:\n" + _bp_config.to_string()); }
   void on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) override;
 
@@ -153,10 +170,7 @@ protected:
   bool should_log(long t) const override { return t > 0 && t % _bp_config.log_interval == 0; }
   bool is_preflop_frozen(long t) const override { return t > _bp_config.preflop_threshold; }
   long next_step(long t, long T) const override;
-
-  StrategyStorage<int>* get_regrets() override { return &_regrets; }
-  StrategyStorage<float>* get_avg_strategy() override { return &_phi; }
-
+  
   double get_discount_factor(long t) const override { return _bp_config.get_discount_factor(t); }
   std::string build_wandb_metrics(long t) const override;
 
@@ -167,7 +181,6 @@ private:
   friend void call_update_strategy(BlueprintSolver* trainer, const PokerState& state, int i, const Board& board,
                                    const std::vector<Hand>& hands, std::ostringstream& debug);
 #endif
-
   StrategyStorage<int> _regrets;
   StrategyStorage<float> _phi;
   BlueprintSolverConfig _bp_config;
@@ -175,12 +188,16 @@ private:
 
 class SampledBlueprint;
 
-class RealTimeMCCFR : public MCCFRSolver {
+class RealTimeMCCFR : public MappedMCCFRSolver {
 public:
   RealTimeMCCFR(const SolverConfig& config, RealTimeSolverConfig rt_config, const std::shared_ptr<const SampledBlueprint> bp);
   const StrategyStorage<int>& get_strategy() const { return _regrets; }
 
 protected:
+  std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override { return nullptr; }
+  StrategyStorage<int>* init_regret_storage() override { return &_regrets; }
+  StrategyStorage<float>* init_avg_storage() override { return nullptr; }
+  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, Action action, const PokerState& next_state) override { return nullptr; }
 
   int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const override;
@@ -195,9 +212,6 @@ protected:
   bool is_preflop_frozen(long t) const override { return false; }
   long next_step(long t, long T) const override { return _rt_config.next_discount_step(t, T); }
   
-  StrategyStorage<int>* get_regrets() override { return &_regrets; };
-  StrategyStorage<float>* get_avg_strategy() override { return nullptr; };
-
   double get_discount_factor(long t) const override { return _rt_config.get_discount_factor(t); }
 
   std::string build_wandb_metrics(long t) const override;

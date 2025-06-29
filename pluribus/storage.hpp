@@ -73,6 +73,13 @@ public:
   inline const ActionProfile& action_profile() const { return _action_profile; }
   inline int n_clusters() const { return _n_clusters; }
   
+  void lcfr_discount(double d) {
+    #pragma omp parallel for schedule(static, 1024)
+    for(auto& e : data()) {
+      e.store(e.load() * d);
+    }
+  }
+  
   void allocate(size_t size) {
     std::cout << "Allocating concurrent vector to size " + std::to_string(size);
     const size_t CHUNK = (size_t(1) * 1024 * 1024 * 1024) / sizeof(T);

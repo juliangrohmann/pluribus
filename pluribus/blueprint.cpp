@@ -126,7 +126,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
 
         for(int c = 0; c < meta.n_clusters; ++c) {
           size_t base_idx = base_idxs[curr_idx] + c * n_actions;
-          auto freq = calculate_strategy(regrets, base_idx, n_actions);
+          auto freq = calculate_strategy(&regrets[base_idx], n_actions);
           for(int fidx = 0; fidx < freq.size(); ++fidx) {
             buffer.freqs[base_idx - base_idxs[bidx_start] + fidx] = freq[fidx];
           }
@@ -348,7 +348,7 @@ SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossl
       PokerState state = init_state.apply(meta.histories[hidx]);
       auto actions = valid_actions(state, bp.get_config().action_profile);
       size_t base_idx = bp.get_strategy().index(state, c);
-      auto freq = calculate_strategy(bp.get_strategy(), base_idx, actions.size());
+      auto freq = calculate_strategy(&bp.get_strategy()[base_idx], actions.size());
       for(Action bias : meta.biases) {
         sampled.push_back(action_to_idx[sample_biased(actions, freq, bias, factor)]);
       }
