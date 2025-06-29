@@ -35,7 +35,13 @@ public:
   const SolverConfig& get_config() const { return _config; }
 
   template <class Archive>
-  void serialize(Archive& ar) {
+  void load(Archive& ar) {
+    ar(_freq);
+    _config = SolverConfig{6, 10'000, 0};
+  }
+
+  template <class Archive>
+  void save(Archive& ar) {
     ar(_freq, _config);
   }
 
