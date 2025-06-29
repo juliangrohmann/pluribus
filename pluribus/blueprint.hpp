@@ -36,7 +36,7 @@ public:
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_freq);
+    ar(_freq, _config);
   }
 
 protected:

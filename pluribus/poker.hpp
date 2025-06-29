@@ -129,8 +129,7 @@ public:
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_cards);
-    update_mask(); // TODO: serialize mask instead
+    ar(_cards, _mask);
   }
 };
 
@@ -220,7 +219,7 @@ public:
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_players, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner);
+    ar(_players, _biases, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner);
   }
 
   uint8_t _first_bias; // TODO: remove, just for asserts

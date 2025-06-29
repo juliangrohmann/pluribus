@@ -62,10 +62,7 @@ public:
 
   template <class Archive>
   void serialize(Archive& ar) {
-    std::vector<float> float_weights; // TODO: compatibility, remove
-    ar(float_weights);
-    _weights.resize(float_weights.size());
-    for(int i = 0; i < float_weights.size(); ++i) _weights[i] = float_weights[i];
+    ar(_weights);
   }
 
   static PokerRange full() { return PokerRange{1.0f}; }
