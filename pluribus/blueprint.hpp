@@ -33,7 +33,6 @@ public:
     throw std::runtime_error("Blueprint strategy is null.");
   }
   const SolverConfig& get_config() const { return _config; }
-  void set_config(SolverConfig config) { _config = config; }
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -43,6 +42,7 @@ public:
 protected:
   void assign_freq(StrategyStorage<T>* freq) { _freq = std::unique_ptr<StrategyStorage<T>>{freq}; }
   std::unique_ptr<StrategyStorage<T>>& get_freq() { return _freq; }
+  void set_config(SolverConfig config) { _config = config; }
 
 private:
   std::unique_ptr<StrategyStorage<T>> _freq;
