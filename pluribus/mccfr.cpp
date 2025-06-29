@@ -265,14 +265,17 @@ int MCCFRSolver::traverse_mccfr_p(const PokerState& state, long t, int i, const 
     if(state.get_round() == 0 && is_preflop_frozen(t)) return v;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
-      if(values.find(a) != values.end()) {
-        int prev_r = (*get_regrets())[base_idx + a_idx].load();
-        int d_r = values[a] - v;
+      auto it = values.find(a);
+      if(it != values.end()) {
+        auto& r_atom = (*get_regrets())[base_idx + a_idx];
+        int prev_r = r_atom.load();
+        int d_r = (*it).second - v;
         int next_r = prev_r + d_r;
         if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
-        int total_r = std::max(next_r, REGRET_FLOOR);
-        (*get_regrets())[base_idx + a_idx].store(total_r);
-        if(_log_level == SolverLogLevel::DEBUG) log_regret(actions[a_idx], d_r, total_r, debug);
+        if(next_r > REGRET_FLOOR) {
+          r_atom.fetch_add(d_r);
+        }
+        if(_log_level == SolverLogLevel::DEBUG) log_regret(actions[a_idx], d_r, next_r, debug);
       }
     }
     return v;
@@ -322,13 +325,15 @@ int MCCFRSolver::traverse_mccfr(const PokerState& state, long t, int i, const Bo
     if(state.get_round() == 0 && is_preflop_frozen(t)) return v;
 
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-      int prev_r = (*get_regrets())[base_idx + a_idx].load();
+      auto& r_atom = (*get_regrets())[base_idx + a_idx];
+      int prev_r = r_atom.load();
       int d_r = values[actions[a_idx]] - v;
       int next_r = prev_r + d_r;
       if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
-      int total_r = std::max(next_r, REGRET_FLOOR);
-      (*get_regrets())[base_idx + a_idx].store(total_r);
-      if(_log_level == SolverLogLevel::DEBUG) log_regret(actions[a_idx], d_r, total_r, debug);
+      if(next_r > REGRET_FLOOR) {
+        r_atom.fetch_add(d_r);
+      }
+      if(_log_level == SolverLogLevel::DEBUG) log_regret(actions[a_idx], d_r, next_r, debug);
     }
     return v;
   }
@@ -368,9 +373,9 @@ void MCCFRSolver::log_net_ev(int ev, float ev_exact, const PokerState& state, st
   if(state.get_round() == 0) debug << "Preflop frozen, skipping regret update.\n";
 }
 
-void MCCFRSolver::log_regret(Action a, int d_r, int total_r, std::ostringstream& debug) const {
+void MCCFRSolver::log_regret(Action a, int d_r, int next_r, std::ostringstream& debug) const {
   debug << "\tR(" << a.to_string() << ") = " << d_r << "\n";
-  debug << "\tcum R(" << a.to_string() << ") = " << total_r << "\n";
+  debug << "\tcum R(" << a.to_string() << ") = " << next_r << "\n";
 }
 
 void MCCFRSolver::log_external_sampling(Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq, 

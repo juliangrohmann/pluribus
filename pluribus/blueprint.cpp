@@ -179,7 +179,7 @@ void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
     #pragma omp parallel for schedule(static)
     for(size_t idx = 0; idx < buf.freqs.size(); ++idx) {
       auto& entry = get_freq()->operator[](buf.offset + idx);
-      entry.store(entry.load() + buf.freqs[idx]);
+      entry.fetch_add(buf.freqs[idx]);
     }
   }
 
