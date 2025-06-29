@@ -83,13 +83,7 @@ public:
   bool operator==(const ActionProfile&) const = default;
 
   template <class Archive>
-  void load(Archive& ar) {
-    ar(_profile);
-    set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{2.00f}, Action::ALL_IN}); // TODO: compatibility, remove
-  }
-
-  template <class Archive>
-  void save(Archive& ar) const {
+  void serialize(Archive& ar) {
     ar(_profile, _iso_actions);
   }
 
