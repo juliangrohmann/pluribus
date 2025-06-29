@@ -41,7 +41,7 @@ public:
   }
 
   template <class Archive>
-  void save(Archive& ar) {
+  void save(Archive& ar) const {
     ar(_freq, _config);
   }
 
