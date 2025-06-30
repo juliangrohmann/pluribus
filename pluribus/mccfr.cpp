@@ -436,9 +436,6 @@ void MappedSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& o
 // || TreeSolver
 // ==========================================================================================
 
-TreeSolver::TreeSolver(const SolverConfig& config, const std::shared_ptr<const TreeStorageConfig> tree_config) 
-    : MCCFRSolver{config}, _tree_config{tree_config}, _regrets_root{std::make_unique<TreeStorageNode<int>>(config.init_state, _tree_config)} {}
-
 float TreeSolver::frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const {
   TreeDecision<int> decision{_regrets_root.get(), get_config().init_state};
   return decision.frequency(action, state, board, hand);
@@ -446,6 +443,14 @@ float TreeSolver::frequency(Action action, const PokerState& state, const Board&
 
 std::atomic<int>* TreeSolver::get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) { 
   return storage->get(cluster); 
+};
+
+TreeStorageNode<int>* TreeSolver::init_regret_storage() { 
+  if(!_regrets_root) {
+    _regrets_tree_config = make_tree_config();
+    _regrets_root = std::make_unique<TreeStorageNode<int>>(get_config().init_state, _regrets_tree_config);
+  }
+  return _regrets_root.get(); 
 };
 
 TreeStorageNode<int>* TreeSolver::next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state) {
@@ -618,14 +623,19 @@ const std::shared_ptr<const TreeStorageConfig> TreeBlueprintSolver::make_tree_co
 }
 
 TreeBlueprintSolver::TreeBlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config) 
-    : TreeSolver{config, make_tree_config()}, BlueprintSolver{config, bp_config}, MCCFRSolver{config},
-    _phi_root{std::make_unique<TreeStorageNode<float>>(config.init_state, get_tree_config())} {
-
-}
+    : TreeSolver{config}, BlueprintSolver{config, bp_config}, MCCFRSolver{config} {}
 
 std::atomic<float>* TreeBlueprintSolver::get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, int cluster) {
   return storage->get(cluster);
 }
+
+TreeStorageNode<float>* TreeBlueprintSolver::init_avg_storage() { 
+  if(!_phi_root) {
+    _phi_tree_config = make_tree_config();
+    _phi_root = std::make_unique<TreeStorageNode<float>>(get_config().init_state, _phi_tree_config);
+  }
+  return _phi_root.get(); 
+};
 
 TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state) {
   return storage->apply_index(action_idx, next_state);

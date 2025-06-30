@@ -167,7 +167,7 @@ private:
 
 class TreeSolver : virtual public MCCFRSolver<TreeStorageNode> {
 public:
-  TreeSolver(const SolverConfig& config, const std::shared_ptr<const TreeStorageConfig> tree_config);
+  TreeSolver(const SolverConfig& config) : MCCFRSolver{config} {}
 
   float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const;
   
@@ -180,17 +180,19 @@ public:
 
 protected:
   std::atomic<int>* get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) override;
-  TreeStorageNode<int>* init_regret_storage() override { return _regrets_root.get(); }
+  TreeStorageNode<int>* init_regret_storage() override;
   TreeStorageNode<int>* next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state) override;
 
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
+  virtual const std::shared_ptr<const TreeStorageConfig> make_tree_config() const = 0;
+
   const TreeStorageNode<int>* get_regrets_root() const { return _regrets_root.get(); }
-  const std::shared_ptr<const TreeStorageConfig> get_tree_config() { return _tree_config; }
+  const std::shared_ptr<const TreeStorageConfig> get_regrets_tree_config() { return _regrets_tree_config; }
 
 private:
-  const std::shared_ptr<const TreeStorageConfig> _tree_config;
-  const std::unique_ptr<TreeStorageNode<int>> _regrets_root;
+  std::shared_ptr<const TreeStorageConfig> _regrets_tree_config = nullptr;
+  std::unique_ptr<TreeStorageNode<int>> _regrets_root = nullptr;
 };
 
 template <template<typename> class StorageT>
@@ -317,16 +319,20 @@ public:
 
 protected:
   std::atomic<float>* get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, int cluster) override;
-  TreeStorageNode<float>* init_avg_storage() override { return _phi_root.get(); };
+  TreeStorageNode<float>* init_avg_storage() override;
   TreeStorageNode<float>* next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state) override;
 
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const override;
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
-private:
-  const std::shared_ptr<const TreeStorageConfig> make_tree_config() const;
+  const std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;
+  
+  const TreeStorageNode<float>* get_phi_root() const { return _phi_root.get(); }
+  const std::shared_ptr<const TreeStorageConfig> get_phi_tree_config() { return _phi_tree_config; }
 
-  const std::unique_ptr<TreeStorageNode<float>> _phi_root;
+private:
+  std::shared_ptr<const TreeStorageConfig> _phi_tree_config = nullptr;
+  std::unique_ptr<TreeStorageNode<float>> _phi_root = nullptr;
 };
 
 }
