@@ -88,6 +88,8 @@ public:
 
   const std::vector<Action>& get_actions() const { return _actions; }
 
+  int get_n_clusters() const { return _n_clusters; }
+
   void lcfr_discount(double d) {
     for(int i = 0; i < _actions.size() * _n_clusters; ++i) {
       _values[i].store(_values[i].load() * d);

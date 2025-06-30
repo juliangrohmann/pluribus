@@ -654,6 +654,11 @@ void TreeBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringst
 
 long sum_node_regrets(const TreeStorageNode<int>* node) {
   long r = 0;
+  for(int c = 0; c < node->get_n_clusters(); ++c) {
+    for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+      r += std::max(node->get(c, a_idx)->load(), 0);
+    }
+  }
   for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
     if(node->is_allocated(a_idx)) r += sum_node_regrets(node->apply_index(a_idx));
   }
