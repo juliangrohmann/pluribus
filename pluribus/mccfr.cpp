@@ -99,6 +99,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
   Logger::log("Solver config:\n" + get_config().to_string());
   on_start();
 
+  // omp_set_num_threads(1);
   bool full_ranges = are_full_ranges(get_config().init_ranges);
   Logger::log("Full ranges: " + std::string{full_ranges ? "true" : "false"});
   Logger::log("Training blueprint from " + std::to_string(_t) + " to " + std::to_string(T));
@@ -251,7 +252,7 @@ template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
     std::ostringstream& debug) {
-  if(is_terminal(state) || state.get_players()[i].has_folded()) {
+  if(is_terminal(state, i)) {
     int u = terminal_utility(state, i, board, hands, get_config().poker.n_chips, indexers, eval);
     if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, get_config().init_state, hands, debug);
     return u;
@@ -269,8 +270,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, long t, int
       Action a = actions[a_idx];
       if(base_ptr[a_idx].load() > PRUNE_CUTOFF) {
         PokerState next_state = state.apply(a);
-        int v_a = traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state), 
-            next_avg_storage(avg_storage, a_idx, next_state), debug);
+        int v_a = traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), 
+            next_avg_storage(avg_storage, a_idx, next_state, i), debug);
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
         if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
@@ -300,8 +301,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, long t, int
     auto actions = available_actions(state, get_config().action_profile);
     int a_idx = external_sampling(actions, state, t, board, hands, indexers, eval, regret_storage, avg_storage, debug);
     PokerState next_state = state.apply(actions[a_idx]);
-    return traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state), 
-        next_avg_storage(avg_storage, a_idx, next_state), debug);
+    return traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), 
+        next_avg_storage(avg_storage, a_idx, next_state, i), debug);
   }
 }
 
@@ -309,7 +310,7 @@ template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
     std::ostringstream& debug) {
-  if(is_terminal(state) || state.get_players()[i].has_folded()) {
+  if(is_terminal(state, i)) {
     int u = terminal_utility(state, i, board, hands, get_config().poker.n_chips, indexers, eval);
     if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, get_config().init_state, hands, debug);
     return u;
@@ -325,8 +326,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, long t, int i
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       PokerState next_state = state.apply(a);
-      int v_a = traverse_mccfr(next_state, t, i, board, hands, indexers, eval, 
-          next_regret_storage(regret_storage, a_idx, next_state), next_avg_storage(avg_storage, a_idx, next_state), debug);
+      int v_a = traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), 
+          next_avg_storage(avg_storage, a_idx, next_state, i), debug);
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
       if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
@@ -352,8 +353,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, long t, int i
     auto actions = available_actions(state, get_config().action_profile);
     int a_idx = external_sampling(actions, state, t, board, hands, indexers, eval, regret_storage, avg_storage, debug);
     PokerState next_state = state.apply(actions[a_idx]);
-    return traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state), 
-        next_avg_storage(avg_storage, a_idx, next_state), debug);
+    return traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), 
+        next_avg_storage(avg_storage, a_idx, next_state, i), debug);
   }
 }
 
@@ -453,8 +454,8 @@ TreeStorageNode<int>* TreeSolver::init_regret_storage() {
   return _regrets_root.get(); 
 };
 
-TreeStorageNode<int>* TreeSolver::next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state) {
-  return storage->apply_index(action_idx, next_state);
+TreeStorageNode<int>* TreeSolver::next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state, int i) {
+  return !is_terminal(next_state, i) ? storage->apply_index(action_idx, next_state) : nullptr;
 }
 
 void TreeSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
@@ -466,9 +467,14 @@ void TreeSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out
 // ==========================================================================================
 
 template <template<typename> class StorageT>
+bool BlueprintSolver<StorageT>::is_update_terminal(const PokerState& state, int i) const {
+  return state.get_winner() != -1 || state.get_round() > 0 || state.get_players()[i].has_folded();
+}
+
+template <template<typename> class StorageT>
 void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
     StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug) {
-  if(state.get_winner() != -1 || state.get_round() > 0 || state.get_players()[i].has_folded()) {
+  if(is_update_terminal(state, i)) {
     return;
   }
   else if(state.get_active() == i) {
@@ -487,15 +493,15 @@ void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, 
     }
     this->get_base_avg_ptr(avg_storage, state, cluster)[a_idx].fetch_add(1.0f);
     PokerState next_state = state.apply(actions[a_idx]);
-    update_strategy(next_state, i, board, hands, this->next_regret_storage(regret_storage, a_idx, next_state), 
-        this->next_avg_storage(avg_storage, a_idx, next_state), debug);
+    update_strategy(next_state, i, board, hands, this->next_regret_storage(regret_storage, a_idx, next_state, i), 
+        this->next_avg_storage(avg_storage, a_idx, next_state, i), debug);
   }
   else {
     auto actions = this->available_actions(state, this->get_config().action_profile);
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       PokerState next_state = state.apply(actions[a_idx]);
-      update_strategy(next_state, i, board, hands, this->next_regret_storage(regret_storage, a_idx, next_state), 
-          this->next_avg_storage(avg_storage, a_idx, next_state), debug);
+      update_strategy(next_state, i, board, hands, this->next_regret_storage(regret_storage, a_idx, next_state, i), 
+          this->next_avg_storage(avg_storage, a_idx, next_state, i), debug);
     }
   }
 }
@@ -528,7 +534,7 @@ long BlueprintSolver<StorageT>::next_step(long t, long T) const {
 template <template<typename> class StorageT>
 int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
-  if(state.get_active() != state._first_bias) {
+  if(state.has_biases() && state.get_active() != state._first_bias) {
     Logger::error("Active player changed after biasing. Active=" + std::to_string(static_cast<int>(state.get_active())) + 
         ", First bias=" + std::to_string(static_cast<int>(state._first_bias)));
   }
@@ -637,8 +643,8 @@ TreeStorageNode<float>* TreeBlueprintSolver::init_avg_storage() {
   return _phi_root.get(); 
 };
 
-TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state) {
-  return storage->apply_index(action_idx, next_state);
+TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state, int i) {
+  return !is_update_terminal(next_state, i) ? storage->apply_index(action_idx, next_state) : nullptr;
 }
 
 void TreeBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {

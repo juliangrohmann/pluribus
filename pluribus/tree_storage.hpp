@@ -49,7 +49,8 @@ public:
       std::lock_guard<std::mutex> lock(_mutexes[action_idx]);
       next = node_atom.load(std::memory_order_seq_cst);
       if(!next) {
-        node_atom.store(new TreeStorageNode<T>(next_state, _config), std::memory_order_seq_cst);
+        next = new TreeStorageNode<T>(next_state, _config);
+        node_atom.store(next, std::memory_order_seq_cst);
       }
     }
     return next;
@@ -176,7 +177,7 @@ private:
   }
 
   std::vector<Action> _actions;
-  int _n_clusters = 0;
+  int _n_clusters;
   const std::shared_ptr<const TreeStorageConfig> _config;
 
   std::unique_ptr<std::atomic<T>[]> _values;

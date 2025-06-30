@@ -83,7 +83,7 @@ protected:
   
   virtual int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
       std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const { return utility(state, i, board, hands, stack_size, eval); }
-  virtual bool is_terminal(const PokerState& state) const { return state.is_terminal(); }
+  virtual bool is_terminal(const PokerState& state, int i) const { return state.is_terminal() || state.get_players()[i].has_folded(); }
   virtual std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const { return valid_actions(state, profile); }
   
   virtual void on_start() {}
@@ -100,8 +100,8 @@ protected:
   virtual std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, const PokerState& state, int cluster) = 0;
   virtual StorageT<int>* init_regret_storage() = 0;
   virtual StorageT<float>* init_avg_storage() = 0;
-  virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, int action_idx, const PokerState& next_state) = 0;
-  virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const PokerState& next_state) = 0;
+  virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, int action_idx, const PokerState& next_state, int i) = 0;
+  virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const PokerState& next_state, int i) = 0;
   
   virtual double get_discount_factor(long t) const = 0;
   
@@ -157,7 +157,7 @@ public:
 protected:
   std::atomic<int>* get_base_regret_ptr(StrategyStorage<int>* storage, const PokerState& state, int cluster) override;
   StrategyStorage<int>* init_regret_storage() override { return &_regrets; }
-  StrategyStorage<int>* next_regret_storage(StrategyStorage<int>* storage, int action_idx, const PokerState& next_state) override { return storage; }
+  StrategyStorage<int>* next_regret_storage(StrategyStorage<int>* storage, int action_idx, const PokerState& next_state, int i) override { return storage; }
 
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
@@ -181,7 +181,7 @@ public:
 protected:
   std::atomic<int>* get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) override;
   TreeStorageNode<int>* init_regret_storage() override;
-  TreeStorageNode<int>* next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state) override;
+  TreeStorageNode<int>* next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state, int i) override;
 
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
@@ -212,6 +212,7 @@ public:
 protected:
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, StorageT<int>* regret_storage, 
       StorageT<float>* avg_storage, std::ostringstream& debug);
+  bool is_update_terminal(const PokerState& state, int i) const;
 
   void on_start() override { Logger::log("Blueprint solver config:\n" + _bp_config.to_string()); }
   void on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) override;
@@ -244,7 +245,7 @@ public:
 protected:
   int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const override;
-  bool is_terminal(const PokerState& state) const override { return state.has_biases(); }
+  bool is_terminal(const PokerState& state, int i) const override { return state.has_biases() || state.is_terminal() || state.get_players()[i].has_folded(); }
   std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const override;
 
   void on_start() override { Logger::log("Real time solver config:\n" + _rt_config.to_string()); }
@@ -259,7 +260,7 @@ protected:
 
   std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override { return nullptr; }
   StrategyStorage<float>* init_avg_storage() override { return nullptr; }
-  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, int action_idx, const PokerState& next_state) override { return nullptr; }
+  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, int action_idx, const PokerState& next_state, int i) override { return nullptr; }
 
 private:
   const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
@@ -284,7 +285,7 @@ public:
 protected:
   std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override;
   StrategyStorage<float>* init_avg_storage() override { return &_phi; };
-  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, int action_idx, const PokerState& next_state) override { return storage; }
+  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, int action_idx, const PokerState& next_state, int i) override { return storage; }
 
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const override;
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
@@ -320,7 +321,7 @@ public:
 protected:
   std::atomic<float>* get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, int cluster) override;
   TreeStorageNode<float>* init_avg_storage() override;
-  TreeStorageNode<float>* next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state) override;
+  TreeStorageNode<float>* next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state, int i) override;
 
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const override;
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
