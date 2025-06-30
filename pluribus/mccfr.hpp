@@ -21,6 +21,7 @@
 #include <pluribus/decision.hpp>
 #include <pluribus/config.hpp>
 #include <pluribus/storage.hpp>
+#include <pluribus/tree_storage.hpp>
 
 namespace pluribus {
 
@@ -40,6 +41,11 @@ public:
   virtual float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const = 0;
   
   bool operator==(const Solver& other) const { return _config == other._config; }
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_config);
+  }
 
 protected:
   virtual void _solve(long t_plus) = 0;
@@ -94,14 +100,19 @@ protected:
   virtual std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, const PokerState& state, int cluster) = 0;
   virtual StorageT<int>* init_regret_storage() = 0;
   virtual StorageT<float>* init_avg_storage() = 0;
-  virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, Action action, const PokerState& next_state) = 0;
-  virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, Action action, const PokerState& next_state) = 0;
-
-  virtual double get_discount_factor(long t) const = 0;
-
-  virtual std::string build_wandb_metrics(long t) const = 0;
-  void error(const std::string& msg, const std::ostringstream& debug) const;
+  virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, int action_idx, const PokerState& next_state) = 0;
+  virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const PokerState& next_state) = 0;
   
+  virtual double get_discount_factor(long t) const = 0;
+  
+  virtual void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const = 0;
+  virtual void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const = 0;
+
+  std::string track_wandb_metrics(long t) const;
+  void track_strategy_by_decision(const DecisionAlgorithm& decision, nlohmann::json& metrics, bool phi) const;
+
+  void error(const std::string& msg, const std::ostringstream& debug) const;
+
   long get_iteration() const { return _t; }
   SolverLogLevel get_log_level() const { return _log_level; }
 
@@ -112,7 +123,7 @@ private:
   int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
       std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage,
       std::ostringstream& debug);
-  Action external_sampling(const PokerState& state, long t, const Board& board, const std::vector<Hand>& hands, 
+  int external_sampling(const std::vector<Action>& actions, const PokerState& state, long t, const Board& board, const std::vector<Hand>& hands, 
       std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
       std::ostringstream& debug);
 #ifdef UNIT_TEST
@@ -132,8 +143,8 @@ class MappedSolver : virtual public MCCFRSolver<StrategyStorage>, public Strateg
 public:
   MappedSolver(const SolverConfig& config, int n_clusters) : MCCFRSolver{config}, _regrets{config.action_profile, n_clusters} {}
 
-  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const;
-  const StrategyStorage<int>& get_strategy() const { return _regrets; }
+  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const override;
+  const StrategyStorage<int>& get_strategy() const override { return _regrets; }
   const SolverConfig& get_config() const override { return Solver::get_config(); }
   
   bool operator==(const MappedSolver& other) const { return MCCFRSolver::operator==(other) && _regrets == other._regrets; }
@@ -146,13 +157,40 @@ public:
 protected:
   std::atomic<int>* get_base_regret_ptr(StrategyStorage<int>* storage, const PokerState& state, int cluster) override;
   StrategyStorage<int>* init_regret_storage() override { return &_regrets; }
-  StrategyStorage<int>* next_regret_storage(StrategyStorage<int>* storage, Action action, const PokerState& next_state) override { return storage; }
+  StrategyStorage<int>* next_regret_storage(StrategyStorage<int>* storage, int action_idx, const PokerState& next_state) override { return storage; }
 
-  template <class T>
-  void log_strategy(const StrategyStorage<T>& strat, const SolverConfig& config, nlohmann::json& metrics, bool phi) const;
+  void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
 private:
   StrategyStorage<int> _regrets;
+};
+
+class TreeSolver : virtual public MCCFRSolver<TreeStorageNode> {
+public:
+  TreeSolver(const SolverConfig& config, const std::shared_ptr<const TreeStorageConfig> tree_config);
+
+  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const;
+  
+  bool operator==(const TreeSolver& other) const { return MCCFRSolver::operator==(other) && *_regrets_root == *other._regrets_root; }
+  
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_regrets_root);
+  }
+
+protected:
+  std::atomic<int>* get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) override;
+  TreeStorageNode<int>* init_regret_storage() override { return _regrets_root.get(); }
+  TreeStorageNode<int>* next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state) override;
+
+  void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
+
+  const TreeStorageNode<int>* get_regrets_root() const { return _regrets_root.get(); }
+  const std::shared_ptr<const TreeStorageConfig> get_tree_config() { return _tree_config; }
+
+private:
+  const std::shared_ptr<const TreeStorageConfig> _tree_config;
+  const std::unique_ptr<TreeStorageNode<int>> _regrets_root;
 };
 
 template <template<typename> class StorageT>
@@ -217,10 +255,14 @@ protected:
   
   double get_discount_factor(long t) const override { return _rt_config.get_discount_factor(t); }
 
+  std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override { return nullptr; }
+  StrategyStorage<float>* init_avg_storage() override { return nullptr; }
+  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, int action_idx, const PokerState& next_state) override { return nullptr; }
+
 private:
   const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
-  RealTimeSolverConfig _rt_config;
-  SampledActionProvider _action_provider;
+  const RealTimeSolverConfig _rt_config;
+  const SampledActionProvider _action_provider;
 };
 
 class MappedBlueprintSolver : virtual public MappedSolver, virtual public BlueprintSolver<StrategyStorage> {
@@ -233,16 +275,19 @@ public:
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_phi, cereal::base_class<MappedSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this));
+    ar(_phi, cereal::base_class<MappedSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this), 
+        cereal::base_class<Solver>(this));
   }
 
 protected:
   std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override;
   StrategyStorage<float>* init_avg_storage() override { return &_phi; };
-  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, Action action, const PokerState& next_state) override { return storage; }
+  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, int action_idx, const PokerState& next_state) override { return storage; }
 
-  std::string build_wandb_metrics(long t) const override;
+  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const override;
+  void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
+private:
   StrategyStorage<float> _phi;
 };
 
@@ -253,11 +298,35 @@ public:
   MappedRealTimeSolver(const std::shared_ptr<const SampledBlueprint> bp, const RealTimeSolverConfig& rt_config = RealTimeSolverConfig{});
 
 protected:
-  std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override { return nullptr; }
-  StrategyStorage<float>* init_avg_storage() override { return nullptr; }
-  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, Action action, const PokerState& next_state) override { return nullptr; }
+  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const override;
+};
 
-  std::string build_wandb_metrics(long t) const override;
+class TreeBlueprintSolver : virtual public TreeSolver, virtual public BlueprintSolver<TreeStorageNode> {
+public:
+  TreeBlueprintSolver(const SolverConfig& config = SolverConfig{}, const BlueprintSolverConfig& bp_config = BlueprintSolverConfig{});
+
+  const TreeStorageNode<float>* get_phi() const { return _phi_root.get(); }
+
+  bool operator==(const MappedBlueprintSolver& other) const;
+  
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_phi_root, cereal::base_class<MappedSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this), 
+        cereal::base_class<Solver>(this));
+  }
+
+protected:
+  std::atomic<float>* get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, int cluster) override;
+  TreeStorageNode<float>* init_avg_storage() override { return _phi_root.get(); };
+  TreeStorageNode<float>* next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state) override;
+
+  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const override;
+  void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
+
+private:
+  const std::shared_ptr<const TreeStorageConfig> make_tree_config() const;
+
+  const std::unique_ptr<TreeStorageNode<float>> _phi_root;
 };
 
 }

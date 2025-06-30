@@ -4,6 +4,7 @@
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/storage.hpp>
+#include <pluribus/tree_storage.hpp>
 #include <pluribus/blueprint.hpp>
 #include <pluribus/actions.hpp>
 #include <pluribus/calc.hpp>
@@ -34,6 +35,30 @@ public:
 private:
   const StrategyStorage<T>& _strategy;
   ActionProfile _profile;
+};
+
+template<class T>
+class TreeDecision : public DecisionAlgorithm {
+public:
+  TreeDecision(const TreeStorageNode<T>* root, const PokerState& init_state) : _root{root}, _init_state{init_state} {}
+
+  float frequency(Action a, const PokerState& state, const Board& board, const Hand& hand) const override {
+    if(!state.get_action_history().is_consistent(_init_state.get_action_history())) {
+    Logger::error("Cannot compute TreeSolver frequency for inconsistent histories:\nInitial state: " 
+        + _init_state.get_action_history().to_string() + "\nGiven state: " + state.get_action_history().to_string());
+    }
+    const TreeStorageNode<T>* node = _root;
+    for(int i = _init_state.get_action_history().size(); i < state.get_action_history().size(); ++i) {
+      node = node->apply(state.get_action_history().get(i));
+    }
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
+    auto freq = calculate_strategy(node->get(cluster), node->get_actions().size());
+    return freq[index_of(a, node->get_actions())];
+  }
+
+private:
+  const PokerState _init_state;
+  const TreeStorageNode<T>* _root;
 };
 
 template <class BlueprintT>

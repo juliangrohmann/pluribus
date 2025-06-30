@@ -121,7 +121,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       if(should_log(t)) {
         std::ostringstream metrics_fn;
         metrics_fn << std::setprecision(1) << std::fixed << t / 1'000'000.0 << ".json";
-        write_to_file(_metrics_dir / metrics_fn.str(), build_wandb_metrics(t));
+        write_to_file(_metrics_dir / metrics_fn.str(), track_wandb_metrics(t));
       }
       for(int i = 0; i < get_config().poker.n_players; ++i) {
         if(_log_level == SolverLogLevel::DEBUG) debug << "============== i = " << i << " ==============\n";
@@ -268,7 +268,9 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, long t, int
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       if(base_ptr[a_idx].load() > PRUNE_CUTOFF) {
-        int v_a = traverse_mccfr_p(state.apply(a), t, i, board, hands, indexers, eval, regret_storage, avg_storage, debug);
+        PokerState next_state = state.apply(a);
+        int v_a = traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state), 
+            next_avg_storage(avg_storage, a_idx, next_state), debug);
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
         if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
@@ -295,8 +297,11 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, long t, int
     return v;
   }
   else {
-    Action a = external_sampling(state, t, board, hands, indexers, eval, regret_storage, avg_storage, debug);
-    return traverse_mccfr_p(state.apply(a), t, i, board, hands, indexers, eval, regret_storage, avg_storage, debug);
+    auto actions = available_actions(state, get_config().action_profile);
+    int a_idx = external_sampling(actions, state, t, board, hands, indexers, eval, regret_storage, avg_storage, debug);
+    PokerState next_state = state.apply(actions[a_idx]);
+    return traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state), 
+        next_avg_storage(avg_storage, a_idx, next_state), debug);
   }
 }
 
@@ -319,7 +324,9 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, long t, int i
     float v_exact = 0;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
-      int v_a = traverse_mccfr(state.apply(a), t, i, board, hands, indexers, eval, regret_storage, avg_storage, debug);
+      PokerState next_state = state.apply(a);
+      int v_a = traverse_mccfr(next_state, t, i, board, hands, indexers, eval, 
+          next_regret_storage(regret_storage, a_idx, next_state), next_avg_storage(avg_storage, a_idx, next_state), debug);
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
       if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
@@ -342,16 +349,18 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, long t, int i
     return v;
   }
   else {
-    Action a = external_sampling(state, t, board, hands, indexers, eval, regret_storage, avg_storage, debug);
-    return traverse_mccfr_p(state.apply(a), t, i, board, hands, indexers, eval, regret_storage, avg_storage, debug);
+    auto actions = available_actions(state, get_config().action_profile);
+    int a_idx = external_sampling(actions, state, t, board, hands, indexers, eval, regret_storage, avg_storage, debug);
+    PokerState next_state = state.apply(actions[a_idx]);
+    return traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state), 
+        next_avg_storage(avg_storage, a_idx, next_state), debug);
   }
 }
 
 template <template<typename> class StorageT>
-Action MCCFRSolver<StorageT>::external_sampling(const PokerState& state, long t, const Board& board, const std::vector<Hand>& hands, 
-    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
-    std::ostringstream& debug) {
-  auto actions = available_actions(state, get_config().action_profile);
+int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const PokerState& state, long t, const Board& board, 
+    const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, 
+    StorageT<float>* avg_storage, std::ostringstream& debug) {
   std::vector<float> freq;
   int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()], 
       state.get_round()));
@@ -363,9 +372,43 @@ Action MCCFRSolver<StorageT>::external_sampling(const PokerState& state, long t,
     std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
     freq = calculate_strategy(base_ptr, actions.size());
   }
-  Action a = actions[sample_action_idx(freq)];
-  if(_log_level == SolverLogLevel::DEBUG) log_external_sampling(a, actions, freq, state, get_config().init_state, debug);
-  return a;
+  int a_idx = sample_action_idx(freq);
+  if(_log_level == SolverLogLevel::DEBUG) log_external_sampling(a_idx, actions, freq, state, get_config().init_state, debug);
+  return a_idx;
+}
+
+template <template<typename> class StorageT>
+std::string MCCFRSolver<StorageT>::track_wandb_metrics(long t) const {
+  auto t_i = std::chrono::high_resolution_clock::now();  
+  nlohmann::json metrics = {};
+  metrics["t (M)"] = static_cast<float>(get_iteration() / 1'000'000.0);
+  std::ostringstream out_str;
+  out_str << std::setprecision(1) << std::fixed << std::setw(7) << t / 1'000'000.0 << "M it   ";
+  track_regret(metrics, out_str);
+  track_strategy(metrics, out_str);
+  auto t_f = std::chrono::high_resolution_clock::now();  
+  auto dt = std::chrono::duration_cast<std::chrono::microseconds>(t_f - t_i).count();
+  out_str << std::setw(8) << dt << " us (metrics)";
+  Logger::dump(out_str);
+  return metrics.dump();
+}
+
+template <template<typename> class StorageT>
+void MCCFRSolver<StorageT>::track_strategy_by_decision(const DecisionAlgorithm& decision, nlohmann::json& metrics, bool phi) const {
+  PokerState state = get_config().init_state;
+  for(int p = 0; p < get_config().poker.n_players; ++p) {
+    if(state.active_players() <= 1) return;
+    auto actions = available_actions(state, get_config().action_profile);
+    PokerRange base_range = get_config().init_ranges[state.get_active()];
+    base_range.remove_cards(get_config().init_board);
+    for(Action a : actions) {
+      PokerRange action_range = build_action_range(base_range, a, state, get_config().init_board, decision);
+      double freq = (base_range * action_range).n_combos() / base_range.n_combos();
+      std::string data_label = pos_to_str(state.get_active(), get_config().poker.n_players) + " " + a.to_string() + (!phi ? " (regrets)" : " (phi)");
+      metrics[data_label] = freq;
+    }
+    state = state.apply(std::find(actions.begin(), actions.end(), Action::FOLD) != actions.end() ? Action::FOLD : Action::CHECK_CALL);
+  }
 }
 
 // to allow use of MCCFRSolver::traverse_mccfr friend in benchmark_mccfr.cpp without moving MCCFRSolver::traverse_mccfr to the header mccfr.hpp 
@@ -376,32 +419,42 @@ template class pluribus::MCCFRSolver<pluribus::StrategyStorage>;
 // || MappedSolver
 // ==========================================================================================
 
+float MappedSolver::frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const {
+  StrategyDecision decision{get_strategy(), get_config().action_profile};
+  return decision.frequency(action, state, board, hand);
+}
+
 std::atomic<int>* MappedSolver::get_base_regret_ptr(StrategyStorage<int>* storage, const PokerState& state, int cluster) {
   return &storage->get(state, cluster);
 }
 
-template <class T>
-void MappedSolver::log_strategy(const StrategyStorage<T>& strat, const SolverConfig& config, nlohmann::json& metrics, bool phi) const {
-  PokerState state = config.init_state;
-  for(int p = 0; p < config.poker.n_players; ++p) {
-    if(state.active_players() <= 1) return;
-    auto actions = available_actions(state, config.action_profile);
-    PokerRange range_copy = config.init_ranges[state.get_active()];
-    
-    auto ranges = build_renderable_ranges(strat, config.action_profile, state, config.init_board, range_copy);
-    for(Action a : actions) {
-      double freq = ranges.at(a).get_range().n_combos() / MAX_COMBOS;
-      std::string data_label = pos_to_str(state.get_active(), config.poker.n_players) + " " + a.to_string() + (!phi ? " (regrets)" : " (phi)");
-      metrics[data_label] = freq;
-    }
-    state = state.apply(std::find(actions.begin(), actions.end(), Action::FOLD) != actions.end() ? Action::FOLD : Action::CHECK_CALL);
-  }
+void MappedSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
+  track_strategy_by_decision(StrategyDecision{get_strategy(), get_config().action_profile}, metrics, false);
 }
 
-float MappedSolver::frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const {
-    StrategyDecision decision{get_strategy(), get_config().action_profile};
-    return decision.frequency(action, state, board, hand);
-  }
+// ==========================================================================================
+// || TreeSolver
+// ==========================================================================================
+
+TreeSolver::TreeSolver(const SolverConfig& config, const std::shared_ptr<const TreeStorageConfig> tree_config) 
+    : MCCFRSolver{config}, _tree_config{tree_config}, _regrets_root{std::make_unique<TreeStorageNode<int>>(config.init_state, _tree_config)} {}
+
+float TreeSolver::frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const {
+  TreeDecision<int> decision{_regrets_root.get(), get_config().init_state};
+  return decision.frequency(action, state, board, hand);
+}
+
+std::atomic<int>* TreeSolver::get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) { 
+  return storage->get(cluster); 
+};
+
+TreeStorageNode<int>* TreeSolver::next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state) {
+  return storage->apply_index(action_idx, next_state);
+}
+
+void TreeSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
+  track_strategy_by_decision(TreeDecision<int>{_regrets_root.get(), get_config().init_state}, metrics, false);
+}
 
 // ==========================================================================================
 // || BlueprintSolver
@@ -428,11 +481,16 @@ void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, 
       debug << "\n";
     }
     this->get_base_avg_ptr(avg_storage, state, cluster)[a_idx].fetch_add(1.0f);
-    update_strategy(state.apply(actions[a_idx]), i, board, hands, regret_storage, avg_storage, debug);
+    PokerState next_state = state.apply(actions[a_idx]);
+    update_strategy(next_state, i, board, hands, this->next_regret_storage(regret_storage, a_idx, next_state), 
+        this->next_avg_storage(avg_storage, a_idx, next_state), debug);
   }
   else {
-    for(Action action : this->available_actions(state, this->get_config().action_profile)) {
-      update_strategy(state.apply(action), i, board, hands, regret_storage, avg_storage, debug);
+    auto actions = this->available_actions(state, this->get_config().action_profile);
+    for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
+      PokerState next_state = state.apply(actions[a_idx]);
+      update_strategy(next_state, i, board, hands, this->next_regret_storage(regret_storage, a_idx, next_state), 
+          this->next_avg_storage(avg_storage, a_idx, next_state), debug);
     }
   }
 }
@@ -497,26 +555,23 @@ std::atomic<float>* MappedBlueprintSolver::get_base_avg_ptr(StrategyStorage<floa
   return &storage->get(state, cluster);
 }
 
-std::string MappedBlueprintSolver::build_wandb_metrics(long t) const {
-  long avg_regret = 0;
-  for(auto& r : get_strategy().data()) avg_regret += std::max(r.load(), 0); // should be sum of the maximum regret at each infoset, not sum of all regrets
-  avg_regret /= t;
-  std::ostringstream buf;
-  buf << std::setprecision(1) << std::fixed << std::setw(7) << t / 1'000'000.0 << "M it   " 
-      << std::setw(12) << avg_regret << " avg regret";
-  Logger::dump(buf);
-  nlohmann::json metrics = {
-    {"avg_regret", static_cast<int>(avg_regret)},
-    {"t (M)", static_cast<float>(t / 1'000'000.0)}
-  };
-  log_strategy(get_strategy(), get_config(), metrics, false);
-  log_strategy(get_phi(), get_config(), metrics, true);
-  return metrics.dump();
-}
-
 bool MappedBlueprintSolver::operator==(const MappedBlueprintSolver& other) const {
   return MappedSolver::operator==(other) && BlueprintSolver::operator==(other) && _phi == other._phi;
 }
+
+void MappedBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
+  MappedSolver::track_strategy(metrics, out_str);
+  track_strategy_by_decision(StrategyDecision{get_phi(), get_config().action_profile}, metrics, true);
+}
+
+void MappedBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const {
+  long avg_regret = 0;
+  for(auto& r : get_strategy().data()) avg_regret += std::max(r.load(), 0); // should be sum of the maximum regret at each infoset, not sum of all regrets
+  avg_regret /= get_iteration();
+  out_str << std::setw(8) << avg_regret << " avg regret   ";
+  metrics["avg_regret"] = static_cast<int>(avg_regret);
+}
+
 
 // ==========================================================================================
 // || MappedRealTimeSolver
@@ -531,8 +586,7 @@ MappedRealTimeSolver::MappedRealTimeSolver(const std::shared_ptr<const SampledBl
   if(rt_config.log_interval < 1) Logger::error("Invalid log interval: " + std::to_string(rt_config.log_interval));
 }
 
-std::string MappedRealTimeSolver::build_wandb_metrics(long t) const {
-  auto t_i = std::chrono::high_resolution_clock::now();  
+void MappedRealTimeSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const {
   long max_regret_sum = 0;
   for(const auto& entry : get_strategy().history_map()) {
     PokerState state{get_config().poker};
@@ -547,20 +601,53 @@ std::string MappedRealTimeSolver::build_wandb_metrics(long t) const {
       max_regret_sum += max_regret;
     }
   }
-  double avg_max_regrets = max_regret_sum / static_cast<double>(t);
-  std::ostringstream buf;
-  buf << std::setprecision(1) << std::fixed << std::setw(7) << t / 1'000'000.0 << "M it   " 
-      << std::setw(8) << avg_max_regrets << " avg max regret   ";
-  nlohmann::json metrics = {
-    {"avg_regret", static_cast<int>(avg_max_regrets)},
-    {"t (M)", static_cast<float>(t / 1'000'000.0)}
-  };
-  log_strategy(get_strategy(), get_config(), metrics, false);
-  auto t_f = std::chrono::high_resolution_clock::now();  
-  auto dt = std::chrono::duration_cast<std::chrono::microseconds>(t_f - t_i).count();
-  buf << std::setw(8) << dt << " us (metrics)";
-  Logger::dump(buf);
-  return metrics.dump();
+  double avg_max_regrets = max_regret_sum / static_cast<double>(get_iteration());
+  out_str << std::setw(8) << std::fixed << std::setprecision(2) << avg_max_regrets << " avg max regret   ";
+  metrics["avg_regret"] = static_cast<int>(avg_max_regrets);
+}
+
+// ==========================================================================================
+// || TreeBlueprintSolver
+// ==========================================================================================
+
+const std::shared_ptr<const TreeStorageConfig> TreeBlueprintSolver::make_tree_config() const {
+  return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
+    [](const PokerState& state) { return state.get_round() == 0 ? 169 : 200; },
+    [this](const PokerState& state) { return available_actions(state, this->get_config().action_profile); }
+  });
+}
+
+TreeBlueprintSolver::TreeBlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config) 
+    : TreeSolver{config, make_tree_config()}, BlueprintSolver{config, bp_config}, MCCFRSolver{config},
+    _phi_root{std::make_unique<TreeStorageNode<float>>(config.init_state, get_tree_config())} {
+
+}
+
+std::atomic<float>* TreeBlueprintSolver::get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, int cluster) {
+  return storage->get(cluster);
+}
+
+TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state) {
+  return storage->apply_index(action_idx, next_state);
+}
+
+void TreeBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
+  TreeSolver::track_strategy(metrics, out_str);
+  track_strategy_by_decision(TreeDecision<float>{_phi_root.get(), get_config().init_state}, metrics, false);
+}
+
+long sum_node_regrets(const TreeStorageNode<int>* node) {
+  long r = 0;
+  for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+    if(node->is_allocated(a_idx)) r += sum_node_regrets(node->apply_index(a_idx));
+  }
+  return r;
+}
+
+void TreeBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const {
+  long avg_regret = sum_node_regrets(get_regrets_root()) / get_iteration(); // should be sum of the maximum regret at each infoset, not sum of all regrets
+  out_str << std::setw(8) << avg_regret << " avg regret   ";
+  metrics["avg_regret"] = static_cast<int>(avg_regret);
 }
 
 }
