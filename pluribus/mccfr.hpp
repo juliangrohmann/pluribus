@@ -38,6 +38,8 @@ public:
   SolverState get_state() { return _state; }; 
   void solve(long t_plus);
   virtual float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const = 0;
+  
+  bool operator==(const Solver& other) const { return _config == other._config; }
 
 protected:
   virtual void _solve(long t_plus) = 0;
@@ -63,13 +65,13 @@ public:
   void set_log_dir(std::string log_dir) { _log_dir = log_dir; }
   void set_log_level(SolverLogLevel log_level) { _log_level = log_level; }
 
+  bool operator==(const MCCFRSolver& other) const { return Solver::operator==(other) && _t == other._t; }
+
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_t);
   }
 
-  virtual ~MCCFRSolver() = default;
-  
 protected:
   void _solve(long t_plus) override;
   
@@ -126,40 +128,50 @@ private:
   SolverLogLevel _log_level = SolverLogLevel::ERRORS;
 };
 
-class MappedMCCFRSolver : public MCCFRSolver<StrategyStorage>, public Strategy<int> {
+class MappedSolver : virtual public MCCFRSolver<StrategyStorage>, public Strategy<int> {
 public:
-  MappedMCCFRSolver(const SolverConfig& config) : MCCFRSolver{config} {}
+  MappedSolver(const SolverConfig& config, int n_clusters) : MCCFRSolver{config}, _regrets{config.action_profile, n_clusters} {}
 
   float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const;
+  const StrategyStorage<int>& get_strategy() const { return _regrets; }
   const SolverConfig& get_config() const override { return Solver::get_config(); }
   
+  bool operator==(const MappedSolver& other) const { return MCCFRSolver::operator==(other) && _regrets == other._regrets; }
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_regrets);
+  }
+
 protected:
   std::atomic<int>* get_base_regret_ptr(StrategyStorage<int>* storage, const PokerState& state, int cluster) override;
+  StrategyStorage<int>* init_regret_storage() override { return &_regrets; }
   StrategyStorage<int>* next_regret_storage(StrategyStorage<int>* storage, Action action, const PokerState& next_state) override { return storage; }
 
   template <class T>
   void log_strategy(const StrategyStorage<T>& strat, const SolverConfig& config, nlohmann::json& metrics, bool phi) const;
+
+private:
+  StrategyStorage<int> _regrets;
 };
 
-class BlueprintSolver : public MappedMCCFRSolver {
+template <template<typename> class StorageT>
+class BlueprintSolver : virtual public MCCFRSolver<StorageT> {
 public:
-  BlueprintSolver(const BlueprintSolverConfig& bp_config = BlueprintSolverConfig{}, const SolverConfig& solver_config = SolverConfig{});
-  bool operator==(const BlueprintSolver& other) const;
-  
-  const StrategyStorage<int>& get_strategy() const { return _regrets; }
-  const StrategyStorage<float>& get_phi() const { return _phi; }
+  BlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config) : _bp_config{bp_config} {}
+
   const BlueprintSolverConfig& get_blueprint_config() const { return _bp_config; }
+
+  bool operator==(const BlueprintSolver& other) const { return MCCFRSolver<StorageT>::operator==(other) && _bp_config == other._bp_config; }
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_regrets, _phi, _bp_config, cereal::base_class<MCCFRSolver>(this));
+    ar(_bp_config);
   }
 
 protected:
-  std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override;
-  StrategyStorage<int>* init_regret_storage() override { return &_regrets; }
-  StrategyStorage<float>* init_avg_storage() override { return &_phi; };
-  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, Action action, const PokerState& next_state) override { return storage; }
+  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, StorageT<int>* regret_storage, 
+      StorageT<float>* avg_storage, std::ostringstream& debug);
 
   void on_start() override { Logger::log("Blueprint solver config:\n" + _bp_config.to_string()); }
   void on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) override;
@@ -172,36 +184,27 @@ protected:
   long next_step(long t, long T) const override;
   
   double get_discount_factor(long t) const override { return _bp_config.get_discount_factor(t); }
-  std::string build_wandb_metrics(long t) const override;
+  
+  #ifdef UNIT_TEST
+  template <template<typename> class T>
+  friend void call_update_strategy(BlueprintSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands,
+      StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug);
+  #endif
 
 private:
-  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, std::ostringstream& debug);
-
-#ifdef UNIT_TEST
-  friend void call_update_strategy(BlueprintSolver* trainer, const PokerState& state, int i, const Board& board,
-                                   const std::vector<Hand>& hands, std::ostringstream& debug);
-#endif
-  StrategyStorage<int> _regrets;
-  StrategyStorage<float> _phi;
   BlueprintSolverConfig _bp_config;
 };
 
-class SampledBlueprint;
-
-class RealTimeMCCFR : public MappedMCCFRSolver {
+template <template<typename> class StorageT>
+class RealTimeSolver : virtual public MCCFRSolver<StorageT> {
 public:
-  RealTimeMCCFR(const SolverConfig& config, RealTimeSolverConfig rt_config, const std::shared_ptr<const SampledBlueprint> bp);
-  const StrategyStorage<int>& get_strategy() const { return _regrets; }
+  RealTimeSolver(const std::shared_ptr<const SampledBlueprint> bp, const RealTimeSolverConfig& rt_config)
+      : _bp{bp}, _rt_config{rt_config}, _action_provider{} {}
 
 protected:
-  std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override { return nullptr; }
-  StrategyStorage<int>* init_regret_storage() override { return &_regrets; }
-  StrategyStorage<float>* init_avg_storage() override { return nullptr; }
-  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, Action action, const PokerState& next_state) override { return nullptr; }
-
   int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const override;
-  bool is_terminal(const PokerState& state) const override;
+  bool is_terminal(const PokerState& state) const override { return state.has_biases(); }
   std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const override;
 
   void on_start() override { Logger::log("Real time solver config:\n" + _rt_config.to_string()); }
@@ -214,13 +217,47 @@ protected:
   
   double get_discount_factor(long t) const override { return _rt_config.get_discount_factor(t); }
 
-  std::string build_wandb_metrics(long t) const override;
-
 private:
   const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
-  StrategyStorage<int> _regrets;
   RealTimeSolverConfig _rt_config;
   SampledActionProvider _action_provider;
+};
+
+class MappedBlueprintSolver : virtual public MappedSolver, virtual public BlueprintSolver<StrategyStorage> {
+public:
+  MappedBlueprintSolver(const SolverConfig& config = SolverConfig{}, const BlueprintSolverConfig& bp_config = BlueprintSolverConfig{});
+
+  const StrategyStorage<float>& get_phi() const { return _phi; }
+
+  bool operator==(const MappedBlueprintSolver& other) const;
+  
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_phi, cereal::base_class<MappedSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this));
+  }
+
+protected:
+  std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override;
+  StrategyStorage<float>* init_avg_storage() override { return &_phi; };
+  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, Action action, const PokerState& next_state) override { return storage; }
+
+  std::string build_wandb_metrics(long t) const override;
+
+  StrategyStorage<float> _phi;
+};
+
+class SampledBlueprint;
+
+class MappedRealTimeSolver : virtual public MappedSolver, virtual public RealTimeSolver<StrategyStorage> {
+public:
+  MappedRealTimeSolver(const std::shared_ptr<const SampledBlueprint> bp, const RealTimeSolverConfig& rt_config = RealTimeSolverConfig{});
+
+protected:
+  std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override { return nullptr; }
+  StrategyStorage<float>* init_avg_storage() override { return nullptr; }
+  StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, Action action, const PokerState& next_state) override { return nullptr; }
+
+  std::string build_wandb_metrics(long t) const override;
 };
 
 }

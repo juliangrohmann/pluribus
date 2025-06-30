@@ -373,15 +373,15 @@ Action MCCFRSolver<StorageT>::external_sampling(const PokerState& state, long t,
 template class pluribus::MCCFRSolver<pluribus::StrategyStorage>; 
 
 // ==========================================================================================
-// || MappedMCCFRSolver
+// || MappedSolver
 // ==========================================================================================
 
-std::atomic<int>* MappedMCCFRSolver::get_base_regret_ptr(StrategyStorage<int>* storage, const PokerState& state, int cluster) {
+std::atomic<int>* MappedSolver::get_base_regret_ptr(StrategyStorage<int>* storage, const PokerState& state, int cluster) {
   return &storage->get(state, cluster);
 }
 
 template <class T>
-void MappedMCCFRSolver::log_strategy(const StrategyStorage<T>& strat, const SolverConfig& config, nlohmann::json& metrics, bool phi) const {
+void MappedSolver::log_strategy(const StrategyStorage<T>& strat, const SolverConfig& config, nlohmann::json& metrics, bool phi) const {
   PokerState state = config.init_state;
   for(int p = 0; p < config.poker.n_players; ++p) {
     if(state.active_players() <= 1) return;
@@ -398,7 +398,7 @@ void MappedMCCFRSolver::log_strategy(const StrategyStorage<T>& strat, const Solv
   }
 }
 
-float MappedMCCFRSolver::frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const {
+float MappedSolver::frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const {
     StrategyDecision decision{get_strategy(), get_config().action_profile};
     return decision.frequency(action, state, board, hand);
   }
@@ -407,64 +407,97 @@ float MappedMCCFRSolver::frequency(Action action, const PokerState& state, const
 // || BlueprintSolver
 // ==========================================================================================
 
-std::atomic<float>* BlueprintSolver::get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) {
-  return &storage->get(state, cluster);
-}
-
-BlueprintSolver::BlueprintSolver(const BlueprintSolverConfig& bp_config, const SolverConfig& solver_config) 
-    : MappedMCCFRSolver{solver_config}, _regrets{solver_config.action_profile, 200}, _phi{solver_config.action_profile, 169}, _bp_config{bp_config} 
-    {}
-
-void BlueprintSolver::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
-    std::ostringstream& debug) {
+template <template<typename> class StorageT>
+void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
+    StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug) {
   if(state.get_winner() != -1 || state.get_round() > 0 || state.get_players()[i].has_folded()) {
     return;
   }
   else if(state.get_active() == i) {
-    auto actions = available_actions(state, get_config().action_profile);
+    auto actions = this->available_actions(state, this->get_config().action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
-    size_t regret_base_idx = _regrets.index(state, cluster);
-    auto freq = calculate_strategy(&_regrets[regret_base_idx], actions.size());
+    std::atomic<int>* base_ptr = this->get_base_regret_ptr(regret_storage, state, cluster);
+    auto freq = calculate_strategy(base_ptr, actions.size());
     int a_idx = sample_action_idx(freq);
-    if(get_log_level() != SolverLogLevel::NONE) {
-      debug << "Update strategy: " << relative_history_str(state, get_config().init_state) << "\n";
+    if(this->get_log_level() != SolverLogLevel::NONE) {
+      debug << "Update strategy: " << relative_history_str(state, this->get_config().init_state) << "\n";
       debug << "\t" << hands[i].to_string() << ": (cluster=" << cluster << ")\n\t";
       for(int ai = 0; ai < actions.size(); ++ai) {
         debug << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << freq[ai] << "  ";
       }
       debug << "\n";
     }
-
-    #pragma omp critical
-    _phi[_phi.index(state, cluster, a_idx)] += 1.0f;
-
-    update_strategy(state.apply(actions[a_idx]), i, board, hands, debug);
+    this->get_base_avg_ptr(avg_storage, state, cluster)[a_idx].fetch_add(1.0f);
+    update_strategy(state.apply(actions[a_idx]), i, board, hands, regret_storage, avg_storage, debug);
   }
   else {
-    for(Action action : available_actions(state, get_config().action_profile)) {
-      update_strategy(state.apply(action), i, board, hands, debug);
+    for(Action action : this->available_actions(state, this->get_config().action_profile)) {
+      update_strategy(state.apply(action), i, board, hands, regret_storage, avg_storage, debug);
     }
   }
 }
 
-void BlueprintSolver::on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) {
-  if(t > 0 && t % _bp_config.strategy_interval == 0 && t < _bp_config.preflop_threshold) {
-    if(get_log_level() != SolverLogLevel::NONE) debug << "============== Updating strategy ==============\n";
-    update_strategy(get_config().init_state, i, get_config().init_board, hands, debug);
+template <template<typename> class StorageT>
+void BlueprintSolver<StorageT>::on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) {
+  if(t > 0 && t % get_blueprint_config().strategy_interval == 0 && t < get_blueprint_config().preflop_threshold) {
+    if(this->get_log_level() != SolverLogLevel::NONE) debug << "============== Updating strategy ==============\n";
+    update_strategy(this->get_config().init_state, i, this->get_config().init_board, hands, 
+        this->init_regret_storage(), this->init_avg_storage(), debug);
   }
 }
 
-bool BlueprintSolver::should_prune(long t) const {
+template <template<typename> class StorageT>
+bool BlueprintSolver<StorageT>::should_prune(long t) const {
   if(t < _bp_config.prune_thresh) return false;
   std::uniform_real_distribution<float> dist(0.0f, 1.0f);
   return dist(GlobalRNG::instance()) > 0.95;
 }
 
-long BlueprintSolver::next_step(long t, long T) const {
+template <template<typename> class StorageT>
+long BlueprintSolver<StorageT>::next_step(long t, long T) const {
   return std::min(std::min(_bp_config.next_discount_step(t, T), _bp_config.next_snapshot_step(t, T)), T);
 }
 
-std::string BlueprintSolver::build_wandb_metrics(long t) const {
+// ==========================================================================================
+// || RealTimeSolver
+// ==========================================================================================
+
+template <template<typename> class StorageT>
+int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
+    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
+  if(state.get_active() != state._first_bias) {
+    Logger::error("Active player changed after biasing. Active=" + std::to_string(static_cast<int>(state.get_active())) + 
+        ", First bias=" + std::to_string(static_cast<int>(state._first_bias)));
+  }
+  PokerState curr_state = state;
+  while(!state.is_terminal() && !state.get_players()[i].has_folded()) {
+    curr_state = curr_state.apply(_action_provider.next_action(indexers[state.get_active()], state, hands, board, _bp.get()));
+  }
+  return utility(curr_state, i, board, hands, stack_size, eval);
+}
+
+template <template<typename> class StorageT>
+std::vector<Action> RealTimeSolver<StorageT>::available_actions(const PokerState& state, const ActionProfile& profile) const {
+  if(state.get_round() >= _rt_config.terminal_round || state.get_bet_level() >= _rt_config.terminal_bet_level) {
+    return _rt_config.bias_profile.get_actions(0, 0, 0, 0);
+  }
+  else {
+    return valid_actions(state, profile);
+  }
+}
+
+// ==========================================================================================
+// || MappedBlueprintSolver
+// ==========================================================================================
+
+MappedBlueprintSolver::MappedBlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config) 
+    : MappedSolver{config, 200}, BlueprintSolver{config, bp_config}, MCCFRSolver{config}, _phi{config.action_profile, 169} {}
+
+std::atomic<float>* MappedBlueprintSolver::get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) {
+  return &storage->get(state, cluster);
+}
+
+std::string MappedBlueprintSolver::build_wandb_metrics(long t) const {
   long avg_regret = 0;
   for(auto& r : get_strategy().data()) avg_regret += std::max(r.load(), 0); // should be sum of the maximum regret at each infoset, not sum of all regrets
   avg_regret /= t;
@@ -481,18 +514,16 @@ std::string BlueprintSolver::build_wandb_metrics(long t) const {
   return metrics.dump();
 }
 
-bool BlueprintSolver::operator==(const BlueprintSolver& other) const {
-  return _regrets == other._regrets &&
-         _phi == other._phi &&
-         _bp_config == other._bp_config;
+bool MappedBlueprintSolver::operator==(const MappedBlueprintSolver& other) const {
+  return MappedSolver::operator==(other) && BlueprintSolver::operator==(other) && _phi == other._phi;
 }
 
 // ==========================================================================================
-// || RealTimeMCCFR
+// || MappedRealTimeSolver
 // ==========================================================================================
 
-RealTimeMCCFR::RealTimeMCCFR(const SolverConfig& config, RealTimeSolverConfig rt_config, const std::shared_ptr<const SampledBlueprint> bp)
-    : MappedMCCFRSolver{config}, _bp{bp}, _regrets{config.action_profile, MAX_COMBOS}, _rt_config{rt_config}, _action_provider{} {
+MappedRealTimeSolver::MappedRealTimeSolver(const std::shared_ptr<const SampledBlueprint> bp, const RealTimeSolverConfig& rt_config)
+    : MappedSolver{bp->get_config(), MAX_COMBOS}, RealTimeSolver{bp, rt_config}, MCCFRSolver{bp->get_config()} {
   if(rt_config.terminal_round < 1 || rt_config.terminal_round > 4) 
     Logger::error("Invalid terminal round: " + std::to_string(rt_config.terminal_round));
   if(rt_config.terminal_bet_level < 1) Logger::error("Invalid terminal bet level: " + std::to_string(rt_config.terminal_bet_level));
@@ -500,44 +531,18 @@ RealTimeMCCFR::RealTimeMCCFR(const SolverConfig& config, RealTimeSolverConfig rt
   if(rt_config.log_interval < 1) Logger::error("Invalid log interval: " + std::to_string(rt_config.log_interval));
 }
 
-bool RealTimeMCCFR::is_terminal(const PokerState& state) const {
-  return state.has_biases();
-}
-
-int RealTimeMCCFR::terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
-    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
-  if(state.get_active() != state._first_bias) {
-    Logger::error("Active player changed after biasing. Active=" + std::to_string(static_cast<int>(state.get_active())) + 
-        ", First bias=" + std::to_string(static_cast<int>(state._first_bias)));
-  }
-  PokerState curr_state = state;
-  while(!state.is_terminal() && !state.get_players()[i].has_folded()) {
-    curr_state = curr_state.apply(_action_provider.next_action(indexers[state.get_active()], state, hands, board, _bp.get()));
-  }
-  return utility(curr_state, i, board, hands, stack_size, eval);
-}
-
-std::vector<Action> RealTimeMCCFR::available_actions(const PokerState& state, const ActionProfile& profile) const {
-  if(state.get_round() >= _rt_config.terminal_round || state.get_bet_level() >= _rt_config.terminal_bet_level) {
-    return _rt_config.bias_profile.get_actions(0, 0, 0, 0);
-  }
-  else {
-    return valid_actions(state, profile);
-  }
-}
-
-std::string RealTimeMCCFR::build_wandb_metrics(long t) const {
+std::string MappedRealTimeSolver::build_wandb_metrics(long t) const {
   auto t_i = std::chrono::high_resolution_clock::now();  
   long max_regret_sum = 0;
-  for(const auto& entry : _regrets.history_map()) {
+  for(const auto& entry : get_strategy().history_map()) {
     PokerState state{get_config().poker};
     state = state.apply(entry.first);
     auto actions = available_actions(state, get_config().action_profile);
-    for(int c = 0; c < _regrets.n_clusters(); ++c) {
+    for(int c = 0; c < get_strategy().n_clusters(); ++c) {
       int max_regret = 0;
       size_t base_idx = entry.second.idx + c * actions.size();
       for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-        max_regret = std::max(_regrets[base_idx + a_idx].load(), max_regret);
+        max_regret = std::max(get_strategy()[base_idx + a_idx].load(), max_regret);
       }
       max_regret_sum += max_regret;
     }

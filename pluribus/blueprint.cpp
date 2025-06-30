@@ -37,7 +37,7 @@ bool validate_preflop_fn(const std::string& preflop_fn, const std::vector<std::s
   return false;
 }
 
-void set_meta_config(LosslessMetadata& meta, const BlueprintSolver& bp) {
+void set_meta_config(LosslessMetadata& meta, const MappedBlueprintSolver& bp) {
   meta.config = bp.get_config();
   meta.n_clusters = bp.get_strategy().n_clusters();
   Logger::log("Initialized blueprint config:");
@@ -79,7 +79,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
   int buf_idx = 0;
   for(int bp_idx = 0; bp_idx < all_fns.size(); ++bp_idx) {
     Logger::log("Loading blueprint " + std::to_string(bp_idx) + "...");
-    BlueprintSolver bp;
+    MappedBlueprintSolver bp;
     cereal_load(bp, all_fns[bp_idx]);
     const auto& regrets = bp.get_strategy();
     if(bp_idx == 0) {
@@ -151,7 +151,7 @@ LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std:
   LosslessMetadata meta;
   meta.preflop_buf_fn = preflop_buf_fn;
   meta.buffer_fns = buffer_fns;
-  BlueprintSolver final_bp;
+  MappedBlueprintSolver final_bp;
   cereal_load(final_bp, final_bp_fn);
   set_meta_config(meta, final_bp);
   set_meta_strategy_info(meta, final_bp.get_strategy());

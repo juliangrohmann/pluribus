@@ -24,7 +24,7 @@ Action BlueprintAgent::act(const PokerState& state, const Board& board, const Ha
   return actions[sample_action_idx(freq)];
 }
 
-// SampledBlueprintAgent::SampledBlueprintAgent(const BlueprintSolver& trainer) : 
+// SampledBlueprintAgent::SampledBlueprintAgent(const MappedBlueprintSolver& trainer) : 
 //     _strategy{trainer.get_config().poker, trainer.get_strategy().n_clusters()}, _action_profile{trainer.get_config().action_profile} {
 //   std::cout << "Populating sampled blueprint...\n";
 //   populate(PokerState{trainer.get_config().poker}, trainer);
@@ -35,7 +35,7 @@ Action BlueprintAgent::act(const PokerState& state, const Board& board, const Ha
 //   return _strategy[info_set];
 // }
 
-// void SampledBlueprintAgent::populate(const PokerState& state, const BlueprintSolver& trainer) {
+// void SampledBlueprintAgent::populate(const PokerState& state, const MappedBlueprintSolver& trainer) {
 //   if(state.is_terminal()) return;
 
 //   int n_clusters = state.get_round() == 0 ? 169 : 200;
@@ -85,7 +85,7 @@ void evaluate_agents(const std::vector<Agent*>& agents, const PokerConfig& confi
   }
 }
 
-void evaluate_strategies(const std::vector<BlueprintSolver*>& trainer_ps, long n_iter) {
+void evaluate_strategies(const std::vector<MappedBlueprintSolver*>& trainer_ps, long n_iter) {
   std::vector<BlueprintAgent> agents;
   for(const auto& p : trainer_ps) agents.push_back(BlueprintAgent{p});
   std::vector<Agent*> agent_ps;
@@ -93,7 +93,7 @@ void evaluate_strategies(const std::vector<BlueprintSolver*>& trainer_ps, long n
   evaluate_agents(agent_ps, trainer_ps[0]->get_config().poker, n_iter);
 }
 
-void evaluate_vs_random(const BlueprintSolver* trainer_p, long n_iter) {
+void evaluate_vs_random(const MappedBlueprintSolver* trainer_p, long n_iter) {
   BlueprintAgent bp_agent{trainer_p};
   std::vector<RandomAgent> rng_agents;
   for(int i = 0; i < trainer_p->get_config().poker.n_players - 1; ++i) rng_agents.push_back(RandomAgent(trainer_p->get_config().action_profile));

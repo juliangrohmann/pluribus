@@ -133,9 +133,10 @@ TEST_CASE("OCHS features", "[ochs]") {
 
 namespace pluribus {
 
-void call_update_strategy(BlueprintSolver* trainer, const PokerState& state, int i, const Board& board, 
-                          const std::vector<Hand>& hands, std::ostringstream& debug) {
-  trainer->update_strategy(state, i, board, hands, debug);
+template <template<typename> class StorageT>
+void call_update_strategy(BlueprintSolver<StorageT>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands,
+    StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug) {
+  trainer->update_strategy(state, i, board, hands, trainer->init_regret_storage(), trainer->init_avg_storage(), debug);
 }
 
 template <template<typename> class StorageT>
@@ -156,7 +157,7 @@ int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state,
 //   Board board{"AcTd2h3cQs"};
 //   std::vector<Hand> hands{Hand{"AsQs"}, Hand{"5c5h"}, Hand{"Kh5d"}, Hand{"Ah3d"}, Hand{"9s9h"}, Hand{"QhJd"}};
 //   // std::vector<Hand> hands{Hand{"AsQs"}, Hand{"5c5h"}};
-//   BlueprintSolver trainer{BlueprintSolverConfig{}, SolverConfig{config}};
+//   MappedBlueprintSolver trainer{BlueprintSolverConfig{}, SolverConfig{config}};
 //   trainer.set_log_level(SolverLogLevel::NONE);
 //   // trainer.allocate_all();
 //   std::ostringstream debug;

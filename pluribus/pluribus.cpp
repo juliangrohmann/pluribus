@@ -123,7 +123,7 @@ int terminal_round(const PokerState& root) {
 }
 
 void Pluribus::_init_solver() {
-  Logger::log("Initializing solver: RealTimeMCCFR");
+  Logger::log("Initializing solver: MappedRealTimeSolver");
   SolverConfig config{_sampled_bp->get_config().poker};
   config.init_state = _root_state;
   config.init_board = _board;
@@ -132,7 +132,7 @@ void Pluribus::_init_solver() {
   RealTimeSolverConfig rt_config;
   rt_config.terminal_round = terminal_round(_root_state);
   rt_config.terminal_bet_level = 999;
-  _solver = std::unique_ptr<Solver>{new RealTimeMCCFR{config, rt_config, _sampled_bp}};
+  _solver = std::unique_ptr<Solver>{new MappedRealTimeSolver{_sampled_bp, rt_config}};
 }
 
 bool can_solve(const PokerState& root) {

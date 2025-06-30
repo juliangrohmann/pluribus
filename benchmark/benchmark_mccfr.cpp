@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
 
   SolverConfig config{2, 10'000, 0};
   omp::HandEvaluator eval;
-  BlueprintSolver trainer{BlueprintSolverConfig{}, config};
+  MappedBlueprintSolver trainer{config, BlueprintSolverConfig{}};
   trainer.set_log_level(SolverLogLevel::NONE);
   std::ostringstream debug;
   // TODO: allocate all storage nodes

@@ -410,8 +410,7 @@ TEST_CASE("Serialize ActionHistory", "[serialize]") {
 }
 
 TEST_CASE("Serialize StrategyStorage, BlueprintSolver", "[serialize][blueprint][slow]") {
-  BlueprintSolverConfig config{};
-  BlueprintSolver trainer{config};
+  MappedBlueprintSolver trainer{};
   trainer.solve(100'000);
 
   REQUIRE(test_serialization(trainer.get_strategy()));
