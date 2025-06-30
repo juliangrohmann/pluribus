@@ -227,10 +227,10 @@ void log_action_ev(Action a, float freq, int ev, const PokerState& state, const 
   debug << "\tu(" << a.to_string() << ") @ " << std::setprecision(2) << std::fixed << freq << " = " << ev << "\n";
 }
 
-void log_net_ev(int ev, float ev_exact, const PokerState& state, const PokerState& init_state, std::ostringstream& debug) {
+void log_net_ev(bool frozen, int ev, float ev_exact, const PokerState& state, const PokerState& init_state, std::ostringstream& debug) {
   debug << "Net EV: " << relative_history_str(state, init_state) << "\n";
   debug << "\tu(sigma) = " << std::setprecision(2) << std::fixed << ev << " (exact=" << ev_exact << ")\n";
-  if(state.get_round() == 0) debug << "Preflop frozen, skipping regret update.\n";
+  if(state.get_round() == 0 && frozen) debug << "Preflop frozen, skipping regret update.\n";
 }
 
 void log_regret(Action a, int d_r, int next_r, std::ostringstream& debug) {
@@ -278,7 +278,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, long t, int
       }
     }
     int v = round(v_exact);
-    if(_log_level == SolverLogLevel::DEBUG) log_net_ev(v, v_exact, state, get_config().init_state, debug);
+    if(_log_level == SolverLogLevel::DEBUG) log_net_ev(is_preflop_frozen(t), v, v_exact, state, get_config().init_state, debug);
     if(state.get_round() == 0 && is_preflop_frozen(t)) return v;
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
@@ -333,7 +333,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, long t, int i
       if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
     }
     int v = round(v_exact);
-    if(_log_level == SolverLogLevel::DEBUG) log_net_ev(v, v_exact, state, get_config().init_state, debug);
+    if(_log_level == SolverLogLevel::DEBUG) log_net_ev(is_preflop_frozen(t), v, v_exact, state, get_config().init_state, debug);
     if(state.get_round() == 0 && is_preflop_frozen(t)) return v;
 
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
@@ -382,7 +382,7 @@ template <template<typename> class StorageT>
 std::string MCCFRSolver<StorageT>::track_wandb_metrics(long t) const {
   auto t_i = std::chrono::high_resolution_clock::now();  
   nlohmann::json metrics = {};
-  metrics["t (M)"] = static_cast<float>(get_iteration() / 1'000'000.0);
+  metrics["t (M)"] = static_cast<float>(t / 1'000'000.0);
   std::ostringstream out_str;
   out_str << std::setprecision(1) << std::fixed << std::setw(7) << t / 1'000'000.0 << "M it   ";
   track_regret(metrics, out_str);
