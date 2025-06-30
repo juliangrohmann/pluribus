@@ -226,7 +226,7 @@ protected:
   bool should_discount(long t) const override { return _bp_config.is_discount_step(t); }
   bool should_snapshot(long t, long T) const override { return _bp_config.is_snapshot_step(t, T); }
   bool should_log(long t) const override { return t > 0 && t % _bp_config.log_interval == 0; }
-  bool is_preflop_frozen(long t) const override { return t > _bp_config.preflop_threshold; }
+  bool is_preflop_frozen(long t) const override { return false; /* return t > _bp_config.preflop_threshold; */ }
   long next_step(long t, long T) const override;
   
   double get_discount_factor(long t) const override { return _bp_config.get_discount_factor(t); }
