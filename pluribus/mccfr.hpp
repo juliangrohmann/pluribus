@@ -105,7 +105,7 @@ protected:
   
   virtual double get_discount_factor(long t) const = 0;
   
-  virtual void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const = 0;
+  virtual void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const = 0;
   virtual void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const = 0;
 
   std::string track_wandb_metrics(long t) const;
@@ -287,7 +287,7 @@ protected:
   StrategyStorage<float>* init_avg_storage() override { return &_phi; };
   StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, int action_idx, const PokerState& next_state, int i) override { return storage; }
 
-  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const override;
+  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override;
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
 private:
@@ -301,7 +301,7 @@ public:
   MappedRealTimeSolver(const std::shared_ptr<const SampledBlueprint> bp, const RealTimeSolverConfig& rt_config = RealTimeSolverConfig{});
 
 protected:
-  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const override;
+  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override;
 };
 
 class TreeBlueprintSolver : virtual public TreeSolver, virtual public BlueprintSolver<TreeStorageNode> {
@@ -323,7 +323,7 @@ protected:
   TreeStorageNode<float>* init_avg_storage() override;
   TreeStorageNode<float>* next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state, int i) override;
 
-  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const override;
+  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override;
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
   const std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;

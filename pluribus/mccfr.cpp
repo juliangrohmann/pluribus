@@ -385,7 +385,7 @@ std::string MCCFRSolver<StorageT>::track_wandb_metrics(long t) const {
   metrics["t (M)"] = static_cast<float>(t / 1'000'000.0);
   std::ostringstream out_str;
   out_str << std::setprecision(1) << std::fixed << std::setw(7) << t / 1'000'000.0 << "M it   ";
-  track_regret(metrics, out_str);
+  track_regret(metrics, out_str, t);
   track_strategy(metrics, out_str);
   auto t_f = std::chrono::high_resolution_clock::now();  
   auto dt = std::chrono::duration_cast<std::chrono::microseconds>(t_f - t_i).count();
@@ -575,10 +575,10 @@ void MappedBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostring
   track_strategy_by_decision(StrategyDecision{get_phi(), get_config().action_profile}, metrics, true);
 }
 
-void MappedBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const {
+void MappedBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const {
   long avg_regret = 0;
   for(auto& r : get_strategy().data()) avg_regret += std::max(r.load(), 0); // should be sum of the maximum regret at each infoset, not sum of all regrets
-  avg_regret /= get_iteration();
+  avg_regret /= t;
   out_str << std::setw(8) << avg_regret << " avg regret   ";
   metrics["avg_regret"] = static_cast<int>(avg_regret);
 }
@@ -597,7 +597,7 @@ MappedRealTimeSolver::MappedRealTimeSolver(const std::shared_ptr<const SampledBl
   if(rt_config.log_interval < 1) Logger::error("Invalid log interval: " + std::to_string(rt_config.log_interval));
 }
 
-void MappedRealTimeSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const {
+void MappedRealTimeSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const {
   long max_regret_sum = 0;
   for(const auto& entry : get_strategy().history_map()) {
     PokerState state{get_config().poker};
@@ -649,7 +649,7 @@ TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<fl
 
 void TreeBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
   TreeSolver::track_strategy(metrics, out_str);
-  track_strategy_by_decision(TreeDecision<float>{_phi_root.get(), get_config().init_state}, metrics, false);
+  track_strategy_by_decision(TreeDecision<float>{_phi_root.get(), get_config().init_state}, metrics, true);
 }
 
 long sum_node_regrets(const TreeStorageNode<int>* node) {
@@ -665,8 +665,8 @@ long sum_node_regrets(const TreeStorageNode<int>* node) {
   return r;
 }
 
-void TreeBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str) const {
-  long avg_regret = sum_node_regrets(get_regrets_root()) / get_iteration(); // should be sum of the maximum regret at each infoset, not sum of all regrets
+void TreeBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const {
+  long avg_regret = sum_node_regrets(get_regrets_root()) / t; // should be sum of the maximum regret at each infoset, not sum of all regrets
   out_str << std::setw(8) << avg_regret << " avg regret   ";
   metrics["avg_regret"] = static_cast<int>(avg_regret);
 }
