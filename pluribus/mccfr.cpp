@@ -670,11 +670,13 @@ void TreeBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringst
 }
 
 long sum_node_regrets(const TreeStorageNode<int>* node) {
-  long r = 0;
+  long r = 0L;
   for(int c = 0; c < node->get_n_clusters(); ++c) {
+    int max_r = 0L;
     for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
-      r += std::max(node->get(c, a_idx)->load(), 0);
+      max_r = std::max(node->get(c, a_idx)->load(), max_r);
     }
+    r += max_r;
   }
   for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
     if(node->is_allocated(a_idx)) r += sum_node_regrets(node->apply_index(a_idx));
@@ -685,7 +687,7 @@ long sum_node_regrets(const TreeStorageNode<int>* node) {
 void TreeBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const {
   long avg_regret = sum_node_regrets(get_regrets_root()) / t; // should be sum of the maximum regret at each infoset, not sum of all regrets
   out_str << std::setw(8) << avg_regret << " avg regret   ";
-  metrics["avg_regret"] = static_cast<int>(avg_regret);
+  metrics["avg max regret"] = static_cast<int>(avg_regret);
 }
 
 }
