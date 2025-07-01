@@ -417,4 +417,11 @@ TEST_CASE("Serialize StrategyStorage, BlueprintSolver", "[serialize][blueprint][
   REQUIRE(test_serialization(trainer));
 }
 
+TEST_CASE("Serialize TreeBlueprintSolver", "[serialize][blueprint][slow]") {
+  TreeBlueprintSolver trainer{};
+  trainer.solve(1'000'000);
+  
+  REQUIRE(test_serialization(trainer));
+}
+
 #endif

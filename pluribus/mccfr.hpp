@@ -173,12 +173,14 @@ public:
   TreeSolver(const SolverConfig& config) : MCCFRSolver{config} {}
 
   float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const;
-  
+  const TreeStorageNode<int>* get_regrets_root() const { return _regrets_root.get(); }
+
   bool operator==(const TreeSolver& other) const { return MCCFRSolver::operator==(other) && *_regrets_root == *other._regrets_root; }
   
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_regrets_root);
+    _regrets_root->set_config(make_tree_config());
   }
 
 protected:
@@ -192,7 +194,6 @@ protected:
 
   virtual const std::shared_ptr<const TreeStorageConfig> make_tree_config() const = 0;
 
-  const TreeStorageNode<int>* get_regrets_root() const { return _regrets_root.get(); }
   const std::shared_ptr<const TreeStorageConfig> get_regrets_tree_config() { return _regrets_tree_config; }
 
 private:
@@ -315,12 +316,13 @@ public:
 
   const TreeStorageNode<float>* get_phi() const { return _phi_root.get(); }
 
-  bool operator==(const MappedBlueprintSolver& other) const;
+  bool operator==(const TreeBlueprintSolver& other) const;
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_phi_root, cereal::base_class<MappedSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this), 
+    ar(_phi_root, cereal::base_class<TreeSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this), 
         cereal::base_class<Solver>(this));
+    _phi_root->set_config(make_tree_config());
   }
 
 protected:

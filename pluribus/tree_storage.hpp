@@ -35,8 +35,7 @@ public:
         _nodes{std::make_unique<std::atomic<TreeStorageNode<T>*>[]>(_actions.size())}, 
         _mutexes{std::make_unique<std::mutex[]>(_actions.size())} {}
 
-  TreeStorageNode(const std::shared_ptr<const TreeStorageConfig> config)
-      : _config{std::move(config)} {}
+  TreeStorageNode() {}
 
   ~TreeStorageNode() {
     free_memory();
@@ -89,6 +88,15 @@ public:
   const std::vector<Action>& get_actions() const { return _actions; }
 
   int get_n_clusters() const { return _n_clusters; }
+
+  void set_config(std::shared_ptr<const TreeStorageConfig> config) {
+    _config = config;
+    for(int a = 0; a < _actions.size(); ++a) {
+      if(TreeStorageNode<T>* child = _nodes[a].load()) {
+        child->set_config(config);
+      }
+    }
+  }
 
   void lcfr_discount(double d) {
     for(int i = 0; i < _actions.size() * _n_clusters; ++i) {
@@ -158,7 +166,7 @@ public:
       bool has_child;
       ar(has_child);
       if(has_child) {
-        auto child = new TreeStorageNode<T>(_config);
+        auto child = new TreeStorageNode<T>();
         ar(*child);
         _nodes[a].store(child);
       }
@@ -180,7 +188,7 @@ private:
 
   std::vector<Action> _actions;
   int _n_clusters;
-  const std::shared_ptr<const TreeStorageConfig> _config;
+  std::shared_ptr<const TreeStorageConfig> _config;
 
   std::unique_ptr<std::atomic<T>[]> _values;
   std::unique_ptr<std::atomic<TreeStorageNode<T>*>[]> _nodes;

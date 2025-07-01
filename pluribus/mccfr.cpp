@@ -690,4 +690,8 @@ void TreeBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstre
   metrics["avg max regret"] = static_cast<int>(avg_regret);
 }
 
+bool TreeBlueprintSolver::operator==(const TreeBlueprintSolver& other) const {
+  return TreeSolver::operator==(other) && BlueprintSolver::operator==(other) && *_phi_root == *other._phi_root;
+}
+
 }
