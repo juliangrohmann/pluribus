@@ -99,7 +99,6 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
   Logger::log("Solver config:\n" + get_config().to_string());
   on_start();
 
-  // omp_set_num_threads(1);
   bool full_ranges = are_full_ranges(get_config().init_ranges);
   Logger::log("Full ranges: " + std::string{full_ranges ? "true" : "false"});
   Logger::log("Training blueprint from " + std::to_string(_t) + " to " + std::to_string(T));
@@ -118,7 +117,6 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       thread_local std::vector<Hand> hands{static_cast<size_t>(get_config().poker.n_players)};
       thread_local std::ostringstream debug;
       if(_log_level == SolverLogLevel::DEBUG) debug << "============== t = " << t << " ==============\n";
-      // if(t % (_config.log_interval) == 0) log_metrics(t);
       if(should_log(t)) {
         std::ostringstream metrics_fn;
         metrics_fn << std::setprecision(1) << std::fixed << t / 1'000'000.0 << ".json";
@@ -140,14 +138,12 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
           std::copy(board.cards().begin(), board.cards().end(), std::inserter(dead_cards, dead_cards.end()));
           for(int p_idx = 0; p_idx < get_config().poker.n_players; ++p_idx) {
             Logger::error("Biased MCCFR sampling not implemented.");
-            // hands[p_idx] = _config.init_ranges[p_idx].sample(dead_cards);
             dead_cards.insert(hands[p_idx].cards()[0]);
             dead_cards.insert(hands[p_idx].cards()[1]);
           }
         }
 
         on_step(t, i, hands, debug);
-        // if(t > _config.prune_thresh) {
         if(should_prune(t)) {
           if(_log_level == SolverLogLevel::DEBUG) debug << "============== Traverse MCCFR-P ==============\n";
           traverse_mccfr_p(get_config().init_state, t, i, board, hands, indexers, eval, init_regret_storage(), init_avg_storage(), debug);
@@ -166,11 +162,8 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
     auto interval_end = std::chrono::high_resolution_clock::now();
     buf << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
     Logger::dump(buf);
-    // if(_t == next_discount) {
     if(should_discount(_t)) {
       Logger::log("============== Discounting ==============");
-      // long discount_interval = _config.discount_interval;
-      // double d = static_cast<double>(_t / discount_interval) / (_t / discount_interval + 1);
       double d = get_discount_factor(_t);
       buf << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
       Logger::dump(buf);
