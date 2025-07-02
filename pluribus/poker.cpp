@@ -107,7 +107,6 @@ PokerState::PokerState(int n_players, int chips, int ante) : _pot{150}, _max_bet
   
   if(_players.size() > 2) {
     _players[0].invest(50);
-    
     _players[1].invest(100);
     _active = 2;
   }

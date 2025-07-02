@@ -61,6 +61,12 @@ enum class SolverLogLevel : int {
   DEBUG = 2
 };
 
+struct MetricsConfig { 
+  int max_vpip = 2;
+  int max_bet_level = 2;
+  bool phi = false;
+};
+
 template <template<typename> class StorageT>
 class MCCFRSolver : public Solver {
 public:
@@ -70,6 +76,7 @@ public:
   void set_metrics_dir(std::string metrics_dir) { _metrics_dir = metrics_dir; }
   void set_log_dir(std::string log_dir) { _log_dir = log_dir; }
   void set_log_level(SolverLogLevel log_level) { _log_level = log_level; }
+  void set_regret_metrics_config(const MetricsConfig& metrics_config) { _regret_metrics_config = metrics_config; }
 
   bool operator==(const MCCFRSolver& other) const { return Solver::operator==(other) && _t == other._t; }
 
@@ -111,12 +118,14 @@ protected:
   virtual void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const = 0;
 
   std::string track_wandb_metrics(long t) const;
-  void track_strategy_by_decision(const DecisionAlgorithm& decision, nlohmann::json& metrics, bool phi) const;
+  void track_strategy_by_decision(const PokerState& state, const std::vector<PokerRange>& ranges, const DecisionAlgorithm& decision, 
+      const MetricsConfig& metrics_config, nlohmann::json& metrics) const;
 
   void error(const std::string& msg, const std::ostringstream& debug) const;
 
   long get_iteration() const { return _t; }
   SolverLogLevel get_log_level() const { return _log_level; }
+  MetricsConfig get_regret_metrics_config() const { return _regret_metrics_config; }
 
 private:
   int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
@@ -139,6 +148,7 @@ private:
   std::filesystem::path _metrics_dir = "metrics";
   std::filesystem::path _log_dir = "logs";
   SolverLogLevel _log_level = SolverLogLevel::ERRORS;
+  MetricsConfig _regret_metrics_config;
 };
 
 class MappedSolver : virtual public MCCFRSolver<StrategyStorage>, public Strategy<int> {
@@ -232,6 +242,8 @@ protected:
   long next_step(long t, long T) const override;
   
   double get_discount_factor(long t) const override { return _bp_config.get_discount_factor(t); }
+
+  MetricsConfig get_avg_metrics_config() const { return _avg_metrics_config; }
   
   #ifdef UNIT_TEST
   template <template<typename> class T>
@@ -241,6 +253,7 @@ protected:
 
 private:
   BlueprintSolverConfig _bp_config;
+  MetricsConfig _avg_metrics_config;
 };
 
 template <template<typename> class StorageT>

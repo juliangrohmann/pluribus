@@ -211,6 +211,7 @@ public:
   inline const std::vector<Action> get_biases() const { return _biases; }
   inline bool is_terminal() const { return get_winner() != -1 || get_round() >= 4; };
   int active_players() const;
+  int vpip_players() const;
   PokerState apply(Action action) const;
   PokerState apply(const ActionHistory& action_history) const;
   PokerState apply_biases(const std::vector<Action>& biases) const;
