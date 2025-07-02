@@ -1,10 +1,8 @@
 #pragma once
 
 #include <vector>
-#include <random>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/poker.hpp>
-#include <pluribus/storage.hpp>
 
 namespace pluribus {
 
@@ -32,16 +30,5 @@ private:
 void evaluate_agents(const std::vector<Agent*>& agents, const PokerConfig& config, long n_iter);
 void evaluate_strategies(const std::vector<MappedBlueprintSolver*>& strategies, long n_iter);
 void evaluate_vs_random(const MappedBlueprintSolver* hero, long n_iter);
-
-// class SampledBlueprintAgent : public Agent {
-// public:
-//   SampledBlueprintAgent(const MappedBlueprintSolver& trainer);
-//   Action act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) override;
-// private:
-//   void populate(const PokerState& state, const MappedBlueprintSolver& trainer);
-
-//   ActionStorage _strategy;
-//   ActionProfile _action_profile;
-// };
 
 }

@@ -2,7 +2,6 @@
 #include <iomanip>
 #include <cassert>
 #include <omp.h>
-#include <tqdm/tqdm.hpp>
 #include <omp/HandEvaluator.h>
 #include <pluribus/util.hpp>
 #include <pluribus/poker.hpp>

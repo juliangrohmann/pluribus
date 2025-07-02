@@ -4,11 +4,6 @@
 #include <fstream>
 #include <filesystem>
 #include <json/json.hpp>
-#include <cereal/cereal.hpp>
-#include <cereal/types/unordered_map.hpp>
-#include <cereal/types/vector.hpp>
-#include <cereal/types/string.hpp>
-#include <cereal/archives/binary.hpp>
 #include <hand_isomorphism/hand_index.h>
 
 namespace pluribus {

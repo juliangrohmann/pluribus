@@ -10,7 +10,6 @@
 #include <cereal/types/unordered_map.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
-#include <pluribus/debug.hpp>
 #include <pluribus/logging.hpp>
 #include <pluribus/indexing.hpp>
 #include <pluribus/mccfr.hpp>

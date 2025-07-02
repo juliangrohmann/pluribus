@@ -2,7 +2,6 @@
 
 #include <unordered_map>
 #include <pluribus/poker.hpp>
-#include <pluribus/sampling.hpp>
 
 namespace pluribus {
 

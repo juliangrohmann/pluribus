@@ -5,7 +5,6 @@
 #include <array>
 #include <string>
 #include <sstream>
-#include <initializer_list>
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
 #include <boost/functional/hash.hpp>

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <memory>
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/storage.hpp>

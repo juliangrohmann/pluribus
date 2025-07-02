@@ -7,16 +7,12 @@
 #include <omp.h>
 #include <cnpy.h>
 #include <tqdm/tqdm.hpp>
-#include <cereal/archives/binary.hpp>
-#include <cereal/types/vector.hpp>
 #include <cereal/types/array.hpp>
 #include <hand_isomorphism/hand_index.h>
 #include <omp/EquityCalculator.h>
 #include <omp/CardRange.h>
 #include <pluribus/constants.hpp>
 #include <pluribus/util.hpp>
-#include <pluribus/indexing.hpp>
-#include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 
 namespace pluribus {

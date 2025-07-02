@@ -5,16 +5,9 @@
 #include <filesystem>
 #include <mutex>
 #include <condition_variable>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <sys/mman.h>
-#include <unistd.h>
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/concurrent_vector.h>
-#include <omp.h>
 #include <pluribus/cereal_ext.hpp>
-#include <pluribus/indexing.hpp>
-#include <pluribus/history_index.hpp>
 #include <pluribus/config.hpp>
 #include <pluribus/actions.hpp>
 

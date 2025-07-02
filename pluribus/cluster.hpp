@@ -6,7 +6,6 @@
 #include <memory>
 #include <omp/EquityCalculator.h>
 #include <omp/Hand.h>
-#include <hand_isomorphism/hand_index.h>
 #include <pluribus/poker.hpp>
 #include <pluribus/indexing.hpp>
 

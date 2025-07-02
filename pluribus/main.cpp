@@ -1,7 +1,4 @@
 #include <iostream>
-#include <map>
-#include <functional>
-#include <cstdlib>
 #include <pluribus/poker.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/range_viewer.hpp>

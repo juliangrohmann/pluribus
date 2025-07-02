@@ -1,19 +1,14 @@
 #pragma once
 
 #include <iostream>
-#include <iomanip>
 #include <unordered_map>
 #include <vector>
 #include <string>
 #include <pluribus/range.hpp>
 #include <pluribus/actions.hpp>
-#include <pluribus/mccfr.hpp>
 #include <pluribus/poker.hpp>
-#include <pluribus/cluster.hpp>
 #include <pluribus/range_viewer.hpp>
 #include <pluribus/decision.hpp>
-#include <pluribus/util.hpp>
-#include <pluribus/blueprint.hpp>
 
 namespace pluribus {
 

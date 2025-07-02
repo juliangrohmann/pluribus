@@ -1,12 +1,9 @@
 #include <iostream>
-#include <iomanip>
 #include <unordered_map>
 #include <vector>
-#include <functional>
 #include <pluribus/range.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/poker.hpp>
-#include <pluribus/cluster.hpp>
 #include <pluribus/range_viewer.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/traverse.hpp>

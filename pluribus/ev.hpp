@@ -3,7 +3,6 @@
 #include <pluribus/poker.hpp>
 #include <pluribus/range.hpp>
 
-
 namespace pluribus {
 
 using Duration = std::chrono::high_resolution_clock::duration;

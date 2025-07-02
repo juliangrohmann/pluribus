@@ -2,7 +2,6 @@
 
 #include <string>
 #include <vector>
-#include <chrono>
 #include <cereal/cereal.hpp>
 #include <cereal/types/memory.hpp>
 #include <pluribus/debug.hpp>

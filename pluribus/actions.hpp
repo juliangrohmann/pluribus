@@ -1,14 +1,12 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <initializer_list>
 #include <memory>
 #include <cereal/cereal.hpp>
-#include <cereal/types/string.hpp>
 #include <cereal/types/array.hpp>
+#include <cereal/types/string.hpp>
 #include <cereal/types/vector.hpp>
-#include <cereal/archives/json.hpp>
 #include <boost/dynamic_bitset.hpp>
 #include <hand_isomorphism/hand_index.h>
 

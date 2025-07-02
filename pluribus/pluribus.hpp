@@ -2,7 +2,6 @@
 
 #include <memory>
 #include <pluribus/poker.hpp>
-#include <pluribus/decision.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/blueprint.hpp>
 

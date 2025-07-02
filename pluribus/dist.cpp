@@ -1,4 +1,5 @@
 #include <pluribus/constants.hpp>
+#include <pluribus/range.hpp>
 #include <pluribus/dist.hpp>
 
 namespace pluribus {

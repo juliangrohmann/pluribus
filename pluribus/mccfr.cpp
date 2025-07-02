@@ -4,14 +4,11 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
-#include <stdexcept>
 #include <atomic>
 #include <limits>
 #include <omp.h>
 #include <tqdm/tqdm.hpp>
 #include <json/json.hpp>
-#include <cereal/archives/binary.hpp>
-#include <cereal/types/unordered_map.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/rng.hpp>
 #include <pluribus/debug.hpp>
