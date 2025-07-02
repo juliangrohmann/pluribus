@@ -175,7 +175,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       std::ostringstream fn_stream;
       Logger::log("============== Saving snapshot ==============");
       fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
-      cereal_save(*this, (_snapshot_dir / fn_stream.str()).string());
+      save_snapshot((_snapshot_dir / fn_stream.str()).string());
     }
   }
 

@@ -12,12 +12,15 @@ using namespace pluribus;
 
 void traverse_strategy(RangeViewer* viewer_p, std::string fn, std::string type) {
   if(type == "--trainer") {
+    Logger::log("Traversing trainer: " + fn);
     traverse_trainer(viewer_p, fn);
   }
   else if(type == "--blueprint"){
+    Logger::log("Traversing blueprint: " + fn);
     traverse_blueprint(viewer_p, fn);
   }
   else if(type == "--tree") {
+    Logger::log("Traversing tree: " + fn);
     traverse_tree(viewer_p, fn);
   }
   else {

@@ -103,6 +103,7 @@ protected:
   virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const PokerState& next_state, int i) = 0;
   virtual std::vector<Action> regret_node_actions(StorageT<int>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
   virtual std::vector<Action> avg_node_actions(StorageT<float>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
+  virtual void save_snapshot(const std::string& fn) const = 0;
   
   virtual double get_discount_factor(long t) const = 0;
   
@@ -279,7 +280,7 @@ public:
   MappedBlueprintSolver(const SolverConfig& config = SolverConfig{}, const BlueprintSolverConfig& bp_config = BlueprintSolverConfig{});
 
   const StrategyStorage<float>& get_phi() const { return _phi; }
-
+  
   bool operator==(const MappedBlueprintSolver& other) const;
   
   template <class Archive>
@@ -292,6 +293,7 @@ protected:
   std::atomic<float>* get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, int cluster) override;
   StrategyStorage<float>* init_avg_storage() override { return &_phi; };
   StrategyStorage<float>* next_avg_storage(StrategyStorage<float>* storage, int action_idx, const PokerState& next_state, int i) override { return storage; }
+  void save_snapshot(const std::string& fn) const override { cereal_save(*this, fn); }
 
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override;
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
@@ -307,6 +309,7 @@ public:
   MappedRealTimeSolver(const std::shared_ptr<const SampledBlueprint> bp, const RealTimeSolverConfig& rt_config = RealTimeSolverConfig{});
 
 protected:
+  void save_snapshot(const std::string& fn) const override { cereal_save(*this, fn); }
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override;
 };
 
@@ -329,6 +332,7 @@ protected:
   std::atomic<float>* get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, int cluster) override;
   TreeStorageNode<float>* init_avg_storage() override;
   TreeStorageNode<float>* next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state, int i) override;
+  void save_snapshot(const std::string& fn) const override { cereal_save(*this, fn); }
 
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override;
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;

@@ -96,7 +96,7 @@ bool test_serialization(const T& obj) {
   T loaded_obj;
   cereal_load(loaded_obj, fn);
   bool match = (obj == loaded_obj);
-  unlink(fn.c_str());
+  // unlink(fn.c_str());
   return match;
 }
 
