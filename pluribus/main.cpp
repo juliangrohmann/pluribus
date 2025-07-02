@@ -10,12 +10,18 @@
 
 using namespace pluribus;
 
-void traverse_strategy(RangeViewer* viewer_p, std::string fn, bool trainer) {
-  if(trainer) {
+void traverse_strategy(RangeViewer* viewer_p, std::string fn, std::string type) {
+  if(type == "--trainer") {
     traverse_trainer(viewer_p, fn);
   }
-  else {
+  else if(type == "--blueprint"){
     traverse_blueprint(viewer_p, fn);
+  }
+  else if(type == "--tree") {
+    traverse_tree(viewer_p, fn);
+  }
+  else {
+    Logger::log("Unknown traverse type: " + type);
   }
 }
 
@@ -41,17 +47,16 @@ int main(int argc, char* argv[]) {
   else if(command == "traverse") {
     // ./Pluribus traverse --blueprint --png out.png lossless_bp_fn
     // ./Pluribus traverse --trainer --png out.png lossless_bp_fn
-    bool trainer = strcmp(argv[2], "--trainer") == 0;
     if(argc > 4 && strcmp(argv[3], "--png") == 0) {
       if(argc <= 4) std::cout << "Missing filename.\n";
       else {
         PngRangeViewer viewer{argv[4]};
-        traverse_strategy(&viewer, argv[5], trainer);
+        traverse_strategy(&viewer, argv[5], argv[2]);
       }
     }
     else {
       WindowRangeViewer viewer{"traverse"};
-      traverse_strategy(&viewer, argv[3], trainer);
+      traverse_strategy(&viewer, argv[3], argv[2]);
     }
     
   }
