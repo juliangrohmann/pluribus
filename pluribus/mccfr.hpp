@@ -71,9 +71,9 @@ class MCCFRSolver : public Solver {
 public:
   MCCFRSolver(const SolverConfig& config) : Solver{config} {}
 
-  void set_snapshot_dir(std::string snapshot_dir) { _snapshot_dir = snapshot_dir; }
-  void set_metrics_dir(std::string metrics_dir) { _metrics_dir = metrics_dir; }
-  void set_log_dir(std::string log_dir) { _log_dir = log_dir; }
+  void set_snapshot_dir(const std::string& snapshot_dir) { _snapshot_dir = snapshot_dir; }
+  void set_metrics_dir(const std::string& metrics_dir) { _metrics_dir = metrics_dir; }
+  void set_log_dir(const std::string& log_dir) { _log_dir = log_dir; }
   void set_log_level(SolverLogLevel log_level) { _log_level = log_level; }
   void set_regret_metrics_config(const MetricsConfig& metrics_config) { _regret_metrics_config = metrics_config; }
 
