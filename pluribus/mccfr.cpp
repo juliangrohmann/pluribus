@@ -400,8 +400,8 @@ int vpip_players(const PokerState& state, const PokerState& init_state) {
 }
 
 bool should_track_strategy(const PokerState& state, const PokerState& init_state, const MetricsConfig& metrics_config) {
-  return state.active_players() <= 1 || state.get_round() > init_state.get_round() 
-      || vpip_players(state, init_state) > metrics_config.max_vpip || state.get_bet_level() > metrics_config.max_bet_level;
+  return state.active_players() > 1 && state.get_round() == init_state.get_round() 
+      && vpip_players(state, init_state) <= metrics_config.max_vpip && state.get_bet_level() <= metrics_config.max_bet_level;
 }
 
 std::string strategy_label(const PokerState& state, const PokerState& init_state, Action action, bool phi) {
@@ -411,27 +411,28 @@ std::string strategy_label(const PokerState& state, const PokerState& init_state
   for(int a_idx = 0; a_idx < rel_actions.size(); ++a_idx) {
     if(!has_player_vpip(state, init_state, curr_state.get_active())) continue;
     oss << pos_to_str(curr_state.get_active(), state.get_players().size()) << " " << rel_actions[a_idx].to_string()
-        << (a_idx == rel_actions.size() - 1 ? "" : ", ");
-    curr_state.apply(rel_actions[a_idx]);
+        << ", ";
+    curr_state = curr_state.apply(rel_actions[a_idx]);
   }
-  oss << (phi ? " (phi)" : " (regrets)");
+  oss << "[" << pos_to_str(curr_state.get_active(), state.get_players().size()) << " " << action.to_string() << "]" 
+      << (phi ? " (phi)" : " (regrets)");
   return oss.str();
 }
 
 template <template<typename> class StorageT>
 void MCCFRSolver<StorageT>::track_strategy_by_decision(const PokerState& state, const std::vector<PokerRange>& ranges, 
-    const DecisionAlgorithm& decision, const MetricsConfig& metrics_config, nlohmann::json& metrics) const {
+    const DecisionAlgorithm& decision, const MetricsConfig& metrics_config, bool phi, nlohmann::json& metrics) const {
   if(!should_track_strategy(state, get_config().init_state, metrics_config)) return;
   PokerRange base_range = ranges[state.get_active()];
   base_range.remove_cards(get_config().init_board);
   for(Action a : available_actions(state, get_config().action_profile)) {
     PokerRange action_range = build_action_range(base_range, a, state, get_config().init_board, decision);
     PokerRange next_range = base_range * action_range;
-    std::string data_label = strategy_label(state, get_config().init_state, a, metrics_config.phi);
+    std::string data_label = strategy_label(state, get_config().init_state, a, phi);
     metrics[data_label] = next_range.n_combos() / base_range.n_combos();
     std::vector<PokerRange> next_ranges = ranges;
     next_ranges[state.get_active()] = next_range;
-    track_strategy_by_decision(state.apply(a), next_ranges, decision, metrics_config, metrics);
+    track_strategy_by_decision(state.apply(a), next_ranges, decision, metrics_config, phi, metrics);
   }
 }
 
@@ -463,7 +464,7 @@ std::vector<Action> MappedSolver::avg_node_actions(StrategyStorage<float>* stora
 void MappedSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
   auto init_ranges = get_config().init_ranges;
   track_strategy_by_decision(get_config().init_state, init_ranges, StrategyDecision{get_strategy(), get_config().action_profile}, 
-      get_regret_metrics_config(), metrics);
+      get_regret_metrics_config(), false, metrics);
 }
 
 // ==========================================================================================
@@ -502,7 +503,8 @@ std::vector<Action> TreeSolver::avg_node_actions(TreeStorageNode<float>* storage
 
 void TreeSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
   auto init_ranges = get_config().init_ranges;
-  track_strategy_by_decision(get_config().init_state, init_ranges, TreeDecision<int>{_regrets_root.get(), get_config().init_state}, get_regret_metrics_config(), metrics);
+  track_strategy_by_decision(get_config().init_state, init_ranges, TreeDecision<int>{_regrets_root.get(), get_config().init_state}, 
+      get_regret_metrics_config(), false, metrics);
 }
 
 // ==========================================================================================
@@ -616,7 +618,8 @@ bool MappedBlueprintSolver::operator==(const MappedBlueprintSolver& other) const
 void MappedBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
   MappedSolver::track_strategy(metrics, out_str);
   auto init_ranges = get_config().init_ranges;
-  track_strategy_by_decision(get_config().init_state, init_ranges, StrategyDecision{get_phi(), get_config().action_profile}, get_avg_metrics_config(), metrics);
+  track_strategy_by_decision(get_config().init_state, init_ranges, StrategyDecision{get_phi(), get_config().action_profile}, 
+      get_avg_metrics_config(), true, metrics);
 }
 
 void MappedBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const {
@@ -694,7 +697,8 @@ TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<fl
 void TreeBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
   TreeSolver::track_strategy(metrics, out_str);
   auto init_ranges = get_config().init_ranges;
-  track_strategy_by_decision(get_config().init_state, init_ranges, TreeDecision<float>{_phi_root.get(), get_config().init_state}, get_avg_metrics_config(), metrics);
+  track_strategy_by_decision(get_config().init_state, init_ranges, TreeDecision<float>{_phi_root.get(), get_config().init_state}, 
+      get_avg_metrics_config(), true, metrics);
 }
 
 long sum_node_regrets(const TreeStorageNode<int>* node) {

@@ -64,7 +64,6 @@ enum class SolverLogLevel : int {
 struct MetricsConfig { 
   int max_vpip = 2;
   int max_bet_level = 2;
-  bool phi = false;
 };
 
 template <template<typename> class StorageT>
@@ -119,7 +118,7 @@ protected:
 
   std::string track_wandb_metrics(long t) const;
   void track_strategy_by_decision(const PokerState& state, const std::vector<PokerRange>& ranges, const DecisionAlgorithm& decision, 
-      const MetricsConfig& metrics_config, nlohmann::json& metrics) const;
+      const MetricsConfig& metrics_config, bool phi, nlohmann::json& metrics) const;
 
   void error(const std::string& msg, const std::ostringstream& debug) const;
 
@@ -216,8 +215,9 @@ template <template<typename> class StorageT>
 class BlueprintSolver : virtual public MCCFRSolver<StorageT> {
 public:
   BlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config) : _bp_config{bp_config} {}
-
+  
   const BlueprintSolverConfig& get_blueprint_config() const { return _bp_config; }
+  void set_avg_metrics_config(const MetricsConfig& metrics_config) { _avg_metrics_config = metrics_config; }
 
   bool operator==(const BlueprintSolver& other) const { return MCCFRSolver<StorageT>::operator==(other) && _bp_config == other._bp_config; }
 
