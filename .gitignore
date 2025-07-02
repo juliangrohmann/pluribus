@@ -4,6 +4,7 @@ temp
 snapshots
 wandb
 .vscode
+.idea
 __pycache__
 *.o
 *.a
