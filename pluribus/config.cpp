@@ -65,6 +65,7 @@ void BlueprintSolverConfig::set_iterations(const BlueprintTimingConfig& timings,
 }
 
 long BlueprintSolverConfig::next_snapshot_step(long t, long T) const {
+    if(t < preflop_threshold) return preflop_threshold;
     long next_snap = std::max((t - preflop_threshold) / snapshot_interval + 1, 0L) * snapshot_interval + preflop_threshold;
     return next_snap < T ? next_snap : T;
 }
