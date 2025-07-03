@@ -10,7 +10,7 @@
 
 namespace pluribus {
 
-std::string round_to_str(int round) {
+std::string round_to_str(const int round) {
   switch(round) {
     case 0: return "Preflop";
     case 1: return "Flop";
@@ -22,19 +22,19 @@ std::string round_to_str(int round) {
 }
 
 const std::vector<std::string> positions{"BTN", "CO", "HJ", "LJ", "UTG+2", "UTG+1", "UTG"};
-std::string pos_to_str(int idx, int n_players) {
+std::string pos_to_str(const int idx, const int n_players) {
   if(idx == 0) return n_players == 2 ? "BB" : "SB";
   if(idx == 1) return n_players == 2 ? "SB" : "BB";
   return positions[n_players - idx - 1];
 }
 
-std::string cluster_file(int round, int n_clusters) {
+std::string cluster_file(const int round, const int n_clusters) {
   return "clusters_r" + std::to_string(round) + "_c" + std::to_string(n_clusters) + ".npy";
 }
 
-void print_cluster(int cluster, int round, const hand_indexer_t& indexer, const std::vector<int>& clusters) {
-  int card_sum = round + 4;
-  int n_idx = hand_indexer_size(&indexer, round);
+void print_cluster(const int cluster, const int round, const hand_indexer_t& indexer, const std::vector<int>& clusters) {
+  const int card_sum = round + 4;
+  const int n_idx = hand_indexer_size(&indexer, round);
   uint8_t cards[7];
   for(int i = 0; i < n_idx; ++i) {
     if(clusters[i] != cluster) continue;
@@ -43,23 +43,21 @@ void print_cluster(int cluster, int round, const hand_indexer_t& indexer, const 
   }
 }
 
-void print_cluster(int cluster, int round, int n_clusters) {
-  std::vector<int> clusters = cnpy::npy_load(cluster_file(round, n_clusters)).as_vec<int>();
+void print_cluster(const int cluster, const int round, const int n_clusters) {
+  const std::vector<int> clusters = cnpy::npy_load(cluster_file(round, n_clusters)).as_vec<int>();
   hand_indexer_t indexer;
-  int card_sum = init_indexer(indexer, round);
   print_cluster(cluster, round, indexer, clusters);
 }
 
-void print_similar_boards(std::string board, int n_clusters) {
-  int round = board.length() / 2 - 4;
-  std::vector<int> clusters = cnpy::npy_load(cluster_file(round, n_clusters)).as_vec<int>();
+void print_similar_boards(const std::string& board, const int n_clusters) {
+  const int round = board.length() / 2 - 4;
+  const std::vector<int> clusters = cnpy::npy_load(cluster_file(round, n_clusters)).as_vec<int>();
   hand_indexer_t indexer;
-  int card_sum = init_indexer(indexer, round);
 
   uint8_t cards[7];
   str_to_cards(board, cards);
-  hand_index_t idx = hand_index_last(&indexer, cards);
-  int cluster = clusters[idx];
+  const hand_index_t idx = hand_index_last(&indexer, cards);
+  const int cluster = clusters[idx];
   std::cout << board << " cluster: " << cluster << std::endl;
   print_cluster(cluster, round, indexer, clusters);
 }

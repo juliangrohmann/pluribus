@@ -7,7 +7,7 @@
 
 using namespace pluribus;
 
-void traverse_strategy(RangeViewer* viewer_p, std::string fn, std::string type) {
+void traverse_strategy(RangeViewer* viewer_p, const std::string& fn, const std::string& type) {
   if(type == "--trainer") {
     Logger::log("Traversing trainer: " + fn);
     traverse_trainer(viewer_p, fn);
@@ -31,12 +31,9 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  std::string command = argv[1];
-
-  if(command == "cluster") {
+  if(std::string command = argv[1]; command == "cluster") {
     // ./Pluribus cluster round
-    int round = atoi(argv[2]);
-    if(round < 1 || round > 3) {
+    if(int round = atoi(argv[2]); round < 1 || round > 3) {
       std::cout << "1 <= round <= 3 required. Given: " << round << std::endl;
     }
     else {
@@ -48,11 +45,8 @@ int main(int argc, char* argv[]) {
     // ./Pluribus traverse --blueprint --png out.png lossless_bp_fn
     // ./Pluribus traverse --trainer --png out.png lossless_bp_fn
     if(argc > 4 && strcmp(argv[3], "--png") == 0) {
-      if(argc <= 4) std::cout << "Missing filename.\n";
-      else {
-        PngRangeViewer viewer{argv[4]};
-        traverse_strategy(&viewer, argv[5], argv[2]);
-      }
+      PngRangeViewer viewer{argv[4]};
+      traverse_strategy(&viewer, argv[5], argv[2]);
     }
     else {
       WindowRangeViewer viewer{"traverse"};

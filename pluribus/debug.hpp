@@ -11,16 +11,17 @@ constexpr bool is_debug =
   true;
 #endif
 
+// ReSharper disable once CppCompileTimeConstantCanBeReplacedWithBooleanConstant
 constexpr bool verbose = is_debug &
 #ifdef VERBOSE
   true;
 #else
-  false;
+                           false;
 #endif
 
 std::string round_to_str(int round);
 std::string pos_to_str(int idx, int n_players);
 void print_cluster(int cluster, int round, int n_clusters);
-void print_similar_boards(std::string board, int n_clusters=200);
+void print_similar_boards(const std::string &board, int n_clusters=200);
 
 }

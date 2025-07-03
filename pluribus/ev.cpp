@@ -7,56 +7,56 @@
 
 namespace pluribus {
 
-void update_stats(int x, double w, double& mean, double& w_sum, double& w_sum2, double& S) {
+void update_stats(const int x, const double w, double& mean, double& w_sum, double& w_sum2, double& S) {
   // Welford's algorithm with weights: https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
   w_sum += w;
   w_sum2 += pow(w, 2);
-  double mean_old = mean;
-  mean = mean_old + (w / w_sum) * (x - mean_old);
+  const double mean_old = mean;
+  mean = mean_old + w / w_sum * (x - mean_old);
   S = S + w * (x - mean_old) * (x - mean);
 }
 
-std::string ResultEV::to_string(int precision) {
+std::string ResultEV::to_string(const int precision) const {
   std::ostringstream oss;
   oss << std::fixed << std::setprecision(precision) << "EV=" << ev << ", stdDev=" << std_dev << ", stdErr=" << std_err 
       << ", iterations=" << iterations << ", time=" << milliseconds << " ms\n";
   return oss.str();
 }
 
-ResultEV MonteCarloEV::lossless(const LosslessBlueprint* bp, const PokerState& state, int i, const std::vector<PokerRange>& ranges, 
+ResultEV MonteCarloEV::lossless(const LosslessBlueprint* bp, const PokerState& state, const int i, const std::vector<PokerRange>& ranges,
     const std::vector<uint8_t>& board) {
-  LosslessActionProvider action_provider;
+  const LosslessActionProvider action_provider;
   return _monte_carlo_ev(state, i, ranges, board, bp->get_config().poker.n_chips, action_provider, bp);
 }
-ResultEV MonteCarloEV::sampled(const std::vector<Action>& biases, const SampledBlueprint* bp, const PokerState& state, int i, 
+ResultEV MonteCarloEV::sampled(const std::vector<Action>& biases, const SampledBlueprint* bp, const PokerState& state, const int i,
     const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) {
-  SampledActionProvider action_provider;
+  const SampledActionProvider action_provider;
   return _monte_carlo_ev(state.apply_biases(biases), i, ranges, board, bp->get_config().poker.n_chips, action_provider, bp);
 }
 
-bool MonteCarloEV::_should_terminate(long t, double std_err, Duration dt) {
+bool MonteCarloEV::_should_terminate(const long t, const double std_err, const Duration dt) const {
   return t >= _min_it && 
       (t >= _max_it || std_err < _std_err_target || std::chrono::duration_cast<std::chrono::milliseconds>(dt).count() > _max_ms);
 }
 
-bool any_collision(uint8_t card, const std::vector<Hand>& hands, const std::vector<uint8_t>& board) {
+bool any_collision(const uint8_t card, const std::vector<Hand>& hands, const std::vector<uint8_t>& board) {
   for(const auto& hand : hands) {
     if(card == hand.cards()[0] || card == hand.cards()[1]) return true;
   }
-  return std::find(board.begin(), board.end(), card) != board.end();
+  return std::ranges::find(board, card) != board.end();
 }
 
-int villain_pos(const PokerState& state, int i) {
+int villain_pos(const PokerState& state, const int i) {
   for(int p = 0; p < state.get_players().size(); ++p) {
     if(p != i && !state.get_players()[p].has_folded()) return p;
   }
   throw std::runtime_error("Villain doesn't exist in state.");
 }
 
-void _validate_ev_inputs(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) {
-  int round = round_of_last_action(state);
-  int n_cards = n_board_cards(round);
-  std::vector<uint8_t> real_board = board.size() > n_cards ? std::vector<uint8_t>{board.begin(), board.begin() + n_cards} : board;
+void _validate_ev_inputs(const PokerState& state, const int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) {
+  const int round = round_of_last_action(state);
+  const int n_cards = n_board_cards(round);
+  const std::vector<uint8_t> real_board = board.size() > n_cards ? std::vector<uint8_t>{board.begin(), board.begin() + n_cards} : board;
   std::cout << "Real round: " << round_to_str(round) << "\n";
   std::cout << "Real board: " << cards_to_str(real_board) << "\n";
   std::cout << "Hero pos: " << i << " (" << pos_to_str(i, state.get_players().size()) << ")\n";
@@ -73,27 +73,25 @@ void _validate_ev_inputs(const PokerState& state, int i, const std::vector<Poker
   if(board.size() > n_board_cards(round)) throw std::runtime_error("Too many board cards!");
 }
 
-double node_ev(const LosslessBlueprint& bp, const PokerState& state, int i, const std::vector<Hand>& hands, const Board& board,
+double node_ev(const LosslessBlueprint& bp, const PokerState& state, const int i, const std::vector<Hand>& hands, const Board& board,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) {
   if(state.is_terminal()) {
-    int hu = utility(state, i, Board{board}, hands, bp.get_config().poker.n_chips, eval);
+    const int hu = utility(state, i, Board{board}, hands, bp.get_config().poker.n_chips, eval);
     return hu;
   }
-  else {
-    const auto& strat = bp.get_strategy();
-    hand_index_t cached_idx = indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round());
-    int cached_cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), cached_idx);
-    int base_idx = strat.index(state, cached_cluster);
-    auto actions = valid_actions(state, bp.get_config().action_profile);
-    double ev = 0.0;
-    for(int aidx = 0; aidx < actions.size(); ++aidx) {
-      ev += strat[base_idx + aidx] * node_ev(bp, state.apply(actions[aidx]), i, hands, board, indexers, eval);
-    }
-    return ev;
+  const auto& strat = bp.get_strategy();
+  const hand_index_t cached_idx = indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round());
+  const int cached_cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), cached_idx);
+  const int base_idx = strat.index(state, cached_cluster);
+  const auto actions = valid_actions(state, bp.get_config().action_profile);
+  double ev = 0.0;
+  for(int aidx = 0; aidx < actions.size(); ++aidx) {
+    ev += strat[base_idx + aidx] * node_ev(bp, state.apply(actions[aidx]), i, hands, board, indexers, eval);
   }
+  return ev;
 }
 
-double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, int i, const std::vector<PokerRange>& ranges, 
+double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, const int i, const std::vector<PokerRange>& ranges,
     const std::vector<uint8_t>& init_board) {
   _validate_ev_inputs(state, i, ranges, init_board);
   std::vector<Board> boards;
@@ -112,8 +110,8 @@ double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, int i,
     throw std::runtime_error("Enumerate EV only supported for Turn/River.");
   }
 
-  int pos_v = villain_pos(state, i);
-  omp::HandEvaluator eval;
+  const int pos_v = villain_pos(state, i);
+  const omp::HandEvaluator eval;
   std::vector<Hand> hands(ranges.size());
   double ev = 0.0;
   double total = 0.0;
@@ -128,8 +126,8 @@ double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, int i,
         hands[i] = hh;
         hands[pos_v] = vh;
         std::vector<CachedIndexer> indexers;
-        for(int i = 0; i < hands.size(); ++i) indexers.push_back(CachedIndexer{});
-        double freq = ranges[i].frequency(hh) * ranges[pos_v].frequency(vh);
+        for(int _ = 0; i < hands.size(); ++_) indexers.push_back(CachedIndexer{});
+        const double freq = ranges[i].frequency(hh) * ranges[pos_v].frequency(vh);
         ev += freq * node_ev(bp, state, i, hands, board, indexers, eval);
         total += freq;
       }

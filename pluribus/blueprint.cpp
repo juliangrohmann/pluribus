@@ -21,7 +21,7 @@ namespace pluribus {
 
 struct LosslessBuffer {
   std::vector<float> freqs;
-  size_t offset;
+  size_t offset{};
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -30,10 +30,7 @@ struct LosslessBuffer {
 };
 
 bool validate_preflop_fn(const std::string& preflop_fn, const std::vector<std::string>& all_fns) {
-  for(const auto& fn : all_fns) {
-    if(fn == preflop_fn) return true;
-  }
-  return false;
+  return std::ranges::any_of(all_fns, [&preflop_fn](const std::string& fn) { return fn == preflop_fn; });
 }
 
 void set_meta_config(LosslessMetadata& meta, const MappedBlueprintSolver& bp) {
@@ -60,18 +57,18 @@ std::vector<size_t> _collect_base_indexes(const StrategyStorage<T>& strategy) {
     base_idxs.push_back(entry.second.idx);
   }
   base_idxs.push_back(strategy.data().size());
-  std::sort(base_idxs.begin(), base_idxs.end());
+  std::ranges::sort(base_idxs);
   return base_idxs;
 }
 
-LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, int max_gb) {
+LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, const int max_gb) {
   Logger::log("Building lossless buffers...");
   Logger::log("Preflop filename: " + preflop_fn);
   if(!validate_preflop_fn(preflop_fn, all_fns)) Logger::error("Preflop filename not found in all filenames.");
 
   std::ostringstream buf;
   LosslessMetadata meta;
-  std::filesystem::path buffer_dir = buf_dir;
+  const std::filesystem::path buffer_dir = buf_dir;
   
   meta.preflop_buf_fn = (buffer_dir / "preflop_phi.bin").string();
 
@@ -93,11 +90,11 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
     }
 
     std::vector<size_t> base_idxs = _collect_base_indexes(regrets);
-    size_t free_ram = std::min(get_free_ram(), max_gb * 1000LL * 1000LL * 1000LL);
-    if(free_ram < 8 * pow(1024, 3)) {
+    const size_t free_ram = std::min(get_free_ram(), max_gb * 1000LL * 1000LL * 1000LL);
+    if(static_cast<double>(free_ram) < 8 * pow(1024, 3)) {
       Logger::error("At least 8G free RAM required to build blueprint. Available (bytes): " + std::to_string(free_ram));
     }
-    size_t buf_sz = static_cast<size_t>((free_ram - 8 * pow(1024, 3)) / sizeof(float));
+    const auto buf_sz = static_cast<size_t>((static_cast<double>(free_ram) - 8 * pow(1024, 3)) / sizeof(float));
     Logger::log("Buffer element cutoff: " + std::to_string(buf_sz));
 
     size_t bidx_start = 0;
@@ -117,14 +114,14 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       #pragma omp parallel for schedule(dynamic)
       for(size_t curr_idx = bidx_start; curr_idx < bidx_end; ++curr_idx) {
         if(curr_idx + 1 >= base_idxs.size()) Logger::error("Buffering: Indexing base indeces out of range!");
-        size_t n_entries = base_idxs[curr_idx + 1] - base_idxs[curr_idx];
+        const size_t n_entries = base_idxs[curr_idx + 1] - base_idxs[curr_idx];
         if(n_entries % meta.n_clusters != 0) Logger::error("Buffering: Indivisible regret section!");
-        size_t n_actions = n_entries / meta.n_clusters;
+        const size_t n_actions = n_entries / meta.n_clusters;
         if(n_actions > meta.config.action_profile.max_actions()) Logger::error("Buffering: Too many actions in storage section:" + 
             std::to_string(n_actions) + " > " + std::to_string(meta.config.action_profile.max_actions()));
 
         for(int c = 0; c < meta.n_clusters; ++c) {
-          size_t base_idx = base_idxs[curr_idx] + c * n_actions;
+          const size_t base_idx = base_idxs[curr_idx] + c * n_actions;
           auto freq = calculate_strategy(&regrets[base_idx], n_actions);
           for(int fidx = 0; fidx < freq.size(); ++fidx) {
             buffer.freqs[base_idx - base_idxs[bidx_start] + fidx] = freq[fidx];
@@ -157,7 +154,7 @@ LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std:
   return meta;
 }
 
-void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, int max_gb) {
+void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, const int max_gb) {
   Logger::log("Building lossless blueprint...");
   build_from_meta_data(build_lossless_buffers(preflop_fn, all_fns, buf_dir, max_gb));
 }
@@ -183,20 +180,20 @@ void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
   }
 
   Logger::log("Inserting histories...");
-  for(const auto& entry : meta.history_map) {
-    get_freq()->history_map()[entry.first] = entry.second;
+  for(const auto& [history, idx] : meta.history_map) {
+    get_freq()->history_map()[history] = idx;
   }
 
   Logger::log("Setting preflop strategy to phi...");
   StrategyStorage<float> phi;
   cereal_load(phi, meta.preflop_buf_fn);
-  for(auto entry : phi.history_map()) {
+  for(const auto history: phi.history_map() | std::views::keys) {
     PokerState state = meta.config.init_state;
-    state.apply(entry.first);
-    int n_actions = valid_actions(state, meta.config.action_profile).size();
+    state = state.apply(history);
+    const int n_actions = valid_actions(state, meta.config.action_profile).size();
     for(int c = 0; c < phi.n_clusters(); ++c) {
-      size_t phi_base_idx = phi.index(state, c);
-      size_t freq_base_idx = get_freq()->index(state, c);
+      const size_t phi_base_idx = phi.index(state, c);
+      const size_t freq_base_idx = get_freq()->index(state, c);
       for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
         get_freq()->operator[](freq_base_idx + a_idx).store(phi[phi_base_idx + a_idx].load());
       }
@@ -204,14 +201,14 @@ void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
   }
 
   Logger::log("Normalizing frequencies...");
-  std::vector<size_t> base_idxs = _collect_base_indexes(*get_freq());
+  const std::vector<size_t> base_idxs = _collect_base_indexes(*get_freq());
   for(size_t curr_idx = 0; curr_idx < base_idxs.size() - 1; ++curr_idx) {
-    size_t n_entries = base_idxs[curr_idx + 1] - base_idxs[curr_idx];
+    const size_t n_entries = base_idxs[curr_idx + 1] - base_idxs[curr_idx];
     if(n_entries % meta.n_clusters != 0) Logger::error("Renorm: Indivisible storage section!");
-    size_t n_actions = n_entries / meta.n_clusters;
+    const size_t n_actions = n_entries / meta.n_clusters;
     if(n_actions > get_config().action_profile.max_actions()) Logger::error("Renorm: Too many actions in storage section!");
     for(int c = 0; c < meta.n_clusters; ++c) {
-      size_t base_idx = base_idxs[curr_idx] + c * n_actions;
+      const size_t base_idx = base_idxs[curr_idx] + c * n_actions;
       float total = 0.0f;
       for(size_t aidx = 0; aidx < n_actions; ++aidx) {
         total += get_freq()->operator[](base_idx + aidx);
@@ -237,18 +234,18 @@ std::unordered_map<Action, uint8_t> build_compression_map(const ActionProfile& p
   std::unordered_map<Action, uint8_t> compression_map;
   uint8_t idx = 0;
   for(Action a : profile.all_actions()) {
-    Logger::log(a.to_string() + " -> " + std::to_string(static_cast<int>(idx)));
+    Logger::log(a.to_string() + " -> " + std::to_string(idx));
     compression_map[a] = idx++;
   }
   return compression_map;
 }
 
-std::vector<Action> build_decompression_map(std::unordered_map<Action, uint8_t> compression_map) {
+std::vector<Action> build_decompression_map(const std::unordered_map<Action, uint8_t>& compression_map) {
   Logger::log("Building action decompression map...");
-  std::vector<Action> decompression_map(compression_map.size(), Action::UNDEFINED);
-  for(const auto& entry : compression_map) {
-    Logger::log(std::to_string(static_cast<int>(entry.second)) + " -> " + entry.first.to_string());
-    decompression_map[entry.second] = entry.first;
+  std::vector decompression_map(compression_map.size(), Action::UNDEFINED);
+  for(const auto& [a, idx] : compression_map) {
+    Logger::log(std::to_string(idx) + " -> " + a.to_string());
+    decompression_map[idx] = a;
   }
   for(int i = 0; i < decompression_map.size(); ++i) {
     if(decompression_map[i] == Action::UNDEFINED) Logger::error("Unmapped compressed action idx: " + std::to_string(i));
@@ -256,13 +253,12 @@ std::vector<Action> build_decompression_map(std::unordered_map<Action, uint8_t> 
   return decompression_map;
 }
 
-std::vector<float> biased_freq(const std::vector<Action>& actions, const std::vector<float>& freq, Action bias, float factor) {
+std::vector<float> biased_freq(const std::vector<Action>& actions, const std::vector<float>& freq, const Action bias, const float factor) {
   std::vector<float> biased_freq;
   if(bias == Action::BIAS_FOLD || bias == Action::BIAS_CALL) {
-    Action biased_action = bias == Action::BIAS_FOLD ? Action::FOLD : Action::CHECK_CALL;
-    auto fold_it = std::find(actions.begin(), actions.end(), biased_action);
-    if(fold_it != actions.end()) {
-      size_t fold_idx = std::distance(actions.begin(), fold_it);
+    const Action biased_action = bias == Action::BIAS_FOLD ? Action::FOLD : Action::CHECK_CALL;
+    if(const auto fold_it = std::ranges::find(actions, biased_action); fold_it != actions.end()) {
+      const size_t fold_idx = std::distance(actions.begin(), fold_it);
       for(int fidx = 0; fidx < freq.size(); ++fidx) {
         biased_freq.push_back(fidx == fold_idx ? freq[fidx] * factor : freq[fidx]);
       }
@@ -283,14 +279,14 @@ std::vector<float> biased_freq(const std::vector<Action>& actions, const std::ve
     Logger::error("Unknown bias: " + bias.to_string());
   }
   float sum = 0.0f;
-  for(float f : biased_freq) sum += f;
+  for(const float f : biased_freq) sum += f;
   for(int fidx = 0; fidx < biased_freq.size(); ++fidx) biased_freq[fidx] /= sum;
   return biased_freq;
 }
 
-Action sample_biased(const std::vector<Action>& actions, const std::vector<float>& freq, Action bias, float factor) {
+Action sample_biased(const std::vector<Action>& actions, const std::vector<float>& freq, const Action bias, const float factor) {
   auto b_freq = biased_freq(actions, freq, bias, factor);
-  std::discrete_distribution<> dist(b_freq.begin(), b_freq.end());
+  std::discrete_distribution dist(b_freq.begin(), b_freq.end());
   return actions[dist(GlobalRNG::instance())];
 }
 
@@ -309,30 +305,15 @@ SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossl
 
   std::cout << "Collecting histories... " << std::flush;
   meta.histories.reserve(bp.get_strategy().history_map().size());
-  // size_t fold_saved = 0, bet_saved = 0;;
   PokerState init_state{meta.config.poker};
-  for(const auto& entry : bp.get_strategy().history_map()) {
-    PokerState state = init_state.apply(entry.first);
-    if(!state.is_terminal()) {
-      meta.histories.push_back(entry.first);
+  for(const auto& history: bp.get_strategy().history_map() | std::views::keys) {
+    if(PokerState state = init_state.apply(history); !state.is_terminal()) {
+      meta.histories.push_back(history);
     }
     else {
       Logger::error("Found terminal state.");
     }
-    // auto actions = valid_actions(state, bp.get_config().action_profile);
-    // int bets = 0;
-    // for(Action a : actions) {
-    //   if(a.get_bet_type() > 0 || a == Action::ALL_IN) ++bets;
-    // }
-    // if(std::find(actions.begin(), actions.end(), Action::FOLD) == actions.end()) {
-    //   fold_saved += 200;
-    // }
-    // if(bets == 0) {
-    //   bet_saved += 200;
-    // }
   }
-  // std::cout << "Fold saved: " << fold_saved << '\n';
-  // std::cout << "Bet saved: " << bet_saved << '\n';
   std::cout << "Collected " << meta.histories.size() << " (" << meta.n_clusters << " clusters).\n";
 
   std::cout << "Clusters=" << meta.n_clusters << ", Biases=" << meta.biases.size() << "\n";
@@ -370,19 +351,18 @@ SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossl
 std::unordered_map<Action, int> build_bias_offset_map(const ActionProfile& bias_profile) {
   Logger::log("Building bias offsets...");
   std::unordered_map<Action, int> bias_offset_map;
-  const std::vector<Action>& all_biases = bias_profile.get_actions(0, 0, 0, 0);
-  for(const auto& bias : all_biases) {
-    bias_offset_map[bias] = std::distance(all_biases.begin(), std::find(all_biases.begin(), all_biases.end(), bias));
+  for(const std::vector<Action>& all_biases = bias_profile.get_actions(0, 0, 0, 0); const auto& bias : all_biases) {
+    bias_offset_map[bias] = std::distance(all_biases.begin(), std::ranges::find(all_biases, bias));
     Logger::log(bias.to_string() + " -> " + std::to_string(bias_offset_map[bias]));
   }
   return bias_offset_map;
 }
 
-void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor) {
+void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::string& buf_dir, const float bias_factor) {
   Logger::log("Building sampled blueprint...");
-  BiasActionProfile bias_profile;
-  SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, bias_profile, bias_factor);
-  std::filesystem::path buffer_dir = buf_dir;
+  const BiasActionProfile bias_profile;
+  const SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, bias_profile, bias_factor);
+  const std::filesystem::path buffer_dir = buf_dir;
   assign_freq(new StrategyStorage<Action>(bias_profile, meta.n_clusters));
   for(const auto& fn : meta.buffer_fns) {
     std::unordered_map<ActionHistory, std::vector<Action>> buffer;
@@ -390,7 +370,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
     for(size_t hidx = 0; hidx < meta.histories.size(); ++hidx) {
       PokerState state{meta.config.poker};
       state = state.apply(meta.histories[hidx]);
-      size_t base_idx = get_freq()->index(state, 0);
+      const size_t base_idx = get_freq()->index(state, 0);
       auto sampled = buffer[meta.histories[hidx]];
       for(int idx = 0; idx < sampled.size(); ++idx) {
         get_freq()->operator[](base_idx + idx) = sampled[idx];

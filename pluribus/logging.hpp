@@ -9,24 +9,23 @@ namespace pluribus {
 
 class Log {
 public:
-  Log(const std::filesystem::path fn, int debug = 0) : _fn{fn}, _debug{debug} {};
+  explicit Log(const std::filesystem::path& fn, const int debug = 0) : _fn{fn}, _debug{debug} {}
 
-  void log(const std::string& msg, int debug = 0) const { 
+  void log(const std::string& msg, const int debug = 0) const {
     if(_debug >= debug) {
-      auto dir = _fn.parent_path();
-      if(!create_dir(dir)) throw std::runtime_error("Failed to create log directory \"" + dir.string() + "\"");
-      std::string line = date_time_str("%m/%d/%Y %H:%M:%S") + ": " + msg + "\n";
+      if(const auto dir = _fn.parent_path(); !create_dir(dir)) throw std::runtime_error("Failed to create log directory \"" + dir.string() + "\"");
+      const std::string line = date_time_str("%m/%d/%Y %H:%M:%S") + ": " + msg + "\n";
       std::cout << line;
       write_to_file(_fn, line, true);
     }
   }
 
-  [[noreturn]] void error(const std::string& msg) { 
+  [[noreturn]] void error(const std::string& msg) const {
     log("Error: " + msg);
     throw std::runtime_error(msg);
   }
 
-  void set_debug(int debug) { _debug = debug; }
+  void set_debug(const int debug) { _debug = debug; }
 
 private:
   std::filesystem::path _fn;
@@ -40,7 +39,7 @@ public:
     buf.str("");
   }
 
-  static void log(const std::string& msg, int debug = 0) {
+  static void log(const std::string& msg, const int debug = 0) {
     instance()->_log.log(msg, debug);
   }
 
@@ -48,11 +47,11 @@ public:
     instance()->_log.error(msg);
   }
 
-  static void set_directory(const std::filesystem::path dir) {
+  static void set_directory(const std::filesystem::path &dir) {
     set_log(Log{dir / (date_time_str() + ".log")});
   }
 
-  static void set_filename(const std::filesystem::path fn) {
+  static void set_filename(const std::filesystem::path &fn) {
     set_log(Log{fn});
   }
 
@@ -68,7 +67,7 @@ private:
     return _instance.get();
   }
 
-  Logger() : _log{std::filesystem::path{"logs"} / (date_time_str() + ".log")} {};
+  Logger() : _log{std::filesystem::path{"logs"} / (date_time_str() + ".log")} {}
 
   static std::unique_ptr<Logger> _instance;
 

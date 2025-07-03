@@ -39,7 +39,7 @@ void traverse(RangeViewer* viewer_p, const DecisionAlgorithm& decision, const So
       std::cout << "Exiting...\n\n";
       break;
     }
-    else if(input == "reset") {
+    if(input == "reset") {
       std::cout << "Resetting...\n\n";
       ranges = config.init_ranges;
       state = config.init_state;
@@ -50,7 +50,7 @@ void traverse(RangeViewer* viewer_p, const DecisionAlgorithm& decision, const So
       ranges[state.get_active()] = action_ranges.at(action).get_range();
       state = state.apply(action);
     }
-    
+
     if(state.is_terminal()) {
       ranges = config.init_ranges;
       state = config.init_state;
@@ -89,15 +89,15 @@ void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn) {
 
 Action str_to_action(const std::string& str) {
   if(str.starts_with("check") || str.starts_with("call")) return Action::CHECK_CALL;
-  else if(str.starts_with("fold")) return Action::FOLD;
-  else if(str.starts_with("all-in")) return Action::ALL_IN;
-  else if(str.starts_with("bet")) return Action(std::stoi(str.substr(4)) / 100.0);
-  else throw std::runtime_error("Invalid action string: " + str);
+  if(str.starts_with("fold")) return Action::FOLD;
+  if(str.starts_with("all-in")) return Action::ALL_IN;
+  if(str.starts_with("bet")) return Action(std::stoi(str.substr(4)) / 100.0);
+  throw std::runtime_error("Invalid action string: " + str);
 }
 
 void render_ranges(RangeViewer* viewer_p, const PokerRange& base_range, const std::unordered_map<Action, RenderableRange>& action_ranges) {
-  std::vector<RenderableRange> ranges{RenderableRange{base_range, "Base Range", Color{255, 255, 255, 255}}};
-  for(auto& entry : action_ranges) ranges.push_back(entry.second);
+  std::vector ranges{RenderableRange{base_range, "Base Range", Color{255, 255, 255, 255}}};
+  for(auto& r : action_ranges | std::views::values) ranges.push_back(r);
   viewer_p->render(ranges);
 }
 
@@ -110,16 +110,16 @@ PokerRange build_action_range(const PokerRange& base_range, const Action& a, con
   return rel_range;
 }
 
-void update_ranges(std::vector<PokerRange>& ranges, Action a, const PokerState& state, const Board& board, 
+void update_ranges(std::vector<PokerRange>& ranges, const Action a, const PokerState& state, const Board& board,
     const DecisionAlgorithm& decision) {
-  auto action_range = build_action_range(ranges[state.get_active()], a, state, board, decision);
+  const auto action_range = build_action_range(ranges[state.get_active()], a, state, board, decision);
   ranges[state.get_active()] *= action_range;
 }
 
 std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const Board& board, const Strategy<float>& strat) {
   PokerState curr_state = strat.get_config().init_state;
   std::vector<PokerRange> ranges = strat.get_config().init_ranges;
-  StrategyDecision decision{strat.get_strategy(), strat.get_config().action_profile};
+  const StrategyDecision decision{strat.get_strategy(), strat.get_config().action_profile};
   for(int aidx = 0; aidx < actions.size(); ++aidx) {
     update_ranges(ranges, actions[aidx], curr_state, board, decision);
     if(aidx != actions.size() - 1) {
@@ -135,7 +135,7 @@ std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const B
 std::unordered_map<Action, RenderableRange> build_renderable_ranges(const DecisionAlgorithm& decision, const ActionProfile& profile, 
     const PokerState& state, const Board& board, PokerRange& base_range) {
   std::unordered_map<Action, RenderableRange> ranges;
-  auto actions = valid_actions(state, profile);
+  const auto actions = valid_actions(state, profile);
   auto color_map = map_colors(actions);
   base_range.remove_cards(board.as_vector(n_board_cards(state.get_round())));
   for(Action a : actions) {

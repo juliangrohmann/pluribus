@@ -172,9 +172,9 @@ int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state,
 
 TEST_CASE("GSL discrete sampling", "[sampling]") {
   auto sparse_range = PokerRange();
-  sparse_range.add_hand({"AcAh"}, 0.5);
-  sparse_range.add_hand({"AcKh"}, 1.0);
-  sparse_range.add_hand({"2c2h"}, 0.25);
+  sparse_range.add_hand(Hand{"AcAh"}, 0.5);
+  sparse_range.add_hand(Hand{"AcKh"}, 1.0);
+  sparse_range.add_hand(Hand{"2c2h"}, 0.25);
   GSLDiscreteDist dist{sparse_range.weights()};
 
   double sum = 0.0;

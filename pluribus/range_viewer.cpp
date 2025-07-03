@@ -23,7 +23,7 @@ Color Color::PURPLE{171, 21, 235, 255};
 
 
 std::unordered_map<Action, Color> map_colors(const std::vector<Action>& actions) {
-  const std::vector<Color> color_order{Color::DARK_RED, Color::RED, Color::LIGHT_RED, Color::YELLOW, Color::CYAN, 
+  const std::vector color_order{Color::DARK_RED, Color::RED, Color::LIGHT_RED, Color::YELLOW, Color::CYAN,
     Color::PINK, Color::PURPLE, Color::DARK_GREEN};
   const std::unordered_map<Action, Color> special_colors{{Action::FOLD, Color::BLUE}, {Action::CHECK_CALL, Color::GREEN}};
 
@@ -34,8 +34,8 @@ std::unordered_map<Action, Color> map_colors(const std::vector<Action>& actions)
       normal_actions.push_back(a);
     }
   }
-  std::sort(normal_actions.begin(), normal_actions.end(), [](const auto& a, const auto& b) { return a.get_bet_type() > b.get_bet_type(); });
-  if(std::find(actions.begin(), actions.end(), Action::ALL_IN) != actions.end()) {
+  std::ranges::sort(normal_actions, [](const auto& a, const auto& b) { return a.get_bet_type() > b.get_bet_type(); });
+  if(std::ranges::find(actions, Action::ALL_IN) != actions.end()) {
     normal_actions.insert(normal_actions.begin(), Action::ALL_IN);
   }
   if(normal_actions.size() > color_order.size()) {
@@ -46,20 +46,20 @@ std::unordered_map<Action, Color> map_colors(const std::vector<Action>& actions)
   for(int i = 0; i < normal_actions.size(); ++i) {
     color_map[normal_actions[i]] = color_order[i];
   }
-  for(const auto& entry : special_colors) {
-    if(std::find(actions.begin(), actions.end(), entry.first) != actions.end()) {
-      color_map[entry.first] = entry.second;
+  for(const auto&[a, color] : special_colors) {
+    if(std::ranges::find(actions, a) != actions.end()) {
+      color_map[a] = color;
     }
   }
   if(actions.size() != color_map.size()) {
-    for(const auto& entry : color_map) std::cout << "Found: " << entry.first.to_string() << "\n";
+    for(const auto& action : color_map | std::views::keys) std::cout << "Found: " << action.to_string() << "\n";
     throw std::runtime_error("Failed to map some colors: actions=" + std::to_string(actions.size()) +
                              ", mapped=" + std::to_string(color_map.size()));
   }
   return color_map;
 }
 
-RenderableRange::RenderableRange(const PokerRange& range, const std::string& label, const Color& color, bool relative) 
+RenderableRange::RenderableRange(const PokerRange& range, const std::string& label, const Color& color, const bool relative)
     : _range{range}, _label{label}, _color{color.sdl_color}, _relative{relative} {
   int row_idx, col_idx, combos;
   const auto& weights = _range.weights();
@@ -75,20 +75,20 @@ RenderableRange::RenderableRange(const PokerRange& range, const std::string& lab
       col_idx = 0;
       combos = hand.cards()[0] / 4 == hand.cards()[1] / 4 ? 6 : 12;
     }
-    int row = _matrix.size() - hand.cards()[row_idx] / 4 - 1;
-    int col = _matrix.size() - hand.cards()[col_idx] / 4 - 1;
+    const int row = _matrix.size() - hand.cards()[row_idx] / 4 - 1;
+    const int col = _matrix.size() - hand.cards()[col_idx] / 4 - 1;
     _matrix[row][col] += weights[idx] / combos;
   }
 }
 
-RangeViewer::RangeViewer(const std::string& title, int width, int height)
+RangeViewer::RangeViewer(const std::string& title, const int width, const int height)
     : _window_width(width), _window_height(height), _title(title) {
   if(SDL_Init(SDL_INIT_VIDEO) < 0 || TTF_Init() < 0) {
     SDL_Log("Initialization failed: %s", SDL_GetError());
     return;
   }
 
-  std::string font_path = std::string(PROJECT_ROOT_DIR) + "/resources/UbuntuMono-Regular.ttf";
+  const std::string font_path = std::string(PROJECT_ROOT_DIR) + "/resources/UbuntuMono-Regular.ttf";
   _font = TTF_OpenFont(font_path.c_str(), 24);
   if(!_font) {
     SDL_Log("Failed to load font: %s", TTF_GetError());
@@ -127,18 +127,18 @@ void set_color(SDL_Renderer* renderer, const SDL_Color& color) {
   SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a);
 }
 
-void RangeViewer::render_text(const std::string& label, int x, int y) {
+void RangeViewer::render_text(const std::string& label, const int x, const int y) {
   SDL_Surface* text_surface = TTF_RenderText_Solid(_font, label.c_str(), _text_color);
   SDL_Texture* text_texture = SDL_CreateTextureFromSurface(get_renderer(), text_surface);
-  SDL_Rect text_rect = {x, y, text_surface->w, text_surface->h};
+  const SDL_Rect text_rect = {x, y, text_surface->w, text_surface->h};
   SDL_RenderCopy(get_renderer(), text_texture, nullptr, &text_rect);
   SDL_FreeSurface(text_surface);
   SDL_DestroyTexture(text_texture);
 }
 
-SDL_Rect RangeViewer::make_rect(int row, int col, float freq, float rel_freq, int offset) const {
-  int rect_h = static_cast<int>(round(_field_sz * freq));
-  SDL_Rect rect = {
+SDL_Rect RangeViewer::make_rect(const int row, const int col, const float freq, const float rel_freq, const int offset) const {
+  const int rect_h = static_cast<int>(round(_field_sz * freq));
+  const SDL_Rect rect = {
     static_cast<int>(round(_margin_x + col * _field_sz + offset)),
     static_cast<int>(round(_margin_y + row * _field_sz + _field_sz - rect_h)),
     static_cast<int>(round(_field_sz * rel_freq)), 
@@ -147,11 +147,11 @@ SDL_Rect RangeViewer::make_rect(int row, int col, float freq, float rel_freq, in
   return rect;
 }
 
-void RangeViewer::render_hand(const SDL_Color& color, int row, int col, float freq, float rel_freq, int offset) {
+void RangeViewer::render_hand(const SDL_Color& color, const int row, const int col, const float freq, const float rel_freq, const int offset) {
   if(freq > 1.0f || rel_freq > 1.0f) {
-    std::runtime_error("RangeViewer --- frequency overflow. freq=" + std::to_string(freq) + ", rel_freq" + std::to_string(rel_freq));
+    throw std::runtime_error("RangeViewer --- frequency overflow. freq=" + std::to_string(freq) + ", rel_freq" + std::to_string(rel_freq));
   }
-  SDL_Rect action_rect = make_rect(row, col, freq, rel_freq, offset);
+  const SDL_Rect action_rect = make_rect(row, col, freq, rel_freq, offset);
   set_color(get_renderer(), color);
   SDL_RenderFillRect(get_renderer(), &action_rect);
 }
@@ -168,8 +168,8 @@ void RangeViewer::render_range(const RenderableRange* range, const RenderableRan
                                RangeMatrix<int>& offset_matrix) {
   for(int row = 0; row < range->get_matrix().size(); ++row) {
     for(int col = 0; col < range->get_matrix()[row].size(); ++col) {
-      float freq = !base_range ? range->get_matrix()[row][col] : base_range->get_matrix()[row][col];
-      float rel_freq = !base_range ? 1.0f : range->get_matrix()[row][col] / base_range->get_matrix()[row][col];
+      const float freq = !base_range ? range->get_matrix()[row][col] : base_range->get_matrix()[row][col];
+      const float rel_freq = !base_range ? 1.0f : range->get_matrix()[row][col] / base_range->get_matrix()[row][col];
       render_hand(range->get_color(), row, col, freq, rel_freq, offset_matrix[row][col]);
       if(base_range) offset_matrix[row][col] += static_cast<int>(round(_field_sz * rel_freq));
       
@@ -191,8 +191,8 @@ void RangeViewer::render_legend(const std::vector<RenderableRange>& ranges) {
   }
   if(n_rel_ranges == 0) return;
   
-  int w = _window_width / n_rel_ranges;
-  int h = 100;
+  const int w = _window_width / n_rel_ranges;
+  constexpr int h = 100;
   int x = 0;
   for(const auto& range : ranges) {
     if(range.is_relative()) {
@@ -218,16 +218,16 @@ void RangeViewer::render_overlay() {
       set_color(get_renderer(), {0, 0, 0, 255});
       SDL_RenderDrawRect(get_renderer(), &border_rect);
 
-      int major = col < row ? col : row;
-      int minor = col < row ? row : col;
-      std::string suit = row == col ? "" : (row > col ? "o" : "s");
+      const int major = col < row ? col : row;
+      const int minor = col < row ? row : col;
+      std::string suit = row == col ? "" : row > col ? "o" : "s";
       std::string label = std::string(1, omp::RANKS[omp::RANKS.size() - major - 1]) + omp::RANKS[omp::RANKS.size() - minor - 1] + suit;
       render_text(label, border_rect.x + 5, border_rect.y + 3);
     }
   } 
 }
 
-WindowRangeViewer::WindowRangeViewer(const std::string& title, int width, int height) : RangeViewer(title, width, height) {
+WindowRangeViewer::WindowRangeViewer(const std::string& title, const int width, const int height) : RangeViewer(title, width, height) {
   _window = SDL_CreateWindow(_title.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 
                             _window_width, _window_height, SDL_WINDOW_SHOWN);
   if(!_window) {
@@ -251,9 +251,8 @@ void WindowRangeViewer::render(const std::vector<RenderableRange>& ranges) {
   SDL_RenderPresent(get_renderer());
 }
 
-PngRangeViewer::PngRangeViewer(const std::string& fn, int width, int height) : RangeViewer(fn, width, height), _fn{fn} {
-  int imgFlags = IMG_INIT_PNG;
-  if(!(IMG_Init(imgFlags) & imgFlags)) {
+PngRangeViewer::PngRangeViewer(const std::string& fn, const int width, const int height) : RangeViewer(fn, width, height), _fn{fn} {
+  if(const int imgFlags = IMG_INIT_PNG; !(IMG_Init(imgFlags) & imgFlags)) {
     SDL_Log("IMG_Init failed: %s", IMG_GetError());
     return;
   }
@@ -267,7 +266,7 @@ PngRangeViewer::PngRangeViewer(const std::string& fn, int width, int height) : R
     SDL_Log("SDL_CreateSoftwareRenderer failed: %s", SDL_GetError());
     return;
   }
-  std::string font_path = std::string(PROJECT_ROOT_DIR) + "/resources/UbuntuMono-Regular.ttf";
+  const std::string font_path = std::string(PROJECT_ROOT_DIR) + "/resources/UbuntuMono-Regular.ttf";
   _font = TTF_OpenFont(font_path.c_str(), 24);
   if(!_font) {
     SDL_Log("Failed to load font: %s", TTF_GetError());

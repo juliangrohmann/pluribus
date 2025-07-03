@@ -27,11 +27,11 @@ class Blueprint : public Strategy<T> {
 public:
   Blueprint() : _freq{nullptr} {}
 
-  const StrategyStorage<T>& get_strategy() const {
+  const StrategyStorage<T>& get_strategy() const override {
     if(_freq) return *_freq;
     throw std::runtime_error("Blueprint strategy is null.");
   }
-  const SolverConfig& get_config() const { return _config; }
+  const SolverConfig& get_config() const override { return _config; }
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -41,7 +41,7 @@ public:
 protected:
   void assign_freq(StrategyStorage<T>* freq) { _freq = std::unique_ptr<StrategyStorage<T>>{freq}; }
   std::unique_ptr<StrategyStorage<T>>& get_freq() { return _freq; }
-  void set_config(SolverConfig config) { _config = config; }
+  void set_config(const SolverConfig& config) { _config = config; }
 
 private:
   std::unique_ptr<StrategyStorage<T>> _freq;
@@ -50,7 +50,7 @@ private:
 
 class LosslessBlueprint : public Blueprint<float> {
 public:
-  void build(const std::string& preflop_fn, const std::vector<std::string>& postflop_fns, const std::string& buf_dir = "", int max_gb = 50);
+  void build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir = "", int max_gb = 50);
   void build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns);
 
 private:
@@ -71,8 +71,8 @@ struct SampledMetadata {
 class SampledBlueprint : public Blueprint<Action> {
 public:
   void build(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor = 5.0f);
-  Action decompress_action(uint8_t action_idx) const { return _idx_to_action[action_idx]; };
-  int bias_offset(Action bias) const { return _bias_to_offset.at(bias); };
+  Action decompress_action(const uint8_t action_idx) const { return _idx_to_action[action_idx]; }
+  int bias_offset(const Action bias) const { return _bias_to_offset.at(bias); }
 
 private:
   SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, const ActionProfile& bias_profile, float factor);

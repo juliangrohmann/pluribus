@@ -23,7 +23,7 @@ std::vector<long> get_payoffs(const Board& board, const std::vector<Hand>& hands
     std::vector<uint8_t> win_idxs = winners(state, hands, board, eval);
     if(verbose) std::cout << "Player" << (win_idxs.size() > 1 ? "s " : " ");
     for(int i = 0; i < hands.size(); ++i) {
-      bool is_winner = std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end();
+      const bool is_winner = std::ranges::find(win_idxs, i) != win_idxs.end();
       payoffs[i] = is_winner ? state.get_pot() / win_idxs.size(): 0;
       if(verbose && is_winner) std::cout << i << (i == win_idxs[win_idxs.size() - 1] ? " " : ", ");
     }
@@ -33,10 +33,10 @@ std::vector<long> get_payoffs(const Board& board, const std::vector<Hand>& hands
   return payoffs;
 }
 
-std::vector<long> simulate(const std::vector<Agent*>& agents, const PokerConfig& config, long n_iter) {
+std::vector<long> simulate(const std::vector<Agent*>& agents, const PokerConfig& config, const long n_iter) {
   std::vector<std::vector<long>> thread_results{agents.size()};
-  int ntid = omp_get_max_threads();
-  long log_interval = n_iter / ntid / 100;
+  const int ntid = omp_get_max_threads();
+  const long log_interval = n_iter / ntid / 100;
   for(auto& result : thread_results) result.resize(ntid);
 
   #pragma omp parallel for schedule(static)
@@ -45,7 +45,7 @@ std::vector<long> simulate(const std::vector<Agent*>& agents, const PokerConfig&
     thread_local Deck deck;
     thread_local Board board;
     thread_local std::vector<Hand> hands{agents.size()};
-    int tid = omp_get_thread_num();
+    const int tid = omp_get_thread_num();
     if(tid == 0 && t % log_interval == 0) std::cout << "Sim: " << std::setprecision(1) << std::fixed << t / static_cast<double>(log_interval) << "%\n";
     PokerState state(config);
     deck.shuffle();
@@ -65,9 +65,9 @@ std::vector<long> simulate(const std::vector<Agent*>& agents, const PokerConfig&
     std::vector<long> payoffs = get_payoffs(board, hands, state, eval);
     long net_round = 0l;
     for(int i = 0; i < hands.size(); ++i) {
-      int winnings = state.get_players()[i].get_chips() - config.n_chips + payoffs[i];
+      const int winnings = state.get_players()[i].get_chips() - config.n_chips + payoffs[i];
       if(verbose) {
-        std::cout << std::setprecision(2) << std::fixed << "Player: " << static_cast<int>(i) << ": " 
+        std::cout << std::setprecision(2) << std::fixed << "Player: " << i << ": "
                   << std::setw(8) << std::showpos << (winnings / 100.0) << " bb\n" << std::noshowpos;
       }
       thread_results[i][tid] += winnings;
@@ -77,7 +77,7 @@ std::vector<long> simulate(const std::vector<Agent*>& agents, const PokerConfig&
   }
 
   long net_winnings = 0l;
-  std::vector<long> results(static_cast<int>(thread_results.size()), 0l);
+  std::vector results(static_cast<int>(thread_results.size()), 0l);
   for(int i = 0; i < thread_results.size(); ++i) {
     for(int tid = 0; tid < thread_results[i].size(); ++tid) {
       results[i] += thread_results[i][tid];
@@ -89,7 +89,7 @@ std::vector<long> simulate(const std::vector<Agent*>& agents, const PokerConfig&
 }
 
 std::vector<long> simulate_round(const Board& board, const std::vector<Hand>& hands, const ActionHistory& actions, const PokerConfig& config) {
-  omp::HandEvaluator eval;
+  const omp::HandEvaluator eval;
   PokerState state(config);
   if(verbose) {
     for(int i = 0; i < hands.size(); ++i) {
@@ -105,20 +105,18 @@ std::vector<long> simulate_round(const Board& board, const std::vector<Hand>& ha
     if(verbose) std::cout << "The round is unfinished.\n";
     return std::vector<long>(hands.size(), 0);
   }
-  else {
-    std::vector<long> results = get_payoffs(board, hands, state, eval);
-    int net_winnings = 0;
-    for(int i = 0; i < hands.size(); ++i) {
-      results[i] += state.get_players()[i].get_chips() - config.n_chips;
-      if(verbose) {
-        std::cout << std::setprecision(2) << std::fixed << "Player: " << static_cast<int>(i) << ": " 
-                  << std::setw(8) << std::showpos << (results[i] / 100.0) << " bb\n" << std::noshowpos;
-      }
-      net_winnings += results[i];
+  std::vector<long> results = get_payoffs(board, hands, state, eval);
+  int net_winnings = 0;
+  for(int i = 0; i < hands.size(); ++i) {
+    results[i] += state.get_players()[i].get_chips() - config.n_chips;
+    if(verbose) {
+      std::cout << std::setprecision(2) << std::fixed << "Player: " << i << ": "
+          << std::setw(8) << std::showpos << (results[i] / 100.0) << " bb\n" << std::noshowpos;
     }
-    assert(net_winnings == 0 && "Winnings are not zero sum.");
-    return results;
+    net_winnings += results[i];
   }
+  assert(net_winnings == 0 && "Winnings are not zero sum.");
+  return results;
 }
 
 }

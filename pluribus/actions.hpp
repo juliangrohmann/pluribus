@@ -14,9 +14,9 @@ namespace pluribus {
 
 class Action {
 public:
-  Action(float bet_type = -3.0f) : _bet_type{bet_type} {}
+  explicit Action(const float bet_type = -3.0f) : _bet_type{bet_type} {}
   
-  float get_bet_type() const { return _bet_type; };
+  float get_bet_type() const { return _bet_type; }
   std::string to_string() const;
 
   bool operator==(const Action& other) const = default;
@@ -45,15 +45,16 @@ bool is_bias(Action a);
 class ActionHistory {
 public:
   ActionHistory() = default;
-  ActionHistory(std::vector<Action> actions) : _history{actions} {}
-  ActionHistory(std::initializer_list<Action> actions) : _history{actions} {}
 
-  const std::vector<Action> get_history() const { return _history; }
+  explicit ActionHistory(const std::vector<Action>& actions) : _history{actions} {}
+  ActionHistory(const std::initializer_list<Action>& actions) : _history{actions} {}
+
   void push_back(const Action& action) { _history.push_back(action); }
-  const Action& get(int i) const { return _history[i]; }
+  const std::vector<Action>& get_history() const { return _history; }
+  const Action& get(const int i) const { return _history[i]; }
   size_t size() const { return _history.size(); }
   std::string to_string() const;
-  ActionHistory slice(int start, int end = -1) const; 
+  ActionHistory slice(int start, int end = -1) const;
   bool is_consistent(const ActionHistory& other) const;
 
   bool operator==(const ActionHistory& other) const = default;
@@ -71,9 +72,9 @@ class ActionProfile {
 public:
   void set_actions(const std::vector<Action>& actions, int round, int bet_level, int pos);
   void set_iso_actions(const std::vector<Action>& actions) { _iso_actions = actions; }
-  const std::vector<Action>& get_actions(int round, int bet_level, int pos, int pot) const;
   void add_action(const Action& action, int round, int bet_level, int pos);
-  int n_bet_levels(int round) const { return _profile[round].size(); }
+  const std::vector<Action>& get_actions(int round, int bet_level, int pos, int pot) const;
+  int n_bet_levels(const int round) const { return static_cast<int>(_profile[round].size()); }
   std::unordered_set<Action> all_actions() const;
   int max_actions() const;
   std::string to_string() const;
@@ -92,7 +93,7 @@ private:
 
 class BlueprintActionProfile : public ActionProfile {
 public:
-  BlueprintActionProfile(int n_players);
+  explicit BlueprintActionProfile(int n_players);
 };
 
 class BiasActionProfile : public ActionProfile {
@@ -106,16 +107,16 @@ namespace std {
 
 template <>
 struct hash<pluribus::Action> {
-  std::size_t operator()(const pluribus::Action& a) const {
+  std::size_t operator()(const pluribus::Action& a) const noexcept {
     return std::hash<float>{}(a.get_bet_type());
   }
 };
 
 template <>
 struct hash<pluribus::ActionHistory> {
-  std::size_t operator()(const pluribus::ActionHistory& ah) const {
+  std::size_t operator()(const pluribus::ActionHistory& ah) const noexcept {
     size_t seed = 0;
-    std::hash<pluribus::Action> action_hasher;    
+    constexpr std::hash<pluribus::Action> action_hasher;
     for(const pluribus::Action& a : ah.get_history()) {
       boost::hash_combine(seed, action_hasher(a));
     }

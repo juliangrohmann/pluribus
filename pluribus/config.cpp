@@ -8,7 +8,7 @@ SolverConfig::SolverConfig(const PokerConfig& poker_)
   for(int i = 0; i < poker_.n_players; ++i) init_ranges.push_back(PokerRange::full());
 }
 
-SolverConfig::SolverConfig(int n_players, int n_chips, int ante) 
+SolverConfig::SolverConfig(const int n_players, const int n_chips, const int ante)
     : SolverConfig{PokerConfig{n_players, n_chips, ante}} {}
 
 std::string SolverConfig::to_string() const {
@@ -24,20 +24,20 @@ std::string SolverConfig::to_string() const {
   return oss.str();
 }
 
-long DiscountConfig::next_discount_step(long t, long T) const {
-  long next_disc = (t / discount_interval + 1) * discount_interval;
+long DiscountConfig::next_discount_step(const long t, const long T) const {
+  const long next_disc = (t / discount_interval + 1) * discount_interval;
   return next_disc < lcfr_thresh ? next_disc : T + 1;
 }
 
-bool DiscountConfig::is_discount_step(long t) const {
+bool DiscountConfig::is_discount_step(const long t) const {
   return t < lcfr_thresh && t % discount_interval == 0;
 }
 
-double DiscountConfig::get_discount_factor(long t) const {
+double DiscountConfig::get_discount_factor(const long t) const {
   return static_cast<double>(t / discount_interval) / (t / discount_interval + 1);
 }
 
-BlueprintSolverConfig::BlueprintSolverConfig(const BlueprintTimingConfig& timings, long it_per_min) {
+BlueprintSolverConfig::BlueprintSolverConfig(const BlueprintTimingConfig& timings, const long it_per_min) {
   set_iterations(timings, it_per_min);
 }
 
@@ -55,7 +55,7 @@ std::string BlueprintSolverConfig::to_string() const {
   return oss.str();
 }
 
-void BlueprintSolverConfig::set_iterations(const BlueprintTimingConfig& timings, long it_per_min) {
+void BlueprintSolverConfig::set_iterations(const BlueprintTimingConfig& timings, const long it_per_min) {
   preflop_threshold = timings.preflop_threshold_m * it_per_min;
   snapshot_interval = timings.snapshot_interval_m * it_per_min;
   prune_thresh = timings.prune_thresh_m * it_per_min;
@@ -64,17 +64,17 @@ void BlueprintSolverConfig::set_iterations(const BlueprintTimingConfig& timings,
   log_interval = timings.log_interval_m * it_per_min;
 }
 
-long BlueprintSolverConfig::next_snapshot_step(long t, long T) const {
+long BlueprintSolverConfig::next_snapshot_step(const long t, const long T) const {
     if(t < preflop_threshold) return preflop_threshold;
-    long next_snap = std::max((t - preflop_threshold) / snapshot_interval + 1, 0L) * snapshot_interval + preflop_threshold;
+    const long next_snap = std::max((t - preflop_threshold) / snapshot_interval + 1, 0L) * snapshot_interval + preflop_threshold;
     return next_snap < T ? next_snap : T;
 }
 
-bool BlueprintSolverConfig::is_snapshot_step(long t, long T) const {
+bool BlueprintSolverConfig::is_snapshot_step(const long t, const long T) const {
   return t == T || (t - preflop_threshold) % snapshot_interval == 0;
 }
 
-RealTimeSolverConfig::RealTimeSolverConfig(const RealTimeTimingConfig& timings, long it_per_sec) {
+RealTimeSolverConfig::RealTimeSolverConfig(const RealTimeTimingConfig& timings, const long it_per_sec) {
   set_iterations(timings, it_per_sec);
 }
 
@@ -82,7 +82,7 @@ std::string RealTimeSolverConfig::to_string() const {
   return "Terminal round: " + round_to_str(terminal_round) + ", Terminal bet level: " + std::to_string(terminal_bet_level) + "-bet";
 }
 
-void RealTimeSolverConfig::set_iterations(const RealTimeTimingConfig& timings, long it_per_sec) {
+void RealTimeSolverConfig::set_iterations(const RealTimeTimingConfig& timings, const long it_per_sec) {
   discount_interval = timings.discount_interval_s * it_per_sec;
   lcfr_thresh = timings.lcfr_thresh_s * it_per_sec;
   log_interval = timings.log_interval_s * it_per_sec;

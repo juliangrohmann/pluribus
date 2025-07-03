@@ -6,10 +6,10 @@ namespace pluribus {
 
 class RealTimeDecision : public DecisionAlgorithm {
 public:
-  RealTimeDecision(const LosslessBlueprint& preflop_bp, const std::shared_ptr<const Solver> solver)
+  RealTimeDecision(const LosslessBlueprint& preflop_bp, const std::shared_ptr<const Solver>& solver)
       : _preflop_decision{StrategyDecision{preflop_bp.get_strategy(), preflop_bp.get_config().action_profile}}, _solver{solver} {}
 
-  float frequency(Action a, const PokerState& state, const Board& board, const Hand& hand) const override {
+  float frequency(const Action a, const PokerState& state, const Board& board, const Hand& hand) const override {
     if(_solver) return _solver->frequency(a, state, board, hand);
     if(state.get_round() == 0) return _preflop_decision.frequency(a, state, board, hand);
     Logger::error("Cannot decide postflop frequency without solver.");
@@ -20,10 +20,10 @@ private:
   const std::shared_ptr<const Solver> _solver;
 };
 
-Pluribus::Pluribus(const std::shared_ptr<const LosslessBlueprint> preflop_bp, const std::shared_ptr<const SampledBlueprint> sampled_bp) 
-    : _sampled_bp{sampled_bp}, _preflop_bp{preflop_bp} {}
+Pluribus::Pluribus(const std::shared_ptr<const LosslessBlueprint>& preflop_bp, const std::shared_ptr<const SampledBlueprint>& sampled_bp)
+    : _preflop_bp{preflop_bp}, _sampled_bp{sampled_bp} {}
 
-void Pluribus::new_game(int hero_pos) {
+void Pluribus::new_game(const int hero_pos) {
   Logger::log("================================ New Game ================================");
   Logger::log("Game idx=" + std::to_string(++_game_idx));
   _real_state = _sampled_bp->get_config().init_state; // TODO: supply state with real stack sizes
@@ -32,8 +32,8 @@ void Pluribus::new_game(int hero_pos) {
 
   Logger::log("Hero position: " + pos_to_str(hero_pos, _root_state.get_players().size()));
   Logger::log("Real state/Root state:\n" + _root_state.to_string());
-  int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;
-  if(_root_state.get_bet_level() > 0 || _root_state.get_round() != 0 || _root_state.get_active() != init_pos) {
+  if(const int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;
+      _root_state.get_bet_level() > 0 || _root_state.get_round() != 0 || _root_state.get_active() != init_pos) {
     Logger::error("Invalid initial state.");
   }
 
@@ -52,7 +52,7 @@ void Pluribus::new_game(int hero_pos) {
   Logger::log("# Board cards: " + std::to_string(_board.size()));
 }
 
-std::string chips_to_str(const PokerState& state, int i) {
+std::string chips_to_str(const PokerState& state, const int i) {
   return pos_to_str(i, state.get_players().size()) + " chips = " + std::to_string(state.get_players()[i].get_chips());
 }
 
@@ -69,7 +69,7 @@ void Pluribus::update_state(const PokerState& state) {
       ", Updated actions=" + std::to_string(state.get_action_history().size()));
   }
 
-  for(Action a : state.get_action_history().slice(_real_state.get_action_history().size()).get_history()) {
+  for(const Action a : state.get_action_history().slice(_real_state.get_action_history().size()).get_history()) {
     _apply_action(a);
   }
 
@@ -97,7 +97,7 @@ void Pluribus::update_state(const PokerState& state) {
   }
 }
 
-void Pluribus::update_board(const std::vector<uint8_t> updated_board) {
+void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
   Logger::log("============================== Update Board ==============================\n");
   Logger::log("Previous board: " + cards_to_str(_board));
   Logger::log("Updated board: " + cards_to_str(updated_board));
@@ -108,12 +108,12 @@ void Pluribus::update_board(const std::vector<uint8_t> updated_board) {
   _board = updated_board;
 }
 
-Solution Pluribus::solution(const PokerState& state, const Hand& hand) {
+Solution Pluribus::solution(const PokerState& state, const Hand& hand) const {
   Solution solution;
   solution.actions = valid_actions(state, _live_profile);
-  RealTimeDecision decision{*_preflop_bp, _solver};
-  for(Action a : solution.actions) {
-    solution.freq.push_back(decision.frequency(a, state, _board, hand));
+  const RealTimeDecision decision{*_preflop_bp, _solver};
+  for(const Action a : solution.actions) {
+    solution.freq.push_back(decision.frequency(a, state, Board{_board}, hand));
   }
   return solution;
 }
@@ -148,7 +148,7 @@ bool is_off_tree(Action a, const PokerState& state, const ActionProfile& profile
   return false;
 }
 
-void Pluribus::_apply_action(Action a) {
+void Pluribus::_apply_action(const Action a) {
   Logger::log("Applying action: " + a.to_string());
   _real_state = _real_state.apply(a);
   if(!can_solve(_root_state) && can_solve(_real_state)) {
@@ -165,12 +165,12 @@ void Pluribus::_apply_action(Action a) {
 
 void Pluribus::_update_root() {
   PokerState curr_state = _root_state;
-  RealTimeDecision decision{*_preflop_bp, _solver};
+  const RealTimeDecision decision{*_preflop_bp, _solver};
   std::ostringstream oss;
   for(Action a : _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history()) {
     oss << pos_to_str(curr_state.get_active(), _ranges.size()) << " action applied to root: " + a.to_string() << ", combos: "
         << std::fixed << std::setprecision(2) << _ranges[curr_state.get_active()].n_combos();
-    update_ranges(_ranges, a, curr_state, _board, decision);
+    update_ranges(_ranges, a, curr_state, Board{_board}, decision);
     oss << " -> " << _ranges[curr_state.get_active()].n_combos();
     Logger::dump(oss);
     curr_state = curr_state.apply(a);

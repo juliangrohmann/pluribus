@@ -19,7 +19,7 @@ int Deck::draw() {
   uint8_t card;
   do {
     card = _cards[_current++];
-  } while(_dead_cards.find(card) != _dead_cards.end());
+  } while(_dead_cards.contains(card));
   return card;
 }
 
@@ -31,28 +31,28 @@ void Deck::reset() {
 }
 
 void Deck::shuffle() {
-  std::shuffle(_cards.begin(), _cards.end(), GlobalRNG::instance());
+  std::ranges::shuffle(_cards, GlobalRNG::instance());
   _current = 0;
 }
 
 uint64_t card_mask(const std::vector<uint8_t>& cards) {
   uint64_t mask = 0L;
-  for(uint8_t c : cards) mask |= card_mask(c);
+  for(const uint8_t c : cards) mask |= card_mask(c);
   return mask;
 }
 
 const Hand Hand::PLACEHOLDER = Hand{MAX_CARDS, MAX_CARDS};
 
-bool collides(uint8_t card, const Hand& hand) {
+bool collides(const uint8_t card, const Hand& hand) {
   return hand.cards()[0] == card || hand.cards()[1] == card;
 }
 
-bool collides(uint8_t card, const Board& board) {
-  return std::find(board.cards().begin(), board.cards().end(), card) != board.cards().end();
+bool collides(const uint8_t card, const Board& board) {
+  return std::ranges::find(board.cards(), card) != board.cards().end();
 }
 
-bool collides(uint8_t card, const std::vector<uint8_t> cards) {
-  return std::find(cards.begin(), cards.end(), card) != cards.end();
+bool collides(const uint8_t card, const std::vector<uint8_t>& cards) {
+  return std::ranges::find(cards, card) != cards.end();
 }
 
 bool collides(const Hand& h1, const Hand& h2) {
@@ -61,24 +61,24 @@ bool collides(const Hand& h1, const Hand& h2) {
 }
 
 bool collides(const Hand& hand, const Board& board) {
-  return std::find(board.cards().begin(), board.cards().end(), hand.cards()[0]) != board.cards().end() ||
-         std::find(board.cards().begin(), board.cards().end(), hand.cards()[1]) != board.cards().end();
+  return std::ranges::find(board.cards(), hand.cards()[0]) != board.cards().end() ||
+         std::ranges::find(board.cards(), hand.cards()[1]) != board.cards().end();
 }
 
 bool collides(const Hand& hand, const std::vector<uint8_t>& cards) {
-  return std::find(cards.begin(), cards.end(), hand.cards()[0]) != cards.end() ||
-         std::find(cards.begin(), cards.end(), hand.cards()[1]) != cards.end();
+  return std::ranges::find(cards, hand.cards()[0]) != cards.end() ||
+         std::ranges::find(cards, hand.cards()[1]) != cards.end();
 }
 
-std::vector<uint8_t> collect_cards(const Board& board, const Hand& hand, int round) {
-  int card_sum = 2 + n_board_cards(round);
+std::vector<uint8_t> collect_cards(const Board& board, const Hand& hand, const int round) {
+  const int card_sum = 2 + n_board_cards(round);
   std::vector<uint8_t> cards(card_sum);
-  std::copy(hand.cards().begin(), hand.cards().end(), cards.data());
+  std::ranges::copy(hand.cards(), cards.data());
   if(round > 0) std::copy(board.cards().begin(), board.cards().begin() + card_sum - 2, cards.data() + 2);
   return cards;
 }
 
-void Player::invest(int amount) {
+void Player::invest(const int amount) {
   assert(!has_folded() && "Attempted to invest but player already folded.");
   assert(get_chips() >= amount && "Attempted to invest more chips than available.");
   _chips -= amount;
@@ -93,12 +93,12 @@ void Player::fold() {
   _folded = true;
 }
 
-void Player::reset(int chips) {
+void Player::reset(const int chips) {
   _chips = chips;
   _betsize = 0;
 }
 
-PokerState::PokerState(int n_players, int chips, int ante) : _pot{150}, _max_bet{100}, _bet_level{1}, _round{0}, _winner{-1} {
+PokerState::PokerState(const int n_players, const int chips, const int ante) : _pot{150}, _max_bet{100}, _round{0}, _bet_level{1}, _winner{-1} {
   _players.reserve(n_players);
   for(int i = 0; i < n_players; ++i) {
     _players.push_back(Player{chips});
@@ -125,7 +125,7 @@ PokerState::PokerState(int n_players, int chips, int ante) : _pot{150}, _max_bet
 
 PokerState::PokerState(const PokerConfig& config) : PokerState{config.n_players, config.n_chips, config.ante} {}
 
-PokerState PokerState::next_state(Action action) const {
+PokerState PokerState::next_state(const Action action) const {
   const Player& player = get_players()[get_active()];
   if(action == Action::ALL_IN) return bet(player.get_chips());
   if(action == Action::FOLD) return fold();
@@ -142,7 +142,7 @@ int PokerState::active_players() const {
   return n;
 }
 
-PokerState PokerState::apply(Action action) const {
+PokerState PokerState::apply(const Action action) const {
   PokerState state = next_state(action);
   state._actions.push_back(action);
   return state;
@@ -203,7 +203,7 @@ std::string PokerConfig::to_string() const {
   return oss.str();
 }
 
-PokerState PokerState::bet(int amount) const {
+PokerState PokerState::bet(const int amount) const {
   if(verbose) std::cout << std::fixed << std::setprecision(2) << "Player " << static_cast<int>(_active) << " (" 
                         << (_players[_active].get_chips() / 100.0) << "): " << (_bet_level == 0 ? "Bet " : "Raise to ")
                         << ((amount + _players[_active].get_betsize()) / 100.0) << " bb\n";
@@ -222,7 +222,7 @@ PokerState PokerState::bet(int amount) const {
 }
 
 PokerState PokerState::call() const {
-  int amount = _max_bet - _players[_active].get_betsize();
+  const int amount = _max_bet - _players[_active].get_betsize();
   if(verbose) std::cout << std::fixed << std::setprecision(2) << "Player " << static_cast<int>(_active) << " (" 
                         << (_players[_active].get_chips() / 100.0) << "): Call " << (amount / 100.0) << " bb\n";
   assert(!_players[_active].has_folded() && "Attempted to call but player already folded.");
@@ -268,7 +268,7 @@ PokerState PokerState::fold() const {
   return state;
 }
 
-PokerState PokerState::bias(Action bias) const {
+PokerState PokerState::bias(const Action bias) const {
   PokerState state = *this;
   if(state._biases.size() == 0) {
     state._first_bias = state._active;
@@ -279,7 +279,7 @@ PokerState PokerState::bias(Action bias) const {
   return state;
 }
 
-uint8_t increment(uint8_t i, uint8_t max_val) {
+uint8_t increment(uint8_t i, const uint8_t max_val) {
   return ++i > max_val ? 0 : i;
 }
 
@@ -312,29 +312,27 @@ void PokerState::next_player() {
       next_round();
       return;
     }
-  } while((_players[_active].has_folded() || _players[_active].get_chips() == 0));
+  } while(_players[_active].has_folded() || _players[_active].get_chips() == 0);
 }
 
 void PokerState::next_bias() {
-  uint8_t init_player_idx = _active;
+  const uint8_t init_player_idx = _active;
   do {
     _active = increment(_active, _players.size() - 1);
   } while(_active != init_player_idx && (_players[_active].has_folded() || _biases[_active] != Action::BIAS_DUMMY));
 }
 
-int total_bet_size(const PokerState& state, Action action) {
+int total_bet_size(const PokerState& state, const Action action) {
   const Player& active_player = state.get_players()[state.get_active()];
   if(action == Action::ALL_IN) {
     return active_player.get_chips() + active_player.get_betsize();
   }
-  else if(action.get_bet_type() > 0.0f) {
-    int missing = state.get_max_bet() - active_player.get_betsize();
-    int real_pot = state.get_pot() + missing;
+  if(action.get_bet_type() > 0.0f) {
+    const int missing = state.get_max_bet() - active_player.get_betsize();
+    const int real_pot = state.get_pot() + missing;
     return real_pot * action.get_bet_type() + missing + active_player.get_betsize();
   }
-  else {
-    throw std::runtime_error("Invalid action bet size: " + std::to_string(action.get_bet_type()));
-  }
+  throw std::runtime_error("Invalid action bet size: " + std::to_string(action.get_bet_type()));
 }
 
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile) {
@@ -347,24 +345,21 @@ std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& 
       valid.push_back(a);
       continue;
     }
-    else if(a == Action::FOLD) {
+    if(a == Action::FOLD) {
       if(player.get_betsize() < state.get_max_bet()) {
         valid.push_back(a);
       }
       continue;
     }
-    else {
-      int total_bet = total_bet_size(state, a);
-      int required = total_bet - player.get_betsize();
-      if(required <= player.get_chips() && total_bet > state.get_max_bet()) {
-        valid.push_back(a);
-      }
+    const int total_bet = total_bet_size(state, a);
+    if(const int required = total_bet - player.get_betsize(); required <= player.get_chips() && total_bet > state.get_max_bet()) {
+      valid.push_back(a);
     }
   }
   return valid;
 }
 
-std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board board_cards, const omp::HandEvaluator& eval) {
+std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval) {
   int best = -1;
   std::vector<uint8_t> winners{};
   omp::Hand board = omp::Hand::empty();
@@ -373,8 +368,7 @@ std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& h
   }
   for(uint8_t i = 0; i < hands.size(); ++i) {
     if(state.get_players()[i].has_folded()) continue;
-    uint16_t value = eval.evaluate(board + hands[i].cards()[0] + hands[i].cards()[1]);
-    if(value == best) {
+    if(const uint16_t value = eval.evaluate(board + hands[i].cards()[0] + hands[i].cards()[1]); value == best) {
       winners.push_back(i);
     }
     else if(value > best) {
@@ -386,10 +380,10 @@ std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& h
   return winners;
 }
 
-int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
+int showdown_payoff(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
   if(state.get_players()[i].has_folded()) return 0;
   std::vector<uint8_t> win_idxs = winners(state, hands, board, eval);
-  return std::find(win_idxs.begin(), win_idxs.end(), i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
+  return std::ranges::find(win_idxs, i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
 }
 
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands) {

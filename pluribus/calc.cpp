@@ -4,7 +4,7 @@
 namespace pluribus {
 
 int sample_action_idx(const std::vector<float>& freq) {
-  std::discrete_distribution<> dist(freq.begin(), freq.end());
+  std::discrete_distribution dist(freq.begin(), freq.end());
   return dist(GlobalRNG::instance());
 }
 

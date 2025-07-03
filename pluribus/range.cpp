@@ -16,7 +16,7 @@ HoleCardIndexer::HoleCardIndexer() {
       // std::cout << "Initialized: " << hand.to_string() << "\n";
       _hand_to_idx[hand] = idx;
       _idx_to_hand[idx] = hand;
-      if(_hand_to_idx.find(hand) == _hand_to_idx.end()) {
+      if(!_hand_to_idx.contains(hand)) {
         std::cout << "failed init: " << hand.to_string() << "\n";
       }
       // std::cout << "Missing hand=" << (_hand_to_idx.find(hand) != _hand_to_idx.end()) << ", Missing idx=" << (_idx_to_hand.find(idx) != _idx_to_hand.end()) << "\n";
@@ -32,8 +32,7 @@ std::vector<Hand> PokerRange::hands() const {
   std::vector<Hand> ret;
   for(uint8_t c1 = 0; c1 < MAX_CARDS; ++c1) {
     for(uint8_t c2 = 0; c2 < c1; ++c2) {
-      Hand hand = canonicalize(Hand{c1, c2});
-      if(frequency(hand) > 0) ret.push_back(hand);
+      if(Hand hand = canonicalize(Hand{c1, c2}); frequency(hand) > 0) ret.push_back(hand);
     } 
   }
   return ret;
@@ -54,13 +53,13 @@ void PokerRange::remove_cards(const std::vector<uint8_t>& cards) {
 PokerRange PokerRange::bayesian_update(const PokerRange& prior_range, const PokerRange& action_range) const {
   PokerRange updated = *this;
   double p_a = 0.0;
-  PokerRange post_range = prior_range * action_range;
+  const PokerRange post_range = prior_range * action_range;
   for(int i = 0; i < updated._weights.size(); ++i) {
     Hand hand = HoleCardIndexer::get_instance()->hand(i);
     auto blocked_post = post_range;
     std::vector<uint8_t> blocked = {hand.cards().begin(), hand.cards().end()};
     blocked_post.remove_cards(blocked);
-    auto a_given_h = blocked_post.n_combos() / prior_range.n_combos();
+    const auto a_given_h = blocked_post.n_combos() / prior_range.n_combos();
     p_a += a_given_h * _weights[i];
     // std::cout << "P(fold|" << hand.to_string() << ")=" << a_given_h <<"\n";
     updated._weights[i] *= a_given_h;

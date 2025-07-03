@@ -4,7 +4,7 @@
 
 namespace pluribus {
 
-SamplingAlgorithm::SamplingAlgorithm(uint64_t init_mask) : _init_mask{init_mask} {}
+SamplingAlgorithm::SamplingAlgorithm(const uint64_t init_mask) : _init_mask{init_mask} {}
 
 SamplingAlgorithm::SamplingAlgorithm(const std::vector<uint8_t>& dead_cards) : _init_mask{card_mask(dead_cards)} {}
 
@@ -16,7 +16,8 @@ MarginalRejectionSampler::MarginalRejectionSampler(const std::vector<PokerRange>
   }
 }
 
-RoundSample sample_rejection(int n_players, uint64_t mask, int* indexes, std::function<int(int)> idx_sampler, std::function<Hand(int,int)> idx_to_hand) {
+RoundSample sample_rejection(const int n_players, const uint64_t mask, int* indexes, const std::function<int(int)>& idx_sampler,
+    const std::function<Hand(int,int)>& idx_to_hand) {
   RoundSample sample{std::vector<Hand>(n_players)};
   int coll;
   int tries = 0;
@@ -36,8 +37,8 @@ RoundSample sample_rejection(int n_players, uint64_t mask, int* indexes, std::fu
 }
 
 RoundSample MarginalRejectionSampler::sample() {
-  return sample_rejection(_hand_dists.size(), init_mask(), _hand_idxs, [this](int i) { return this->_hand_dists[i].sample(); }, 
-      [](int i, int h_idx) { return HoleCardIndexer::get_instance()->hand(h_idx); });
+  return sample_rejection(_hand_dists.size(), init_mask(), _hand_idxs, [this](const int i) { return this->_hand_dists[i].sample(); },
+      [](int, const int h_idx) { return HoleCardIndexer::get_instance()->hand(h_idx); });
 }
 
 ImportanceSampler::ImportanceSampler(const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& dead_cards) 
@@ -67,13 +68,13 @@ ImportanceRejectionSampler::ImportanceRejectionSampler(const std::vector<PokerRa
     : ImportanceSampler{ranges, dead_cards} {
   _uniform_dists.reserve(ranges.size());
   for(int i = 0; i < ranges.size(); ++i) {
-    _uniform_dists.push_back(omp::FastUniformIntDistribution<unsigned, 21>(0, filtered_hands()[i].size() - 1));
+    _uniform_dists.push_back(omp::FastUniformIntDistribution<>(0, filtered_hands()[i].size() - 1));
   }
 }
 
 RoundSample ImportanceRejectionSampler::sample_hands() {
   return sample_rejection(_uniform_dists.size(), init_mask(), hand_indexes(),
-      [this](int i) { return this->_uniform_dists[i](this->rng()); }, [this](int i, int h_idx) { return filtered_hands()[i][h_idx]; });
+      [this](const int i) { return this->_uniform_dists[i](this->rng()); }, [this](const int i, const int h_idx) { return filtered_hands()[i][h_idx]; });
 }
 
 RoundSample ImportanceRejectionSampler::sample() {
@@ -96,7 +97,7 @@ RoundSample ImportanceRandomWalkSampler::sample() {
   sample.hands.resize(filtered_hands().size());
   sample.weight = 1.0 / joint_probability();
   sample.mask = init_mask();
-  int p_idx = _idx_dist(rng());
+  const int p_idx = _idx_dist(rng());
   for(int i = 0; i < filtered_hands().size(); ++i) {
     if(i != p_idx) {
       auto hand = filtered_hands()[i][hand_indexes()[i]];
@@ -117,7 +118,7 @@ RoundSample ImportanceRandomWalkSampler::sample() {
 }
 
 void ImportanceRandomWalkSampler::next_sample(RoundSample& sample) {
-  int p_idx = _idx_dist(rng());
+  const int p_idx = _idx_dist(rng());
   int& combo_idx = hand_indexes()[p_idx];
   sample.weight /= filtered_weights()[p_idx][combo_idx];
   sample.mask -= filtered_hands()[p_idx][combo_idx].mask();
@@ -147,14 +148,13 @@ void RoundSampler::next_sample(RoundSample& sample) {
   return _importance_walk.next_sample(sample);
 }
 
-Board sample_board(const std::vector<uint8_t>& init_board, uint64_t mask) {
+Board sample_board(const std::vector<uint8_t>& init_board, const uint64_t mask) {
   Board board{init_board};
   int board_idx = init_board.size();
   uint64_t init_mask = mask;
   while(board_idx < 5) {
-    uint8_t next_card = gsl_rng_uniform_int(GSLGlobalRNG::instance(), MAX_CARDS); // TODO: use Random.h fast uniform int
-    uint64_t curr_mask = card_mask(next_card);
-    if(!(init_mask & curr_mask)) {
+    const uint8_t next_card = gsl_rng_uniform_int(GSLGlobalRNG::instance(), MAX_CARDS); // TODO: use Random.h fast uniform int
+    if(const uint64_t curr_mask = card_mask(next_card); !(init_mask & curr_mask)) {
       board.set_card(board_idx++, next_card);
       init_mask |= curr_mask;
     }

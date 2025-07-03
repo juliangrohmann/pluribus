@@ -54,17 +54,16 @@ void load(Archive& ar, tbb::concurrent_vector<T>& vec) {
   size_t size;
   ar(size);
   vec.clear();
-  const size_t CHUNK = (size_t(1) * 1024 * 1024 * 1024) / sizeof(T);
+  const size_t CHUNK = static_cast<size_t>(1) * 1024 * 1024 * 1024 / sizeof(T);
   size_t loaded = 0;
   while(loaded < size) {
-    size_t this_chunk = std::min(CHUNK, size - loaded);
+    const size_t this_chunk = std::min(CHUNK, size - loaded);
     vec.grow_to_at_least(loaded + this_chunk);
     for(size_t i = 0; i < this_chunk; ++i) {
       ar(vec[loaded + i]);
     }
     loaded += this_chunk;
   }
-  std::cout << "Successful concurrent vector load.\n";
 }
 
 template<class Archive, class Key, class T>

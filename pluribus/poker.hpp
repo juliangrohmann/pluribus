@@ -17,14 +17,14 @@ namespace pluribus {
 
 class Deck {
 public:
-  Deck(const std::unordered_set<uint8_t>& dead_cards = {}) : _dead_cards{dead_cards} { reset(); }
-  Deck(const std::vector<uint8_t>& dead_cards) {
-    std::copy(dead_cards.begin(), dead_cards.end(), std::inserter(_dead_cards, _dead_cards.end()));
+  explicit Deck(const std::unordered_set<uint8_t>& dead_cards = {}) : _dead_cards{dead_cards} { reset(); }
+  explicit Deck(const std::vector<uint8_t>& dead_cards) {
+    std::ranges::copy(dead_cards, std::inserter(_dead_cards, _dead_cards.end()));
     reset();
   }
 
   int draw();
-  void add_dead_card(uint8_t card) { _dead_cards.insert(card); }
+  void add_dead_card(const uint8_t card) { _dead_cards.insert(card); }
 
   template<typename Container>
   void add_dead_cards(const Container& cont) { for(auto it = cont.begin(); it != cont.end(); ++it) add_dead_card(*it); }
@@ -39,7 +39,7 @@ private:
     uint8_t _current = 0;
 };
 
-inline uint64_t card_mask(uint8_t card) { return 1L << card; }
+inline uint64_t card_mask(const uint8_t card) { return 1L << card; }
 uint64_t card_mask(const std::vector<uint8_t>& cards);
 
 template<int N>
@@ -49,22 +49,22 @@ public:
     _cards.fill(0); 
     update_mask();
   }
-  CardSet(const std::array<uint8_t, N>& cards) : _cards{cards} { 
+  explicit CardSet(const std::array<uint8_t, N>& cards) : _cards{cards} {
     update_mask(); 
   }
-  CardSet(const std::vector<uint8_t>& cards) { 
+  explicit CardSet(const std::vector<uint8_t>& cards) {
     std::copy(cards.begin(), cards.end(), _cards.begin()); 
-    update_mask(0, cards.size()); 
+    update_mask(0, cards.size());
   }
-  CardSet(const std::initializer_list<uint8_t>& cards) { 
+  explicit CardSet(const std::initializer_list<uint8_t>& cards) {
     std::copy(cards.begin(), cards.end(), _cards.begin()); 
-    update_mask(0, cards.size()); 
+    update_mask(0, cards.size());
   }
-  CardSet(const std::string& card_str) { 
+  explicit CardSet(const std::string& card_str) {
     str_to_cards(card_str, _cards.data()); 
-    update_mask(0, card_str.size() / 2); 
+    update_mask(0, card_str.size() / 2);
   }
-  CardSet(Deck& deck, const std::vector<uint8_t> init_cards = {}) { 
+   explicit CardSet(Deck& deck, const std::vector<uint8_t>& init_cards = {}) {
     deal(deck, init_cards); 
   }
 
@@ -73,7 +73,7 @@ public:
     update_mask(i, i + 1);
   }
 
-  bool collides(const CardSet<N>& other) const {
+  bool collides(const CardSet& other) const {
     return _mask & other._mask;
   }
 
@@ -90,12 +90,12 @@ public:
   }
   std::string to_string() const { return cards_to_str(_cards.data(), N); }
 
-  bool operator==(const CardSet<N>&) const = default;
+  bool operator==(const CardSet&) const = default;
 
 protected:
-  void update_mask(int i = 0, int n = N) {
+  void update_mask(int i = 0, const int n = N) {
     _mask = 0L;
-    for(int i = 0; i < n; ++i) _mask |= card_mask(_cards[i]);
+    for(; i < n; ++i) _mask |= card_mask(_cards[i]);
   }
 
   std::array<uint8_t, N> _cards;
@@ -104,23 +104,23 @@ protected:
 
 class Board : public CardSet<5> {
 public:
-  Board() : CardSet<5>{} {}
-  Board(const std::array<uint8_t, 5>& cards) : CardSet<5>{cards} {}
-  Board(const std::vector<uint8_t>& cards) : CardSet<5>{cards} {}
-  Board(const std::initializer_list<uint8_t>& cards) : CardSet<5>{cards} {}
-  Board(const std::string& card_str) : CardSet<5>{card_str} {};
-  Board(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : CardSet<5>{deck, init_cards} {};
+  Board() {}
+  explicit Board(const std::array<uint8_t, 5>& cards) : CardSet{cards} {}
+  explicit Board(const std::vector<uint8_t>& cards) : CardSet{cards} {}
+  explicit Board(const std::initializer_list<uint8_t>& cards) : CardSet{cards} {}
+  explicit Board(const std::string& card_str) : CardSet{card_str} {}
+  explicit Board(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : CardSet{deck, init_cards} {}
   bool operator==(const Board&) const = default;
 };
 
 class Hand : public CardSet<2> {
 public:
-  Hand() : CardSet<2>{} {}
-  Hand(const std::array<uint8_t, 2>& cards) : CardSet<2>{cards} {}
-  Hand(const std::vector<uint8_t>& cards) : CardSet<2>{cards} {}
-  Hand(const std::initializer_list<uint8_t>& cards) : CardSet<2>{cards} {}
-  Hand(const std::string& card_str) : CardSet<2>{card_str} {};
-  Hand(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : CardSet<2>{deck, init_cards} {};
+  Hand() {}
+  explicit Hand(const std::array<uint8_t, 2>& cards) : CardSet{cards} {}
+  explicit Hand(const std::vector<uint8_t>& cards) : CardSet{cards} {}
+  explicit Hand(const std::initializer_list<uint8_t>& cards) : CardSet{cards} {}
+  explicit Hand(const std::string& card_str) : CardSet{card_str} {}
+  explicit Hand(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : CardSet{deck, init_cards} {}
   bool operator==(const Hand&) const = default;
 
   static const Hand PLACEHOLDER;
@@ -137,7 +137,7 @@ inline Hand canonicalize(const Hand& hand) {
 
 bool collides(uint8_t card, const Hand& hand);
 bool collides(uint8_t card, const Board& board);
-bool collides(uint8_t card, const std::vector<uint8_t> cards);
+bool collides(uint8_t card, const std::vector<uint8_t>& cards);
 bool collides(const Hand& h1, const Hand& h2);
 bool collides(const Hand& hand, const Board& board);
 bool collides(const Hand& hand, const std::vector<uint8_t>& cards);
@@ -145,7 +145,7 @@ std::vector<uint8_t> collect_cards(const Board& board, const Hand& hand, int rou
 
 class Player {
 public:
-  Player(int chips = 10'000) : _chips{chips} {};
+  explicit Player(const int chips = 10'000) : _chips{chips} {}
   Player(const Player&) = default;
   Player(Player&&) = default;
 
@@ -153,9 +153,9 @@ public:
   Player& operator=(Player&&) = default;
   bool operator==(const Player& other) const = default;
 
-  inline int get_chips() const { return _chips; }
-  inline int get_betsize() const { return _betsize; }
-  inline bool has_folded() const { return _folded; }
+  int get_chips() const { return _chips; }
+  int get_betsize() const { return _betsize; }
+  bool has_folded() const { return _folded; }
   void invest(int amount);
   void next_round();
   void fold();
@@ -189,8 +189,8 @@ struct PokerConfig {
 
 class PokerState {
 public:
-  PokerState(int n_players = 2, int chips = 10'000, int ante = 0);
-  PokerState(const PokerConfig& config);
+  explicit PokerState(int n_players = 2, int chips = 10'000, int ante = 0);
+  explicit PokerState(const PokerConfig& config);
   PokerState(const PokerState&) = default;
   PokerState(PokerState&&) = default;
 
@@ -198,21 +198,20 @@ public:
   PokerState& operator=(PokerState&&) = default;
   bool operator==(const PokerState& other) const = default;
 
-  inline const std::vector<Player>& get_players() const { return _players; }
-  inline const ActionHistory& get_action_history() const { return _actions; }
-  inline int get_pot() const { return _pot; }
-  inline int get_max_bet() const { return _max_bet; }
-  inline uint8_t get_active() const { return _active; }
-  inline uint8_t get_round() const { return _round; }
-  inline uint8_t get_bet_level() const { return _bet_level; }
-  inline int8_t get_winner() const { return _winner; }
-  inline const std::vector<Action> get_biases() const { return _biases; }
-  inline bool is_terminal() const { return get_winner() != -1 || get_round() >= 4; };
+  const std::vector<Player>& get_players() const { return _players; }
+  const ActionHistory& get_action_history() const { return _actions; }
+  int get_pot() const { return _pot; }
+  int get_max_bet() const { return _max_bet; }
+  uint8_t get_active() const { return _active; }
+  uint8_t get_round() const { return _round; }
+  uint8_t get_bet_level() const { return _bet_level; }
+  int8_t get_winner() const { return _winner; }
+  const std::vector<Action>& get_biases() const { return _biases; }
+  bool is_terminal() const { return get_winner() != -1 || get_round() >= 4; }
   int active_players() const;
-  int vpip_players() const;
-  PokerState apply(Action action) const;
-  PokerState apply(const ActionHistory& action_history) const;
-  PokerState apply_biases(const std::vector<Action>& biases) const;
+  [[nodiscard]] PokerState apply(Action action) const;
+  [[nodiscard]] PokerState apply(const ActionHistory& action_history) const;
+  [[nodiscard]] PokerState apply_biases(const std::vector<Action>& biases) const;
   bool has_biases() const { return _biases.size() > _active && _biases[_active] != Action::BIAS_DUMMY; }
   std::string to_string() const;
   
@@ -248,21 +247,19 @@ private:
 int total_bet_size(const PokerState& state, Action action);
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile);
 int round_of_last_action(const PokerState& state);
-std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board board_cards, const omp::HandEvaluator& eval);
+std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval);
 int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands);
 void deal_board(Deck& deck, std::array<uint8_t, 5>& board);
 }
 
-namespace std {
-  template <>
-  struct hash<pluribus::Hand> {
-    size_t operator()(const pluribus::Hand& hand) const noexcept {
-      size_t hash_value = 0;
-      for(const auto& card : hand.cards()) {
-        hash_value = hash_value * 31 + static_cast<size_t>(card);
-      }
-      return hash_value;
+template <>
+struct std::hash<pluribus::Hand> {
+  size_t operator()(const pluribus::Hand& hand) const noexcept {
+    size_t hash_value = 0;
+    for(const auto& card : hand.cards()) {
+      hash_value = hash_value * 31 + static_cast<size_t>(card);
     }
-  };
-}
+    return hash_value;
+  }
+};

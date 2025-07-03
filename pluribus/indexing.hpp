@@ -8,10 +8,10 @@ namespace pluribus {
 
 class HandIndexer {
 public:
-  hand_index_t index(const uint8_t cards[], int round) { return hand_index_last(&_indexers[round], cards); }
+  hand_index_t index(const uint8_t cards[], const int round) const { return hand_index_last(&_indexers[round], cards); }
   hand_index_t index(const Board& board, const Hand& hand, int round);
 
-  hand_indexer_t* get_indexer(int round) { return &_indexers[round]; }
+  hand_indexer_t* get_indexer(const int round) { return &_indexers[round]; }
 
   static HandIndexer* get_instance() {
     if(!_instance) {
@@ -33,7 +33,7 @@ private:
 
 class CachedIndexer {
 public:
-  CachedIndexer(int max_round = 3);
+  explicit CachedIndexer(int max_round = 3);
 
   hand_index_t index(const uint8_t cards[], int round);
   hand_index_t index(const Board& board, const Hand& hand, int round);

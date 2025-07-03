@@ -189,7 +189,7 @@ TEST_CASE("Simulate hands", "[poker][slow]") {
 
 TEST_CASE("Split pot", "[poker]") {
   Deck deck;
-  std::vector<Hand> hands{{"KsTc"}, {"As4c"}, {"Ac2h"}};
+  std::vector<Hand> hands{Hand{"KsTc"}, Hand{"As4c"}, Hand{"Ac2h"}};
   Board board{"AdKh9s9h5c"};
   ActionHistory actions = {
     Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
@@ -369,8 +369,8 @@ TEST_CASE("Lossless monte carlo EV", "[ev][slow][dependency]") {
   std::vector<uint8_t> board = str_to_cards("AcTd3c2s");
   PokerState state{bp.get_config().poker};
   std::vector<Action> actions = {Action{0.75f}, Action::CHECK_CALL, Action::CHECK_CALL, Action{0.50f}, Action::CHECK_CALL, Action::CHECK_CALL, Action::CHECK_CALL};
-  state = state.apply(actions);
-  auto ranges = build_ranges(state.get_action_history().get_history(), board, bp);
+  state = state.apply(ActionHistory{actions});
+  auto ranges = build_ranges(state.get_action_history().get_history(), Board{board}, bp);
   MonteCarloEV ev_solver{};
   double enum_ev = enumerate_ev(bp, state, 0, ranges, board);
   ResultEV mc_result = ev_solver.set_max_iterations(N)
@@ -417,7 +417,7 @@ TEST_CASE("Serialize StrategyStorage, BlueprintSolver", "[serialize][blueprint][
   REQUIRE(test_serialization(trainer));
 }
 
-TEST_CASE("Serialize TreeBlueprintSolver", "[serialize][blueprint][slow]") {
+TEST_CASE("Serialize TreeBlueprintSolver", "[serialize][blueprint][slow][inconsistent]") {
   TreeBlueprintSolver trainer{};
   trainer.solve(1'000'000);
   

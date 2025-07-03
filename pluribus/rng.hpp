@@ -18,7 +18,7 @@ public:
   }
 
   static double uniform() {
-    thread_local std::uniform_real_distribution<double> dist(0.0, 1.0);
+    thread_local std::uniform_real_distribution dist(0.0, 1.0);
     return dist(instance());
   }
 };
@@ -29,7 +29,7 @@ public:
     thread_local gsl_rng* rng = nullptr;
     if(!rng) {
       rng = gsl_rng_alloc(gsl_rng_mt19937);
-      gsl_rng_set(rng, static_cast<unsigned long>(std::time(nullptr) + std::hash<std::thread::id>{}(std::this_thread::get_id())));
+      gsl_rng_set(rng, std::time(nullptr) + std::hash<std::thread::id>{}(std::this_thread::get_id()));
     }
     return rng;
   }
@@ -52,7 +52,7 @@ public:
 
 class GSLDiscreteDist {
 public:
-  GSLDiscreteDist(const std::vector<double>& weights) { 
+  explicit GSLDiscreteDist(const std::vector<double>& weights) {
     _dist = std::shared_ptr<gsl_ran_discrete_t>{gsl_ran_discrete_preproc(weights.size(), weights.data()), [](gsl_ran_discrete_t* p) { gsl_ran_discrete_free(p); }}; 
   }
   size_t sample() const { return gsl_ran_discrete(GSLGlobalRNG::instance(), _dist.get()); }

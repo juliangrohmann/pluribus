@@ -21,28 +21,28 @@ HandIndexer::HandIndexer() {
   _indexers = init_indexer_vec();
 }
 
-uint64_t HandIndexer::index(const Board& board, const Hand& hand, int round) {
+uint64_t HandIndexer::index(const Board& board, const Hand& hand, const int round) {
   return index(collect_cards(board, hand, round).data(), round);
 }
 
-CachedIndexer::CachedIndexer(int max_round) : _max_round{max_round} {
+CachedIndexer::CachedIndexer(const int max_round) : _max_round{max_round} {
   hand_indexer_state_init(HandIndexer::get_instance()->get_indexer(max_round), &_state);
 }
 
-uint64_t CachedIndexer::index(const uint8_t cards[], int round) {
+uint64_t CachedIndexer::index(const uint8_t cards[], const int round) {
   while(_indices.size() <= round) {
-    int curr_round = _indices.size();
-    int offset = curr_round == 0 ? 0 : n_board_cards(curr_round - 1) + 2;
+    const int curr_round = _indices.size();
+    const int offset = curr_round == 0 ? 0 : n_board_cards(curr_round - 1) + 2;
     _indices.push_back(hand_index_next_round(HandIndexer::get_instance()->get_indexer(_max_round), cards + offset, &_state));
   }
   return _indices[round];
 }
 
-uint64_t CachedIndexer::index(const Board& board, const Hand& hand, int round) {
+uint64_t CachedIndexer::index(const Board& board, const Hand& hand, const int round) {
   return _indices.size() > round ? _indices[round] : index(collect_cards(board, hand, round).data(), round);
 }
 
-long count(const PokerState& state, const ActionProfile& action_profile, int max_round, bool infosets) {
+long count(const PokerState& state, const ActionProfile& action_profile, const int max_round, const bool infosets) {
   if(state.is_terminal() || state.get_round() > max_round) {
     return 0;
   }
@@ -53,17 +53,17 @@ long count(const PokerState& state, const ActionProfile& action_profile, int max
   else {
     c = 1;
   }
-  for(Action a : valid_actions(state, action_profile)) {
+  for(const Action a : valid_actions(state, action_profile)) {
     c += count(state.apply(a), action_profile, max_round, infosets);
   }
   return c;
 }
 
-long count_infosets(const PokerState& state, const ActionProfile& action_profile, int max_round) {
+long count_infosets(const PokerState& state, const ActionProfile& action_profile, const int max_round) {
   return count(state, action_profile, max_round, true);
 }
 
-long count_actionsets(const PokerState& state, const ActionProfile& action_profile, int max_round) {
+long count_actionsets(const PokerState& state, const ActionProfile& action_profile, const int max_round) {
   return count(state, action_profile, max_round, false);
 }
 

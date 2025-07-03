@@ -24,17 +24,17 @@ const std::array<std::string, 8> ochs_categories = {
 
 
 void assign_features(const std::string& hand, const std::string& board, float* data);
-double equity(const omp::Hand& hero, const omp::CardRange villain, const omp::Hand& board);
+double equity(const omp::Hand& hero, const omp::CardRange &villain, const omp::Hand& board);
 void build_ochs_features(int round);
 std::string cluster_filename(int round, int n_clusters, int split);
 std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(int n_clusters);
 
 class FlatClusterMap {
 public:
-  uint16_t cluster(int round, uint64_t index) const { return _cluster_map[round][index]; }
-  uint16_t cluster(int round, const Board& board, const Hand& hand) const {
+  uint16_t cluster(const int round, const uint64_t index) const { return _cluster_map[round][index]; }
+  uint16_t cluster(const int round, const Board& board, const Hand& hand) const {
     return cluster(round, HandIndexer::get_instance()->index(board, hand, round));
-  };
+  }
 
   static FlatClusterMap* get_instance() {
     if(!_instance) {

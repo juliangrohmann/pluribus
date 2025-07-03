@@ -7,8 +7,8 @@
 namespace pluribus {
 
 struct SolverConfig {
-  SolverConfig(int n_players = 2, int n_chips = 10'000, int ante = 0);
-  SolverConfig(const PokerConfig& poker_);
+  explicit SolverConfig(int n_players = 2, int n_chips = 10'000, int ante = 0);
+  explicit SolverConfig(const PokerConfig& poker_);
 
   std::string to_string() const;
 
@@ -52,7 +52,7 @@ struct BlueprintTimingConfig {
   long log_interval_m = 1;
 };
 
-struct BlueprintSolverConfig : public DiscountConfig {
+struct BlueprintSolverConfig : DiscountConfig {
   BlueprintSolverConfig(const BlueprintTimingConfig& timings = BlueprintTimingConfig{}, long it_per_min = 10'000'000L);
 
   std::string to_string() const;
@@ -82,8 +82,8 @@ struct RealTimeTimingConfig {
   double log_interval_s = 1.0;
 };
 
-struct RealTimeSolverConfig : public DiscountConfig {
-  RealTimeSolverConfig(const RealTimeTimingConfig& timings = RealTimeTimingConfig{}, long it_per_sec = 100'000);
+struct RealTimeSolverConfig : DiscountConfig {
+  explicit RealTimeSolverConfig(const RealTimeTimingConfig& timings = RealTimeTimingConfig{}, long it_per_sec = 100'000);
 
   std::string to_string() const;
   void set_iterations(const RealTimeTimingConfig& timings, long it_per_min);

@@ -13,7 +13,7 @@ public:
   uint16_t index(const Hand& hand) const { 
     return _hand_to_idx.at(canonicalize(hand)); 
   }
-  Hand hand(uint16_t idx) const { return _idx_to_hand.at(idx); }
+  Hand hand(const uint16_t idx) const { return _idx_to_hand.at(idx); }
 
   static HoleCardIndexer* get_instance() {
     if(!_instance) {
@@ -36,17 +36,17 @@ private:
 
 class PokerRange {
 public:
-  PokerRange(double freq = 0.0f) : _weights(MAX_COMBOS, freq) { HoleCardIndexer::get_instance(); }
+  explicit PokerRange(const double freq = 0.0f) : _weights(MAX_COMBOS, freq) { HoleCardIndexer::get_instance(); }
 
-  void add_hand(const Hand& hand, double freq = 1.0f) { 
-    int idx = HoleCardIndexer::get_instance()->index(hand);
+  void add_hand(const Hand& hand, const double freq = 1.0f) {
+    const int idx = HoleCardIndexer::get_instance()->index(hand);
     if(idx >= _weights.size()) {
       throw std::runtime_error{"PokerRange writing out of bounds!" + std::to_string(idx) + " < " + std::to_string(_weights.size())};
     }
     _weights[idx] += freq; 
   }
-  void multiply_hand(const Hand& hand, double freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] *= freq; }
-  void set_frequency(const Hand& hand, double freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] = freq; }
+  void multiply_hand(const Hand& hand, const double freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] *= freq; }
+  void set_frequency(const Hand& hand, const double freq) { _weights[HoleCardIndexer::get_instance()->index(hand)] = freq; }
   double frequency(const Hand& hand) const { return _weights[HoleCardIndexer::get_instance()->index(hand)]; }
   const std::vector<double>& weights() const { return _weights; }
   void remove_cards(const std::vector<uint8_t>& cards);

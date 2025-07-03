@@ -65,9 +65,10 @@ private:
 class RangeViewer {
 public:
   RangeViewer(const std::string& title, int width, int height);
-  ~RangeViewer();
 
-  void render(const RenderableRange& range) { render({range}); }
+  virtual ~RangeViewer();
+
+  void render(const RenderableRange& range) { render(std::vector{range}); }
   virtual void render(const std::vector<RenderableRange>& ranges) = 0;
 
 protected:
@@ -95,8 +96,8 @@ protected:
 
 class WindowRangeViewer : public RangeViewer {
 public:
-  WindowRangeViewer(const std::string& title, int width = 1300, int height = 4300);
-  ~WindowRangeViewer();
+  explicit WindowRangeViewer(const std::string& title, int width = 1300, int height = 4300);
+  ~WindowRangeViewer() override;
 
   void render(const std::vector<RenderableRange>& ranges) override;
 
@@ -109,8 +110,8 @@ private:
 
 class PngRangeViewer : public RangeViewer {
 public:
-  PngRangeViewer(const std::string& fn, int width = 1300, int height = 1400);
-  ~PngRangeViewer();
+  explicit PngRangeViewer(const std::string& fn, int width = 1300, int height = 1400);
+  ~PngRangeViewer() override;
 
   void render(const std::vector<RenderableRange>& ranges) override;
 

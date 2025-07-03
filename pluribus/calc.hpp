@@ -8,7 +8,7 @@ namespace pluribus {
 int sample_action_idx(const std::vector<float>& freq);
 
 template <class T>
-std::vector<float> calculate_strategy(const std::atomic<T>* base_ptr, int n_actions) {
+std::vector<float> calculate_strategy(const std::atomic<T>* base_ptr, const int n_actions) {
   std::vector<float> freq;
   freq.reserve(n_actions);
   float sum = 0;
@@ -24,7 +24,7 @@ std::vector<float> calculate_strategy(const std::atomic<T>* base_ptr, int n_acti
     }
   }
   else {
-    float uni = 1.0f / n_actions;
+    const float uni = 1.0f / n_actions;
     for(auto& f : freq) {
       f = uni;
     }

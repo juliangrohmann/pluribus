@@ -21,26 +21,26 @@ const Action Action::FOLD{-1.0f};
 const Action Action::CHECK_CALL{0.0f};
 
 std::string Action::to_string() const {
-  if(_bet_type == Action::UNDEFINED._bet_type) return "Undefined";
-  if(_bet_type == Action::BIAS_DUMMY._bet_type) return "Bias dummy";
-  if(_bet_type == Action::BIAS_FOLD._bet_type) return "Bias: Fold";
-  if(_bet_type == Action::BIAS_CALL._bet_type) return "Bias: Call";
-  if(_bet_type == Action::BIAS_RAISE._bet_type) return "Bias: Raise";
-  if(_bet_type == Action::BIAS_NONE._bet_type) return "Bias: None";
-  if(_bet_type == Action::ALL_IN._bet_type) return "All-in";
-  if(_bet_type == Action::FOLD._bet_type) return "Fold";
-  if(_bet_type == Action::CHECK_CALL._bet_type) return "Check/Call";
+  if(_bet_type == UNDEFINED._bet_type) return "Undefined";
+  if(_bet_type == BIAS_DUMMY._bet_type) return "Bias dummy";
+  if(_bet_type == BIAS_FOLD._bet_type) return "Bias: Fold";
+  if(_bet_type == BIAS_CALL._bet_type) return "Bias: Call";
+  if(_bet_type == BIAS_RAISE._bet_type) return "Bias: Raise";
+  if(_bet_type == BIAS_NONE._bet_type) return "Bias: None";
+  if(_bet_type == ALL_IN._bet_type) return "All-in";
+  if(_bet_type == FOLD._bet_type) return "Fold";
+  if(_bet_type == CHECK_CALL._bet_type) return "Check/Call";
   std::ostringstream oss; 
   oss << "Bet " << std::setprecision(0) << std::fixed << _bet_type * 100.0f << "%";
   return oss.str();
 }
 
-bool is_bias(Action a) {
-  return a.get_bet_type() == Action::BIAS_FOLD || a.get_bet_type() == Action::BIAS_CALL || 
-      a.get_bet_type() == Action::BIAS_RAISE || a.get_bet_type() == Action::BIAS_NONE;
+bool is_bias(const Action a) {
+  return a == Action::BIAS_FOLD || a == Action::BIAS_CALL ||
+      a == Action::BIAS_RAISE || a == Action::BIAS_NONE;
 }
 
-ActionHistory ActionHistory::slice(int start, int end) const { 
+ActionHistory ActionHistory::slice(const int start, const int end) const {
   return ActionHistory{std::vector<Action>{_history.begin() + start, end != -1 ? _history.begin() + end : _history.end()}}; 
 }
 
@@ -52,27 +52,27 @@ bool ActionHistory::is_consistent(const ActionHistory& other) const {
 }
 
 std::string ActionHistory::to_string() const {
-  std::string str = "";
+  std::string str;
   for(int i = 0; i < _history.size(); ++i) {
     str += _history[i].to_string() + (i == _history.size() - 1 ? "" : ", ");
   }
   return str;
 }
 
-void ActionProfile::set_actions(const std::vector<Action>& actions, int round, int bet_level, int pos) {
+void ActionProfile::set_actions(const std::vector<Action>& actions, const int round, const int bet_level, const int pos) {
   if(bet_level >= _profile[round].size()) _profile[round].resize(bet_level + 1);
   if(pos >= _profile[round][bet_level].size()) _profile[round][bet_level].resize(pos + 1);
   _profile[round][bet_level][pos] = actions;
 }
 
-const std::vector<Action>& ActionProfile::get_actions(int round, int bet_level, int pos, int pot) const { 
+const std::vector<Action>& ActionProfile::get_actions(const int round, const int bet_level, const int pos, const int pot) const {
   if(round == 0 && bet_level == 1 && pot > 150) return _iso_actions;
-  int level_idx = std::min(bet_level, static_cast<int>(_profile[round].size()) - 1);
-  int pos_idx = std::min(pos, static_cast<int>(_profile[round][level_idx].size()) - 1);
+  const int level_idx = std::min(bet_level, static_cast<int>(_profile[round].size()) - 1);
+  const int pos_idx = std::min(pos, static_cast<int>(_profile[round][level_idx].size()) - 1);
   return _profile[round][level_idx][pos_idx]; 
 }
 
-void ActionProfile::add_action(const Action& action, int round, int bet_level, int pos) {
+void ActionProfile::add_action(const Action& action, const int round, const int bet_level, const int pos) {
   if(bet_level >= _profile[round].size()) _profile[round].resize(bet_level + 1);
   if(pos >= _profile[round][bet_level].size()) _profile[round][bet_level].resize(pos + 1);
   _profile[round][bet_level][pos].push_back(action);
@@ -122,7 +122,7 @@ std::string ActionProfile::to_string() const {
   return oss.str();
 }
 
-BlueprintActionProfile::BlueprintActionProfile(int n_players) {
+BlueprintActionProfile::BlueprintActionProfile(const int n_players) {
   if(n_players > 2) { // preflop RFI & isos
     for(int pos = 2; pos < n_players - 2; ++pos) {
       set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.40f}, Action::ALL_IN}, 0, 1, pos);
@@ -184,7 +184,7 @@ BlueprintActionProfile::BlueprintActionProfile(int n_players) {
 }
 
 BiasActionProfile::BiasActionProfile() {
-  std::vector<Action> bias_actions = {Action::BIAS_FOLD, Action::BIAS_CALL, Action::BIAS_RAISE, Action::BIAS_NONE};
+  const std::vector bias_actions = {Action::BIAS_FOLD, Action::BIAS_CALL, Action::BIAS_RAISE, Action::BIAS_NONE};
   set_iso_actions(bias_actions);
   for(int round = 0; round <= 3; ++round) {
     set_actions(bias_actions, round, 0, 0);
