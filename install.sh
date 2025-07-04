@@ -28,14 +28,14 @@ cd ..
 cd pluribus
 mkdir build
 mkdir temp
-cd build
-cmake -DVERBOSE=OFF -DUNIT_TEST=ON ..
-cmake --build .
 
+cd build
 wget \
   https://pluribus-poker.s3.us-east-1.amazonaws.com/clusters_r{1,2}_c200.npy \
   https://pluribus-poker.s3.us-east-1.amazonaws.com/clusters_r3_c200_p{1,2}.npy
 
+cmake -DVERBOSE=OFF -DUNIT_TEST=ON ..
+cmake --build .
 
 ./Test
 ./Benchmark
