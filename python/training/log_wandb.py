@@ -26,12 +26,25 @@ def read_and_move(file_path, logged_dir):
     print(f"Error moving {file_path} to {logged_dir}: {e}")
   return json_data
 
+def clean_startup(directory, logged_dir="logged"):
+  for entry in os.listdir(logged_dir):
+    path = os.path.join(logged_dir, entry)
+    if os.path.isfile(path) or os.path.islink(path):
+      os.remove(path)
+  for entry in os.listdir(directory):
+    if entry == logged_dir: continue
+    path = os.path.join(directory, entry)
+    if os.path.isfile(path) or os.path.islink(path):
+      os.remove(path)
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument('-d', '--directory', type=str, default='.')
   args = parser.parse_args()
   logged_dir = str(pathlib.Path(args.directory) / "logged")
   os.makedirs(logged_dir, exist_ok=True)  
+
+  clean_startup(args.directory)
 
   wandb.login()
   run = wandb.init(project="Pluribus", config={})
