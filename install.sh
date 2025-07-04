@@ -1,5 +1,7 @@
-apt-get update && apt-get upgrade
-apt-get install -y g++ cmake libsdl2-dev libsdl2-image-dev python3.10-venv libboost-all-dev libtbb-dev libsdl2-ttf-dev libgsl-dev
+sudo DEBIAN_FRONTEND=noninteractive apt-get update \
+  && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+  && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+       g++ cmake libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev python3.10-venv libboost-all-dev libtbb-dev libgsl-dev
 
 git clone https://github.com/catchorg/Catch2.git
 cd Catch2
@@ -25,11 +27,15 @@ cd ..
 
 cd pluribus
 mkdir build
+mkdir temp
 cd build
 cmake -DVERBOSE=OFF -DUNIT_TEST=ON ..
 cmake --build .
 
-# TODO: download clusters
+wget \
+  https://pluribus-poker.s3.us-east-1.amazonaws.com/clusters_r{1,2}_c200.npy \
+  https://pluribus-poker.s3.us-east-1.amazonaws.com/clusters_r3_c200_p{1,2}.npy
+
 
 ./Test
 ./Benchmark
