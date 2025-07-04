@@ -4,7 +4,7 @@
 namespace pluribus {
 
 SolverConfig::SolverConfig(const PokerConfig& poker_) 
-    : poker{poker_}, action_profile{BlueprintActionProfile{poker_.n_players}}, init_state{poker_} {
+    : poker{poker_}, action_profile{BlueprintActionProfile{poker_.n_players, poker_.n_chips}}, init_state{poker_} {
   for(int i = 0; i < poker_.n_players; ++i) init_ranges.push_back(PokerRange::full());
 }
 

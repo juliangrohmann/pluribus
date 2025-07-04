@@ -175,11 +175,12 @@ TEST_CASE("Simple equity solver", "[equity]") {
 
 TEST_CASE("Simulate hands", "[poker][slow]") {
   int n_players = 9;
+  int stack_size = 10'000;
   std::vector<RandomAgent> rng_agents;
-  for(int i = 0; i < n_players; ++i) rng_agents.push_back(RandomAgent{BlueprintActionProfile{n_players}});
+  for(int i = 0; i < n_players; ++i) rng_agents.push_back(RandomAgent{BlueprintActionProfile{n_players, stack_size}});
   std::vector<Agent*> agents;
   for(int i = 0; i < n_players; ++i) agents.push_back(&rng_agents[i]);
-  auto results = simulate(agents, PokerConfig{9, 10'000, 0}, 100'000);
+  auto results = simulate(agents, PokerConfig{n_players, stack_size, 0}, 100'000);
   long net = 0l;
   for(long result : results) {
     net += result;

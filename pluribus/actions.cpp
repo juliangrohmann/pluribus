@@ -122,7 +122,7 @@ std::string ActionProfile::to_string() const {
   return oss.str();
 }
 
-BlueprintActionProfile::BlueprintActionProfile(const int n_players) {
+BlueprintActionProfile::BlueprintActionProfile(const int n_players, const int stack_size) {
   if(n_players > 2) { // preflop RFI & isos
     for(int pos = 2; pos < n_players - 2; ++pos) {
       set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.40f}, Action::ALL_IN}, 0, 1, pos);
@@ -147,10 +147,13 @@ BlueprintActionProfile::BlueprintActionProfile(const int n_players) {
   }
   else {
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.333f}, Action{1.667f}, Action{2.00f}}, 0, 2, 0);
+    if(stack_size < 10'000) add_action(Action{0.75f}, 0, 2, 0);
   }
 
-  // preflop 4-bet+  
+  // preflop 4-bet+
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.70f}, Action{0.80f}, Action{0.90f}, Action{1.00f}, Action::ALL_IN}, 0, 3, 0);
+  if(stack_size < 10'000) add_action(Action{0.50f}, 0, 3, 0);
+
 
   // flop
   if(n_players > 2) {
@@ -170,6 +173,7 @@ BlueprintActionProfile::BlueprintActionProfile(const int n_players) {
   else {
     set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 2, 0, 0);
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 2, 1, 0);
+    if(stack_size < 10'000) add_action(Action{0.33f}, 2, 0, 0);
   }
 
   // river
@@ -180,6 +184,7 @@ BlueprintActionProfile::BlueprintActionProfile(const int n_players) {
   else {
     set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 3, 0, 0);  
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 3, 1, 0);
+    if(stack_size < 10'000) add_action(Action{0.33f}, 3, 0, 0);
   }
 }
 
