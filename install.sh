@@ -1,7 +1,7 @@
 sudo DEBIAN_FRONTEND=noninteractive apt-get update \
   && sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
   && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-       g++ cmake libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev python3.10-venv libboost-all-dev libtbb-dev libgsl-dev
+       vim g++ cmake libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev python3.10-venv libboost-all-dev libtbb-dev libgsl-dev
 
 git clone https://github.com/catchorg/Catch2.git
 cd Catch2
