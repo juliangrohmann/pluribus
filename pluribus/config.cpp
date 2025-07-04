@@ -46,6 +46,7 @@ std::string BlueprintSolverConfig::to_string() const {
   oss << "================ Blueprint Trainer Config ================\n";
   oss << "Strategy interval: " << strategy_interval << "\n";
   oss << "Preflop threshold: " << preflop_threshold << "\n";
+  oss << "Snapshot threshold: " << snapshot_threshold << "\n";
   oss << "Snapshot interval: " << snapshot_interval << "\n";
   oss << "Prune threshold: " << prune_thresh << "\n";
   oss << "LCFR threshold: " << lcfr_thresh << "\n";
@@ -57,6 +58,7 @@ std::string BlueprintSolverConfig::to_string() const {
 
 void BlueprintSolverConfig::set_iterations(const BlueprintTimingConfig& timings, const long it_per_min) {
   preflop_threshold = timings.preflop_threshold_m * it_per_min;
+  snapshot_threshold = timings.snapshot_threshold_m * it_per_min;
   snapshot_interval = timings.snapshot_interval_m * it_per_min;
   prune_thresh = timings.prune_thresh_m * it_per_min;
   lcfr_thresh = timings.lcfr_thresh_m * it_per_min;
@@ -65,13 +67,13 @@ void BlueprintSolverConfig::set_iterations(const BlueprintTimingConfig& timings,
 }
 
 long BlueprintSolverConfig::next_snapshot_step(const long t, const long T) const {
-    if(t < preflop_threshold) return preflop_threshold;
-    const long next_snap = std::max((t - preflop_threshold) / snapshot_interval + 1, 0L) * snapshot_interval + preflop_threshold;
+    if(t < snapshot_threshold) return snapshot_threshold;
+    const long next_snap = std::max((t - snapshot_threshold) / snapshot_interval + 1, 0L) * snapshot_interval + snapshot_threshold;
     return next_snap < T ? next_snap : T;
 }
 
 bool BlueprintSolverConfig::is_snapshot_step(const long t, const long T) const {
-  return t == T || (t - preflop_threshold) % snapshot_interval == 0;
+  return t == T || (t >= snapshot_threshold && (t - snapshot_threshold) % snapshot_interval == 0);
 }
 
 RealTimeSolverConfig::RealTimeSolverConfig(const RealTimeTimingConfig& timings, const long it_per_sec) {
