@@ -133,4 +133,10 @@ int init_indexer(hand_indexer_t& indexer, const int round) {
   return card_sum;
 }
 
+std::string join_strs(const std::vector<std::string>& strs, const std::string& sep) {
+  std::ostringstream oss;
+  for(int i = 0; i < strs.size(); ++i) oss << strs[i] << (i == strs.size() - 1 ? "" : sep);
+  return oss.str();
+}
+
 }

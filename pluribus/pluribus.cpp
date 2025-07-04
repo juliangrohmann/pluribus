@@ -23,14 +23,18 @@ private:
 Pluribus::Pluribus(const std::shared_ptr<const LosslessBlueprint>& preflop_bp, const std::shared_ptr<const SampledBlueprint>& sampled_bp)
     : _preflop_bp{preflop_bp}, _sampled_bp{sampled_bp} {}
 
-void Pluribus::new_game(const int hero_pos) {
+void Pluribus::new_game(const std::vector<std::string>& players) {
   Logger::log("================================ New Game ================================");
-  Logger::log("Game idx=" + std::to_string(++_game_idx));
+  std::ostringstream oss;
+  Logger::log("Players: " + join_strs(players, ", "));
+
   _real_state = _sampled_bp->get_config().init_state; // TODO: supply state with real stack sizes
   _root_state = _real_state;
   _mapped_actions = _real_state.get_action_history();
 
-  Logger::log("Hero position: " + pos_to_str(hero_pos, _root_state.get_players().size()));
+  if(players.size() != _real_state.get_players().size()) {
+    Logger::error("Player number mismatch. Expected " + std::to_string(_real_state.get_players().size()) + " players.");
+  }
   Logger::log("Real state/Root state:\n" + _root_state.to_string());
   if(const int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;
       _root_state.get_bet_level() > 0 || _root_state.get_round() != 0 || _root_state.get_active() != init_pos) {
@@ -38,7 +42,6 @@ void Pluribus::new_game(const int hero_pos) {
   }
 
   _ranges = _sampled_bp->get_config().init_ranges;
-  std::ostringstream oss;
   oss << "Starting ranges:\n";
   for(int p = 0; p < _ranges.size(); ++p) {
     oss << pos_to_str(p, _real_state.get_players().size()) << ": " << _ranges[p].n_combos() << " combos\n";
@@ -56,45 +59,13 @@ std::string chips_to_str(const PokerState& state, const int i) {
   return pos_to_str(i, state.get_players().size()) + " chips = " + std::to_string(state.get_players()[i].get_chips());
 }
 
-void Pluribus::update_state(const PokerState& state) {
+void Pluribus::update_state(const Action action, const int pos) {
   Logger::log("============================== Update State ==============================");
-  Logger::log(state.to_string());
-  if(!state.get_action_history().is_consistent(_real_state.get_action_history())) {
-    Logger::log("Real action history: " + _real_state.get_action_history().to_string());
-    Logger::log("Updated action history: " + _real_state.get_action_history().to_string());
-    Logger::error("Inconsistent action histories.");
+  Logger::log(pos_to_str(pos, _real_state.get_players().size()) + ": " + action.to_string());
+  if(_real_state.get_active() != pos) {
+    Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state.get_active(), _real_state.get_players().size()) + " to act.");
   }
-  if(state.get_action_history().size() <= _real_state.get_action_history().size()) {
-    Logger::error("No new actions in updated state. Real actions=" + std::to_string(_real_state.get_action_history().size()) + 
-      ", Updated actions=" + std::to_string(state.get_action_history().size()));
-  }
-
-  for(const Action a : state.get_action_history().slice(_real_state.get_action_history().size()).get_history()) {
-    _apply_action(a);
-  }
-
-  for(int p = 0; p < state.get_players().size(); ++p) {
-    if(state.get_players()[p].get_betsize() != _real_state.get_players()[p].get_betsize()) {
-      Logger::error(pos_to_str(p, _real_state.get_players().size()) + " betsize mismatch. " +
-        "Real=" + std::to_string(_real_state.get_players()[p].get_betsize()) + ", "
-        "Updated=" + std::to_string(state.get_players()[p].get_betsize()));
-    }
-    if(state.get_players()[p].get_chips() != _real_state.get_players()[p].get_chips()) {
-      Logger::error(pos_to_str(p, _real_state.get_players().size()) + " chips mismatch. " +
-        "Real=" + std::to_string(_real_state.get_players()[p].get_chips()) + ", "
-        "Updated=" + std::to_string(state.get_players()[p].get_chips()));
-    }
-  }
-  if(state.get_bet_level() != _real_state.get_bet_level()) {
-    Logger::error("Bet level mismatch. Real=" + std::to_string(_real_state.get_bet_level()) + 
-      ", Updated=" + std::to_string(state.get_bet_level()));
-  }
-  if(state.get_max_bet() != _real_state.get_max_bet()) {
-    Logger::error("Max bet mismatch. Real=" + std::to_string(_real_state.get_max_bet()) + ", Updated=" + std::to_string(state.get_max_bet()));
-  }
-  if(state.get_pot() != _real_state.get_pot()) {
-    Logger::error("Pot mismatch. Real=" + std::to_string(_real_state.get_pot()) + ", Updated=" + std::to_string(state.get_pot()));
-  }
+  _apply_action(action);
 }
 
 void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
