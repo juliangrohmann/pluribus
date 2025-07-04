@@ -33,7 +33,10 @@ public:
       : _actions{config->action_provider(state)}, _n_clusters{config->n_clusters_provider(state)}, _config{std::move(config)},
         _values{std::make_unique<std::atomic<T>[]>(_actions.size() * _n_clusters)}, 
         _nodes{std::make_unique<std::atomic<TreeStorageNode*>[]>(_actions.size())},
-        _mutexes{std::make_unique<std::mutex[]>(_actions.size())} {}
+        _mutexes{std::make_unique<std::mutex[]>(_actions.size())} {
+    for(int i = 0; i < _actions.size() * _n_clusters; ++i) _values[i].store(T{0}, std::memory_order_relaxed);
+    for(int i = 0; i < _actions.size(); ++i) _nodes[i].store(nullptr, std::memory_order_relaxed);
+  }
 
   TreeStorageNode(): _n_clusters(0) {}
 
@@ -169,6 +172,9 @@ public:
         auto child = new TreeStorageNode();
         ar(*child);
         _nodes[a].store(child);
+      }
+      else {
+        _nodes[a].store(nullptr);
       }
     }
   }
