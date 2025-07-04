@@ -26,13 +26,14 @@ def read_and_move(file_path, logged_dir):
     print(f"Error moving {file_path} to {logged_dir}: {e}")
   return json_data
 
-def clean_startup(directory, logged_dir="logged"):
-  for entry in os.listdir(logged_dir):
-    path = os.path.join(logged_dir, entry)
+def clean_startup(directory, used_dir="logged"):
+  logged_path = os.path.join(directory, used_dir)
+  for entry in os.listdir(logged_path):
+    path = os.path.join(logged_path, entry)
     if os.path.isfile(path) or os.path.islink(path):
       os.remove(path)
   for entry in os.listdir(directory):
-    if entry == logged_dir: continue
+    if entry == used_dir: continue
     path = os.path.join(directory, entry)
     if os.path.isfile(path) or os.path.islink(path):
       os.remove(path)
