@@ -87,6 +87,9 @@ public:
   }
 
 private:
+  void grow_to_fit(int round, int bet_level, int pos);
+  void sort(int round, int bet_level, int pos);
+
   std::array<std::vector<std::vector<std::vector<Action>>>, 4> _profile;
   std::vector<Action> _iso_actions;
 };

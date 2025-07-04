@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <vector>
 #include <sstream>
+#include <limits>
 #include <cereal/cereal.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/debug.hpp>
@@ -59,10 +60,23 @@ std::string ActionHistory::to_string() const {
   return str;
 }
 
-void ActionProfile::set_actions(const std::vector<Action>& actions, const int round, const int bet_level, const int pos) {
+void ActionProfile::grow_to_fit(const int round, const int bet_level, const int pos) {
   if(bet_level >= _profile[round].size()) _profile[round].resize(bet_level + 1);
   if(pos >= _profile[round][bet_level].size()) _profile[round][bet_level].resize(pos + 1);
+}
+
+float sort_key(const Action a) {
+  return a == Action::ALL_IN ? std::numeric_limits<float>::max() : a.get_bet_type();
+}
+
+void ActionProfile::sort(const int round, const int bet_level, const int pos) {
+  std::ranges::sort(_profile[round][bet_level][pos], std::ranges::less{}, &sort_key);
+}
+
+void ActionProfile::set_actions(const std::vector<Action>& actions, const int round, const int bet_level, const int pos) {
+  grow_to_fit(round, bet_level, pos);
   _profile[round][bet_level][pos] = actions;
+  sort(round, bet_level, pos);
 }
 
 const std::vector<Action>& ActionProfile::get_actions(const int round, const int bet_level, const int pos, const int pot) const {
@@ -73,9 +87,9 @@ const std::vector<Action>& ActionProfile::get_actions(const int round, const int
 }
 
 void ActionProfile::add_action(const Action& action, const int round, const int bet_level, const int pos) {
-  if(bet_level >= _profile[round].size()) _profile[round].resize(bet_level + 1);
-  if(pos >= _profile[round][bet_level].size()) _profile[round][bet_level].resize(pos + 1);
+  grow_to_fit(round, bet_level, pos);
   _profile[round][bet_level][pos].push_back(action);
+  sort(round, bet_level, pos);
 }
 
 std::unordered_set<Action> ActionProfile::all_actions() const {
