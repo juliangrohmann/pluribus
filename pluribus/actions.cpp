@@ -184,7 +184,7 @@ BlueprintActionProfile::BlueprintActionProfile(const int n_players, const int st
   else {
     set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 3, 0, 0);  
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 3, 1, 0);
-    if(stack_size < 10'000) add_action(Action{0.33f}, 3, 0, 0);
+    if(stack_size < 7'500) add_action(Action{0.33f}, 3, 0, 0);
   }
 }
 
