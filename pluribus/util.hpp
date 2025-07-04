@@ -21,6 +21,7 @@ std::string cards_to_str(const uint8_t cards[], int n);
 std::string cards_to_str(const std::vector<uint8_t>& cards);
 int n_board_cards(int round);
 int init_indexer(hand_indexer_t& indexer, int round);
+std::string join_strs(const std::vector<std::string>& strs, const std::string& sep);
 
 template <class T> 
 int index_of(T e, const std::vector<T>& v) {
@@ -28,4 +29,5 @@ int index_of(T e, const std::vector<T>& v) {
   if(it == v.end()) throw std::runtime_error("Failed to find element in vector of " + std::to_string(v.size()) + " elements."); 
   return std::distance(v.begin(), it);
 }
+
 }

@@ -14,9 +14,9 @@ struct Solution  {
 
 class Pluribus {
 public:
-  Pluribus(const std::shared_ptr<const LosslessBlueprint> &preflop_bp, const std::shared_ptr<const SampledBlueprint> &sampled_bp);
-  void new_game(int hero_pos);
-  void update_state(const PokerState& state);
+  Pluribus(const std::shared_ptr<const LosslessBlueprint>& preflop_bp, const std::shared_ptr<const SampledBlueprint>& sampled_bp);
+  void new_game(const std::vector<std::string>& players);
+  void update_state(Action action, int pos);
   void update_board(const std::vector<uint8_t> &updated_board);
   Solution solution(const PokerState& state, const Hand& hand) const;
 

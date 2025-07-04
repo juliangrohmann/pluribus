@@ -47,13 +47,14 @@ struct BlueprintTimingConfig {
   long discount_interval_m = 10;
   long lcfr_thresh_m = 400;
   long preflop_threshold_m = 800;
+  long snapshot_threshold_m = 800;
   long snapshot_interval_m = 200;
   long prune_thresh_m = 200;
   long log_interval_m = 1;
 };
 
 struct BlueprintSolverConfig : DiscountConfig {
-  BlueprintSolverConfig(const BlueprintTimingConfig& timings = BlueprintTimingConfig{}, long it_per_min = 10'000'000L);
+  explicit BlueprintSolverConfig(const BlueprintTimingConfig& timings = BlueprintTimingConfig{}, long it_per_min = 10'000'000L);
 
   std::string to_string() const;
 
@@ -66,11 +67,12 @@ struct BlueprintSolverConfig : DiscountConfig {
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(strategy_interval, preflop_threshold, snapshot_interval, prune_thresh, lcfr_thresh, discount_interval, log_interval);
+    ar(strategy_interval, preflop_threshold, snapshot_threshold, snapshot_interval, prune_thresh, lcfr_thresh, discount_interval, log_interval);
   }
 
   long strategy_interval = 10'000;
   long preflop_threshold;
+  long snapshot_threshold;
   long snapshot_interval;
   long prune_thresh;
   long log_interval;
