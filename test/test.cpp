@@ -188,6 +188,16 @@ TEST_CASE("Simulate hands", "[poker][slow]") {
   REQUIRE(net == 0l);
 }
 
+TEST_CASE("Straddle", "[poker]") {
+  PokerState state{6, 20'000, 50, true};
+  REQUIRE(state.get_pot() == 650);
+  REQUIRE(state.get_active() == 3);
+
+  auto history = ActionHistory{{Action::FOLD, Action::FOLD, Action::CHECK_CALL, Action::FOLD, Action::CHECK_CALL}};
+  state = state.apply(history);
+  REQUIRE(state.get_round() == 0);
+  REQUIRE(state.get_active() == 3);
+}
 TEST_CASE("Split pot", "[poker]") {
   Deck deck;
   std::vector<Hand> hands{Hand{"KsTc"}, Hand{"As4c"}, Hand{"Ac2h"}};
