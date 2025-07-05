@@ -5,6 +5,7 @@
 #include <functional>
 #include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/concurrency.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/logging.hpp>
 
@@ -18,7 +19,7 @@ struct TreeStorageConfig {
 inline int _compute_action_index(const Action a, const std::vector<Action>& actions) {
   const auto it = std::ranges::find(actions, a);
   // TODO: remove error checking for performance
-  if(it == actions.end()) Logger::error("Failed to find action index in TreeStorageNode actions. Action=" + a.to_string()); 
+  if(it == actions.end()) Logger::error("Failed to find action index in TreeStorageNode actions. Action=" + a.to_string());
   return std::distance(actions.begin(), it);
 }
 
@@ -33,7 +34,7 @@ public:
       : _actions{config->action_provider(state)}, _n_clusters{config->n_clusters_provider(state)}, _config{std::move(config)},
         _values{std::make_unique<std::atomic<T>[]>(_actions.size() * _n_clusters)}, 
         _nodes{std::make_unique<std::atomic<TreeStorageNode*>[]>(_actions.size())},
-        _mutexes{std::make_unique<std::mutex[]>(_actions.size())} {
+        _locks{std::make_unique<SpinLock[]>(_actions.size())} {
     for(int i = 0; i < _actions.size() * _n_clusters; ++i) _values[i].store(T{0}, std::memory_order_relaxed);
     for(int i = 0; i < _actions.size(); ++i) _nodes[i].store(nullptr, std::memory_order_relaxed);
   }
@@ -48,7 +49,7 @@ public:
     auto& node_atom = _nodes[action_idx];
     TreeStorageNode* next = node_atom.load(std::memory_order_seq_cst);
     if(!next) {
-      std::lock_guard lock(_mutexes[action_idx]);
+      std::lock_guard lock(_locks[action_idx]);
       next = node_atom.load(std::memory_order_seq_cst);
       if(!next) {
         next = new TreeStorageNode(next_state, _config);
@@ -155,7 +156,7 @@ public:
     int n = _actions.size();
     _values = std::make_unique<std::atomic<T>[]>(n * _n_clusters);
     _nodes = std::make_unique<std::atomic<TreeStorageNode*>[]>(n);
-    _mutexes = std::make_unique<std::mutex[]>(n);
+    _locks = std::make_unique<SpinLock[]>(n);
 
     for(int c = 0; c < _n_clusters; ++c) {
       for(int a = 0; a < n; ++a) {
@@ -198,7 +199,7 @@ private:
 
   std::unique_ptr<std::atomic<T>[]> _values;
   std::unique_ptr<std::atomic<TreeStorageNode*>[]> _nodes;
-  std::unique_ptr<std::mutex[]> _mutexes;
+  std::unique_ptr<SpinLock[]> _locks;
 };
 
 }
