@@ -44,13 +44,13 @@ public:
 
   TreeStorageNode* apply_index(int action_idx, const PokerState& next_state) {
     auto& node_atom = _nodes[action_idx];
-    TreeStorageNode* next = node_atom.load(std::memory_order_seq_cst);
+    TreeStorageNode* next = node_atom.load(std::memory_order_acquire);
     if(!next) {
       std::lock_guard lock(_locks[action_idx]);
-      next = node_atom.load(std::memory_order_seq_cst);
+      next = node_atom.load(std::memory_order_acquire);
       if(!next) {
         next = new TreeStorageNode(next_state, _config);
-        node_atom.store(next, std::memory_order_seq_cst);
+        node_atom.store(next, std::memory_order_release);
       }
     }
     return next;
