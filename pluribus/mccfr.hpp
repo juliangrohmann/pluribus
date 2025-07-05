@@ -92,7 +92,6 @@ protected:
   virtual bool should_discount(long t) const = 0;
   virtual bool should_snapshot(long t, long T) const = 0;
   virtual bool should_log(long t) const = 0;
-  virtual bool is_preflop_frozen(long t) const = 0;
   virtual long next_step(long t, long T) const = 0;
   
   virtual std::atomic<int>* get_base_regret_ptr(StorageT<int>* storage, const PokerState& state, int cluster) = 0;
@@ -127,9 +126,8 @@ private:
   int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
       std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage,
       std::ostringstream& debug);
-  int external_sampling(const std::vector<Action>& actions, const PokerState& state, long t, const Board& board, const std::vector<Hand>& hands, 
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
-      std::ostringstream& debug);
+  int external_sampling(const std::vector<Action>& actions, const PokerState& state, const Board& board, const std::vector<Hand>& hands,
+      std::vector<CachedIndexer>& indexers, StorageT<int>* regret_storage, std::ostringstream& debug);
 #ifdef UNIT_TEST
   template <template<typename> class T>
   friend int call_traverse_mccfr(MCCFRSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
@@ -235,7 +233,6 @@ protected:
   bool should_discount(const long t) const override { return _bp_config.is_discount_step(t); }
   bool should_snapshot(const long t, const long T) const override { return _bp_config.is_snapshot_step(t, T); }
   bool should_log(const long t) const override { return t > 0 && t % _bp_config.log_interval == 0; }
-  bool is_preflop_frozen(long t) const override { return false; /* return t > _bp_config.preflop_threshold; */ }
   long next_step(long t, long T) const override;
   
   double get_discount_factor(const long t) const override { return _bp_config.get_discount_factor(t); }
@@ -270,7 +267,6 @@ protected:
   bool should_discount(const long t) const override { return t % _rt_config.discount_interval == 0; }
   bool should_snapshot(long t, long T) const override { return false; }
   bool should_log(const long t) const override { return t % _rt_config.log_interval == 0; }
-  bool is_preflop_frozen(const long t) const override { return false; }
   long next_step(const long t, const long T) const override { return _rt_config.next_discount_step(t, T); }
   
   double get_discount_factor(const long t) const override { return _rt_config.get_discount_factor(t); }
