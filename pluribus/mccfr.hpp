@@ -188,6 +188,8 @@ public:
   }
 
 protected:
+  void on_start() override;
+
   std::atomic<int>* get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) override;
   TreeStorageNode<int>* init_regret_storage() override;
   TreeStorageNode<int>* next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state, int i) override;
@@ -337,6 +339,8 @@ public:
   }
 
 protected:
+  void on_start() override;
+
   std::atomic<float>* get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, int cluster) override;
   TreeStorageNode<float>* init_avg_storage() override;
   TreeStorageNode<float>* next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state, int i) override;

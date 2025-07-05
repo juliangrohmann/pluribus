@@ -465,16 +465,20 @@ float TreeSolver::frequency(const Action action, const PokerState& state, const 
   return decision.frequency(action, state, board, hand);
 }
 
+void TreeSolver::on_start() {
+  if(!_regrets_root) {
+    Logger::log("Initializing regret storage tree ...");
+    _regrets_tree_config = make_tree_config();
+    _regrets_root = std::make_unique<TreeStorageNode<int>>(get_config().init_state, _regrets_tree_config);
+  }
+}
+
 std::atomic<int>* TreeSolver::get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, const int cluster) {
   return storage->get(cluster); 
 }
 
 TreeStorageNode<int>* TreeSolver::init_regret_storage() { 
-  if(!_regrets_root) {
-    _regrets_tree_config = make_tree_config();
-    _regrets_root = std::make_unique<TreeStorageNode<int>>(get_config().init_state, _regrets_tree_config);
-  }
-  return _regrets_root.get(); 
+  return _regrets_root.get();
 }
 
 TreeStorageNode<int>* TreeSolver::next_regret_storage(TreeStorageNode<int>* storage, const int action_idx, const PokerState& next_state, const int i) {
@@ -665,16 +669,21 @@ const std::shared_ptr<const TreeStorageConfig> TreeBlueprintSolver::make_tree_co
 TreeBlueprintSolver::TreeBlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config) 
     : TreeSolver{config}, MCCFRSolver{config}, BlueprintSolver{config, bp_config} {}
 
+void TreeBlueprintSolver::on_start() {
+  TreeSolver::on_start();
+  if(!_phi_root) {
+    Logger::log("Initializing avg storage tree ...");
+    _phi_tree_config = make_tree_config();
+    _phi_root = std::make_unique<TreeStorageNode<float>>(get_config().init_state, _phi_tree_config);
+  }
+}
+
 std::atomic<float>* TreeBlueprintSolver::get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, const int cluster) {
   return storage->get(cluster);
 }
 
 TreeStorageNode<float>* TreeBlueprintSolver::init_avg_storage() { 
-  if(!_phi_root) {
-    _phi_tree_config = make_tree_config();
-    _phi_root = std::make_unique<TreeStorageNode<float>>(get_config().init_state, _phi_tree_config);
-  }
-  return _phi_root.get(); 
+  return _phi_root.get();
 }
 
 TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<float>* storage, const int action_idx, const PokerState& next_state,
