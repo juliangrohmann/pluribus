@@ -17,10 +17,7 @@ struct TreeStorageConfig {
 };
 
 inline int _compute_action_index(const Action a, const std::vector<Action>& actions) {
-  const auto it = std::ranges::find(actions, a);
-  // TODO: remove error checking for performance
-  if(it == actions.end()) Logger::error("Failed to find action index in TreeStorageNode actions. Action=" + a.to_string());
-  return std::distance(actions.begin(), it);
+  return std::distance(actions.begin(), std::ranges::find(actions, a));
 }
 
 inline int _value_index(const int n_actions, const int cluster, const int action_idx) {
