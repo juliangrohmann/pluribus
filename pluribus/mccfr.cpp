@@ -386,9 +386,10 @@ std::string strategy_label(const PokerState& state, const PokerState& init_state
   std::ostringstream oss;
   PokerState curr_state = init_state;
   for(int a_idx = 0; a_idx < rel_actions.size(); ++a_idx) {
-    if(!has_player_vpip(state, init_state, curr_state.get_active())) continue;
-    oss << pos_to_str(curr_state.get_active(), state.get_players().size()) << " " << rel_actions[a_idx].to_string()
+    if(has_player_vpip(state, init_state, curr_state.get_active())) {
+      oss << pos_to_str(curr_state.get_active(), state.get_players().size()) << " " << rel_actions[a_idx].to_string()
         << ", ";
+    }
     curr_state = curr_state.apply(rel_actions[a_idx]);
   }
   oss << "[" << pos_to_str(curr_state.get_active(), state.get_players().size()) << " " << action.to_string() << "]" 
