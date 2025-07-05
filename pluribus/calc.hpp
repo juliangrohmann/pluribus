@@ -13,7 +13,7 @@ std::vector<float> calculate_strategy(const std::atomic<T>* base_ptr, const int 
   freq.reserve(n_actions);
   float sum = 0;
   for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-    float value = std::max(static_cast<float>(base_ptr[a_idx].load()), 0.0f);
+    float value = std::max(static_cast<float>(base_ptr[a_idx].load(std::memory_order_relaxed)), 0.0f);
     freq.push_back(value);
     sum += value;
   }
