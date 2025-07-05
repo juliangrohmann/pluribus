@@ -57,8 +57,8 @@ std::string BlueprintSolverConfig::to_string() const {
 }
 
 void BlueprintSolverConfig::set_iterations(const BlueprintTimingConfig& timings, const long it_per_min) {
-  preflop_threshold = timings.preflop_threshold_m * it_per_min;
-  snapshot_threshold = timings.snapshot_threshold_m * it_per_min;
+  preflop_threshold = timings.preflop_thresh_m * it_per_min;
+  snapshot_threshold = timings.snapshot_thresh_m * it_per_min;
   snapshot_interval = timings.snapshot_interval_m * it_per_min;
   prune_thresh = timings.prune_thresh_m * it_per_min;
   lcfr_thresh = timings.lcfr_thresh_m * it_per_min;

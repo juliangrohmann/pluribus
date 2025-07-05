@@ -46,8 +46,8 @@ struct DiscountConfig {
 struct BlueprintTimingConfig {
   long discount_interval_m = 10;
   long lcfr_thresh_m = 400;
-  long preflop_threshold_m = 800;
-  long snapshot_threshold_m = 800;
+  long preflop_thresh_m = 800;
+  long snapshot_thresh_m = 800;
   long snapshot_interval_m = 200;
   long prune_thresh_m = 200;
   long log_interval_m = 1;
