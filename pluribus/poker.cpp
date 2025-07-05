@@ -98,7 +98,8 @@ void Player::reset(const int chips) {
   _betsize = 0;
 }
 
-PokerState::PokerState(const int n_players, const int chips, const int ante) : _pot{150}, _max_bet{100}, _round{0}, _bet_level{1}, _winner{-1} {
+PokerState::PokerState(const int n_players, const int chips, const int ante, const bool straddle)
+    : _pot{150}, _max_bet{100}, _round{0}, _bet_level{1}, _winner{-1}, _straddle{straddle} {
   _players.reserve(n_players);
   for(int i = 0; i < n_players; ++i) {
     _players.push_back(Player{chips});
@@ -107,7 +108,15 @@ PokerState::PokerState(const int n_players, const int chips, const int ante) : _
   if(_players.size() > 2) {
     _players[0].invest(50);
     _players[1].invest(100);
-    _active = 2;
+    if(straddle) {
+      _players[2].invest(200);
+      _pot += 200;
+      _max_bet = 200;
+      _active = n_players > 3 ? 3 : 0;
+    }
+    else {
+      _active = 2;
+    }
   }
   else {
     _players[0].invest(100);
@@ -194,7 +203,12 @@ int8_t find_winner(const PokerState& state) {
 }
 
 int big_blind_idx(const PokerState& state) {
-  return state.get_players().size() == 2 ? 0 : 1;
+  if(state.get_players().size() == 2) return 0;
+  return state.is_straddle() ? 2 : 1;
+}
+
+int big_blind_size(const PokerState& state) {
+  return state.is_straddle() ? 200 : 100;
 }
 
 std::string PokerConfig::to_string() const {
@@ -298,7 +312,7 @@ void PokerState::next_round() {
 bool is_round_complete(const PokerState& state) {
   return state.get_players()[state.get_active()].get_betsize() == state.get_max_bet() && 
          (state.get_max_bet() > 0 || state.get_active() == 0) &&
-         (state.get_max_bet() > 100 || state.get_active() != big_blind_idx(state) || state.get_round() != 0); // preflop, big blind
+         (state.get_max_bet() > big_blind_size(state) || state.get_active() != big_blind_idx(state) || state.get_round() != 0); // preflop, big blind
 }
 
 int round_of_last_action(const PokerState& state) {

@@ -185,11 +185,12 @@ struct PokerConfig {
   int n_players = 2;
   int n_chips = 10'000;
   int ante = 0;
+  bool straddle = false;
 };
 
 class PokerState {
 public:
-  explicit PokerState(int n_players = 2, int chips = 10'000, int ante = 0);
+  explicit PokerState(int n_players = 2, int chips = 10'000, int ante = 0, bool straddle = false);
   explicit PokerState(const PokerConfig& config);
   PokerState(const PokerState&) = default;
   PokerState(PokerState&&) = default;
@@ -200,6 +201,7 @@ public:
 
   const std::vector<Player>& get_players() const { return _players; }
   const ActionHistory& get_action_history() const { return _actions; }
+  bool is_straddle() const { return _straddle; }
   int get_pot() const { return _pot; }
   int get_max_bet() const { return _max_bet; }
   uint8_t get_active() const { return _active; }
@@ -232,6 +234,7 @@ private:
   uint8_t _round;
   uint8_t _bet_level;
   int8_t _winner;
+  bool _straddle;
 
   PokerState bet(int amount) const;
   PokerState call() const;
