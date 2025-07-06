@@ -132,8 +132,17 @@ int ActionProfile::max_actions() const {
   return std::max(ret, static_cast<int>(_iso_actions.size()));
 }
 
+std::string actions_to_str(const std::vector<Action>& actions) {
+  std::ostringstream oss;
+  for(Action a : actions) {
+    oss << a.to_string() << "  ";
+  }
+  return oss.str();
+}
+
 std::string ActionProfile::to_string() const {
   std::ostringstream oss;
+  oss << "Iso actions: " << actions_to_str(_iso_actions) << "\n";
   for(int round = 0; round < 4; ++round) {
     oss << round_to_str(round) << " action profile:\n";
     for(int bet_level = 0; bet_level < _profile[round].size(); ++bet_level) {
