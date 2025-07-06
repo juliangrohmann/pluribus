@@ -594,8 +594,23 @@ void MappedBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringst
   long avg_regret = 0;
   for(auto& r : get_strategy().data()) avg_regret += std::max(r.load(), 0); // should be sum of the maximum regret at each infoset, not sum of all regrets
   avg_regret /= t;
+  long regret_nodes = get_strategy().history_map().size();
+  long regret_values = get_strategy().data().size();
+  long phi_nodes = get_phi().history_map().size();
+  long phi_values = get_phi().data().size();
+  const double free_ram = static_cast<double>(get_free_ram()) / 1'000'000'000.0;
   out_str << std::setw(8) << avg_regret << " avg regret   ";
+  out_str << std::setw(12) << regret_nodes << " regret nodes   ";
+  out_str << std::setw(12) << regret_values << " regret values   ";
+  out_str << std::setw(12) << phi_nodes << " avg nodes   ";
+  out_str << std::setw(12) << phi_values << " avg values   ";
+  out_str << std::setw(8) << std::fixed << std::setprecision(2) << free_ram << " GB free ram   ";
   metrics["avg_regret"] = static_cast<int>(avg_regret);
+  metrics["regret_nodes"] = regret_nodes;
+  metrics["regret_values"] = regret_values;
+  metrics["avg_nodes"] = phi_nodes;
+  metrics["avg_values"] = phi_values;
+  metrics["free_ram"] = free_ram;
 }
 
 
@@ -675,25 +690,54 @@ void TreeBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringst
       get_avg_metrics_config(), true, metrics);
 }
 
-long sum_node_regrets(const TreeStorageNode<int>* node) {
-  long r = 0L;
+struct NodeMetrics {
+  long max_value_sum = 0L;
+  long nodes = 0L;
+  long values = 0L;
+
+  NodeMetrics& operator+=(const NodeMetrics& other) {
+    max_value_sum += other.max_value_sum;
+    nodes += other.nodes;
+    values += other.values;
+    return *this;
+  }
+};
+
+template <class T>
+NodeMetrics collect_node_metrics(const TreeStorageNode<T>* node) {
+  NodeMetrics metrics;
   for(int c = 0; c < node->get_n_clusters(); ++c) {
-    int max_r = 0L;
+    T max_v = 0L;
     for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
-      max_r = std::max(node->get(c, a_idx)->load(), max_r);
+      max_v = std::max(node->get(c, a_idx)->load(), max_v);
     }
-    r += max_r;
+    metrics.max_value_sum += max_v;
   }
+  ++metrics.nodes;
+  metrics.values = node->get_actions().size() * node->get_n_clusters();
   for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
-    if(node->is_allocated(a_idx)) r += sum_node_regrets(node->apply_index(a_idx));
+    if(node->is_allocated(a_idx)) metrics += collect_node_metrics(node->apply_index(a_idx));
   }
-  return r;
+  return metrics;
 }
 
 void TreeBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str, const long t) const {
-  const long avg_regret = sum_node_regrets(get_regrets_root()) / t; // should be sum of the maximum regret at each infoset, not sum of all regrets
+  NodeMetrics regret_metrics = collect_node_metrics(get_regrets_root());
+  NodeMetrics phi_metrics = collect_node_metrics(get_phi_root());
+  const long avg_regret = regret_metrics.max_value_sum / t; // should be sum of the maximum regret at each infoset, not sum of all regrets
+  const double free_ram = static_cast<double>(get_free_ram()) / 1'000'000'000.0;
   out_str << std::setw(8) << avg_regret << " avg regret   ";
+  out_str << std::setw(12) << regret_metrics.nodes << " regret nodes   ";
+  out_str << std::setw(12) << regret_metrics.values << " regret values   ";
+  out_str << std::setw(12) << phi_metrics.nodes << " avg nodes   ";
+  out_str << std::setw(12) << phi_metrics.values << " avg values   ";
+  out_str << std::setw(8) << std::fixed << std::setprecision(2) << free_ram << " GB free ram   ";
   metrics["avg max regret"] = static_cast<int>(avg_regret);
+  metrics["regret_nodes"] = regret_metrics.nodes;
+  metrics["regret_values"] = regret_metrics.values;
+  metrics["avg_nodes"] = phi_metrics.nodes;
+  metrics["avg_values"] = phi_metrics.values;
+  metrics["free_ram"] = free_ram;
 }
 
 bool TreeBlueprintSolver::operator==(const TreeBlueprintSolver& other) const {
@@ -701,3 +745,7 @@ bool TreeBlueprintSolver::operator==(const TreeBlueprintSolver& other) const {
 }
 
 }
+// Histories: 207'676'198
+// Regrets: 89'388'760'400
+// Actionsets: 940'68'252'553
+// Infosets: 470'785'886
