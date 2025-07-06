@@ -196,11 +196,12 @@ TEST_CASE("Straddle", "[poker]") {
   auto history = ActionHistory{{Action::FOLD, Action::FOLD, Action::CHECK_CALL, Action::FOLD, Action::CHECK_CALL}};
   state = state.apply(history);
   REQUIRE(state.get_round() == 0);
-  REQUIRE(state.get_active() == 3);
+  REQUIRE(state.get_active() == 2);
 }
+
 TEST_CASE("Split pot", "[poker]") {
   Deck deck;
-  std::vector<Hand> hands{Hand{"KsTc"}, Hand{"As4c"}, Hand{"Ac2h"}};
+  std::vector hands{Hand{"KsTc"}, Hand{"As4c"}, Hand{"Ac2h"}};
   Board board{"AdKh9s9h5c"};
   ActionHistory actions = {
     Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
@@ -212,6 +213,54 @@ TEST_CASE("Split pot", "[poker]") {
   REQUIRE(result[0] == -50);
   REQUIRE(result[1] == 25);
   REQUIRE(result[2] == 25);
+}
+
+TEST_CASE("VPIP", "[poker]") {
+  const PokerState state{6, 10'000, 0};
+  REQUIRE(state.vpip_players() == 0);
+  REQUIRE(state.has_player_vpip(0) == false);
+  REQUIRE(state.has_player_vpip(1) == false);
+  REQUIRE(state.has_player_vpip(2) == false);
+  REQUIRE(state.is_in_position(state.get_active()) == true);
+
+  PokerState limp_state = state.apply({Action::CHECK_CALL, Action::FOLD, Action::FOLD, Action::FOLD, Action::CHECK_CALL});
+  REQUIRE(limp_state.vpip_players() == 2);
+  REQUIRE(limp_state.is_in_position(limp_state.get_active()) == false);
+
+  PokerState ip_state = state.apply({Action{1.00f}, Action::FOLD, Action::FOLD});
+  REQUIRE(ip_state.vpip_players() == 1);
+  REQUIRE(ip_state.has_player_vpip(2) == true);
+  REQUIRE(ip_state.is_in_position(ip_state.get_active()) == true);
+}
+
+TEST_CASE("Action profile", "[profile]") {
+  ActionProfile profile;
+  const std::vector iso = {Action::FOLD, Action{2.00f}, Action::ALL_IN};
+  const std::vector sb = {Action::FOLD, Action{0.50f}, Action{0.80f}, Action::ALL_IN};
+  const std::vector cutoff_oop = {Action::FOLD, Action{0.60f}, Action::ALL_IN};
+  const std::vector cutoff_ip = {Action::FOLD, Action{0.25f}, Action{1.20f}, Action{1.40f}, Action::ALL_IN};
+  const std::vector bb_oop = {Action::FOLD, Action{0.65f}, Action{0.90f}, Action::ALL_IN};
+  const std::vector bb_ip = {Action::FOLD, Action{0.30f}, Action{0.75f}, Action::ALL_IN};
+  profile.set_iso_actions(iso);
+  profile.set_actions(sb, 0, 0, 0);
+  profile.set_actions(bb_oop, 0, 0, 1);
+  profile.set_actions(bb_ip, 0, 0, 1, true);
+  profile.set_actions(cutoff_oop, 0, 0, 4);
+  profile.set_actions(cutoff_ip, 0, 0, 4, true);
+  const PokerState state{6, 10'000, 0}; // pos == 2
+  REQUIRE(profile.get_actions(state) == bb_ip); // skipped position fill-in
+
+  const PokerState limp_state = state.apply(Action::CHECK_CALL);
+  REQUIRE(profile.get_actions(limp_state) == iso);
+
+  const PokerState ip_overflow_state = state.apply({Action::FOLD, Action::FOLD, Action{1.00f}}); // pos == 5
+  REQUIRE(profile.get_actions(ip_overflow_state) == cutoff_ip); // pos overflow
+
+  const PokerState bb_oop_state = ip_overflow_state.apply({Action::FOLD, Action::FOLD}); // pos = 1
+  REQUIRE(profile.get_actions(bb_oop_state) == bb_oop);
+
+  const PokerState bb_ip_state = state.apply({Action::FOLD, Action::FOLD, Action::FOLD, Action::FOLD, Action{1.00f}}); // pos = 1
+  REQUIRE(profile.get_actions(bb_ip_state) == bb_ip);
 }
 
 void test_hand_distribution(const PokerRange& range, std::function<Hand()>sampler, long n_samples, double threshold) {

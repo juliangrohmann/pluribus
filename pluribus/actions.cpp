@@ -8,6 +8,7 @@
 #include <pluribus/debug.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
+#include <sys/stat.h>
 
 namespace pluribus {
 
@@ -60,36 +61,45 @@ std::string ActionHistory::to_string() const {
   return str;
 }
 
-void ActionProfile::grow_to_fit(const int round, const int bet_level, const int pos) {
-  if(bet_level >= _profile[round].size()) _profile[round].resize(bet_level + 1);
-  if(pos >= _profile[round][bet_level].size()) _profile[round][bet_level].resize(pos + 1);
+template <class T>
+void grow_by_copy(std::vector<T>& vec, int size) {
+  if(vec.size() == 0) vec.resize(1);
+  while(vec.size() < size) vec.push_back(vec[vec.size() - 1]);
+}
+
+void ActionProfile::grow_to_fit(const int round, const int bet_level, const int pos, const bool in_position) {
+  grow_by_copy(_profile[round], bet_level + 1);
+  grow_by_copy(_profile[round][bet_level], pos + 1);
+  grow_by_copy(_profile[round][bet_level][pos], in_position + 1);
 }
 
 float sort_key(const Action a) {
   return a == Action::ALL_IN ? std::numeric_limits<float>::max() : a.get_bet_type();
 }
 
-void ActionProfile::sort(const int round, const int bet_level, const int pos) {
-  std::ranges::sort(_profile[round][bet_level][pos], std::ranges::less{}, &sort_key);
+void ActionProfile::sort(const int round, const int bet_level, const int pos, const bool in_position) {
+  std::ranges::sort(_profile[round][bet_level][pos][static_cast<int>(in_position)], std::ranges::less{}, &sort_key);
 }
 
-void ActionProfile::set_actions(const std::vector<Action>& actions, const int round, const int bet_level, const int pos) {
-  grow_to_fit(round, bet_level, pos);
-  _profile[round][bet_level][pos] = actions;
-  sort(round, bet_level, pos);
+void ActionProfile::set_actions(const std::vector<Action>& actions, const int round, const int bet_level, const int pos, const bool in_position) {
+  grow_to_fit(round, bet_level, pos, in_position);
+  _profile[round][bet_level][pos][in_position] = actions;
+  sort(round, bet_level, pos, in_position);
 }
 
-const std::vector<Action>& ActionProfile::get_actions(const int round, const int bet_level, const int pos, const int pot) const {
-  if(round == 0 && bet_level == 1 && pot > 150) return _iso_actions;
-  const int level_idx = std::min(bet_level, static_cast<int>(_profile[round].size()) - 1);
-  const int pos_idx = std::min(pos, static_cast<int>(_profile[round][level_idx].size()) - 1);
-  return _profile[round][level_idx][pos_idx]; 
+void ActionProfile::add_action(const Action& action, const int round, const int bet_level, const int pos, const bool in_position) {
+  grow_to_fit(round, bet_level, pos, in_position);
+  _profile[round][bet_level][pos][in_position].push_back(action);
+  sort(round, bet_level, pos, in_position);
 }
 
-void ActionProfile::add_action(const Action& action, const int round, const int bet_level, const int pos) {
-  grow_to_fit(round, bet_level, pos);
-  _profile[round][bet_level][pos].push_back(action);
-  sort(round, bet_level, pos);
+const std::vector<Action>& ActionProfile::get_actions(const PokerState& state) const {
+  if(state.get_round() == 0 && state.get_bet_level() == 1 && state.vpip_players() > 0) return _iso_actions;
+  const int level_idx = std::min(static_cast<int>(state.get_bet_level()), static_cast<int>(_profile[state.get_round()].size()) - 1);
+  const int pos_idx = std::min(static_cast<int>(state.get_active()), static_cast<int>(_profile[state.get_round()][level_idx].size()) - 1);
+  const auto& ip_vec = _profile[state.get_round()][level_idx][pos_idx];
+  if(ip_vec.size() == 1) return ip_vec[0];
+  return ip_vec[static_cast<int>(state.is_in_position(state.get_active()))];
 }
 
 std::unordered_set<Action> ActionProfile::all_actions() const {
@@ -97,8 +107,10 @@ std::unordered_set<Action> ActionProfile::all_actions() const {
   for(auto& round : _profile) {
     for(auto& level : round) {
       for(auto& pos : level) {
-        for(Action a : pos) {
-          actions.insert(a);
+        for(auto& ip : pos) {
+          for(Action a : ip) {
+            actions.insert(a);
+          }
         }
       }
     }
@@ -111,7 +123,9 @@ int ActionProfile::max_actions() const {
   for(auto& round : _profile) {
     for(auto& level : round) {
       for(auto& pos : level) {
-        ret = std::max(static_cast<int>(pos.size()), ret);
+        for(auto& ip : pos) {
+          ret = std::max(static_cast<int>(ip.size()), ret);
+        }
       }
     }
   }
@@ -125,9 +139,12 @@ std::string ActionProfile::to_string() const {
     for(int bet_level = 0; bet_level < _profile[round].size(); ++bet_level) {
       oss << "\tBet level " << bet_level << ":\n";
       for(int pos = 0; pos < _profile[round][bet_level].size(); ++pos) {
-        oss << "\t\t" << "Position " << pos << ":  ";
-        for(Action a : _profile[round][bet_level][pos]) {
-          oss << a.to_string() << "  ";
+        oss << "\t\t" << "Position " << pos << ", ";
+        for(int ip = 0; ip < _profile[round][bet_level][pos].size(); ++ip) {
+          oss << (ip == 0 ? "OOP" : "IP") << ":  ";
+          for(Action a : _profile[round][bet_level][pos][ip]) {
+            oss << a.to_string() << "  ";
+          }
         }
         oss << "\n";
       }

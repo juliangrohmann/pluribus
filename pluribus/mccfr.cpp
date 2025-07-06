@@ -364,21 +364,9 @@ std::string MCCFRSolver<StorageT>::track_wandb_metrics(const long t) const {
   return metrics.dump();
 }
 
-int has_player_vpip(const PokerState& state, const PokerState& init_state, const int p_idx) {
-  return state.get_players()[p_idx].get_betsize() > init_state.get_players()[p_idx].get_betsize();
-}
-
-int vpip_players(const PokerState& state, const PokerState& init_state) {
-  int n = 0;
-  for(int i = 0; i < state.get_players().size(); ++i) {
-    if(has_player_vpip(state, init_state, i)) ++n;
-  }
-  return n;
-}
-
 bool should_track_strategy(const PokerState& state, const PokerState& init_state, const MetricsConfig& metrics_config) {
   return state.active_players() > 1 && state.get_round() == init_state.get_round() 
-      && vpip_players(state, init_state) <= metrics_config.max_vpip && state.get_bet_level() <= metrics_config.max_bet_level;
+      && state.vpip_players() <= metrics_config.max_vpip && state.get_bet_level() <= metrics_config.max_bet_level;
 }
 
 std::string strategy_label(const PokerState& state, const PokerState& init_state, const Action action, const bool phi) {
@@ -386,7 +374,7 @@ std::string strategy_label(const PokerState& state, const PokerState& init_state
   std::ostringstream oss;
   PokerState curr_state = init_state;
   for(int a_idx = 0; a_idx < rel_actions.size(); ++a_idx) {
-    if(has_player_vpip(state, init_state, curr_state.get_active())) {
+    if(state.has_player_vpip(curr_state.get_active())) {
       oss << pos_to_str(curr_state.get_active(), state.get_players().size()) << " " << rel_actions[a_idx].to_string()
         << ", ";
     }
@@ -575,7 +563,7 @@ int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const in
 template <template<typename> class StorageT>
 std::vector<Action> RealTimeSolver<StorageT>::available_actions(const PokerState& state, const ActionProfile& profile) const {
   if(state.get_round() >= _rt_config.terminal_round || state.get_bet_level() >= _rt_config.terminal_bet_level) {
-    return _rt_config.bias_profile.get_actions(0, 0, 0, 0);
+    return _rt_config.bias_profile.get_actions(state);
   }
   return valid_actions(state, profile);
 }

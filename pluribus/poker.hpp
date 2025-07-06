@@ -143,6 +143,9 @@ bool collides(const Hand& hand, const Board& board);
 bool collides(const Hand& hand, const std::vector<uint8_t>& cards);
 std::vector<uint8_t> collect_cards(const Board& board, const Hand& hand, int round = 3);
 
+int big_blind_idx(const PokerState& state);
+int blind_size(const PokerState& state, int pos);
+
 class Player {
 public:
   explicit Player(const int chips = 10'000) : _chips{chips} {}
@@ -211,6 +214,9 @@ public:
   int8_t get_winner() const { return _winner; }
   const std::vector<Action>& get_biases() const { return _biases; }
   bool is_terminal() const { return get_winner() != -1 || get_round() >= 4; }
+  bool has_player_vpip(int pos) const;
+  bool is_in_position(int pos) const;
+  int vpip_players() const;
   int active_players() const;
   [[nodiscard]] PokerState apply(Action action) const;
   [[nodiscard]] PokerState apply(const ActionHistory& action_history) const;

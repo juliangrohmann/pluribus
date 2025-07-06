@@ -19,7 +19,7 @@ public:
   float get_bet_type() const { return _bet_type; }
   std::string to_string() const;
 
-  bool operator==(const Action& other) const = default;
+  bool operator==(const Action& other) const { return _bet_type == other._bet_type; }
 
   template <class Archive>
   void serialize(Archive& ar) {
@@ -68,12 +68,14 @@ private:
   std::vector<Action> _history;
 };
 
+class PokerState;
+
 class ActionProfile {
 public:
-  void set_actions(const std::vector<Action>& actions, int round, int bet_level, int pos);
+  void set_actions(const std::vector<Action>& actions, int round, int bet_level, int pos, bool in_position = false);
   void set_iso_actions(const std::vector<Action>& actions) { _iso_actions = actions; }
-  void add_action(const Action& action, int round, int bet_level, int pos);
-  const std::vector<Action>& get_actions(int round, int bet_level, int pos, int pot) const;
+  void add_action(const Action& action, int round, int bet_level, int pos, bool in_position = false);
+  const std::vector<Action>& get_actions(const PokerState& state) const;
   int n_bet_levels(const int round) const { return static_cast<int>(_profile[round].size()); }
   std::unordered_set<Action> all_actions() const;
   int max_actions() const;
@@ -87,10 +89,10 @@ public:
   }
 
 private:
-  void grow_to_fit(int round, int bet_level, int pos);
-  void sort(int round, int bet_level, int pos);
+  void grow_to_fit(int round, int bet_level, int pos, bool in_position);
+  void sort(int round, int bet_level, int pos, bool in_position);
 
-  std::array<std::vector<std::vector<std::vector<Action>>>, 4> _profile;
+  std::array<std::vector<std::vector<std::vector<std::vector<Action>>>>, 4> _profile;
   std::vector<Action> _iso_actions;
 };
 

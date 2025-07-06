@@ -78,6 +78,20 @@ std::vector<uint8_t> collect_cards(const Board& board, const Hand& hand, const i
   return cards;
 }
 
+int blind_size(const PokerState& state, const int pos) {
+  switch(pos) {
+    case 0: return 50;
+    case 1: return 100;
+    case 2: return state.is_straddle() ? 200 : 0;
+    default: return 0;
+  }
+}
+
+int big_blind_idx(const PokerState& state) {
+  if(state.get_players().size() == 2) return 0;
+  return state.is_straddle() ? 2 : 1;
+}
+
 void Player::invest(const int amount) {
   assert(!has_folded() && "Attempted to invest but player already folded.");
   assert(get_chips() >= amount && "Attempted to invest more chips than available.");
@@ -147,10 +161,37 @@ PokerState PokerState::next_state(const Action action) const {
   return bet(total_bet_size(*this, action) - player.get_betsize());
 }
 
+bool PokerState::has_player_vpip(const int pos) const {
+  if(get_round() != 0) throw std::runtime_error("VPIP is only defined preflop.");
+  return get_players()[pos].get_betsize() > blind_size(*this, pos);
+}
+
+bool PokerState::is_in_position(const int pos) const {
+  if(get_round() == 0) {
+    for(int i = pos + 1; i < get_players().size(); ++i) {
+      if(has_player_vpip(i)) return false;
+    }
+  }
+  else {
+    for(int i = pos + 1; i < get_players().size(); ++i) {
+      if(!get_players()[i].has_folded()) return false;
+    }
+  }
+  return true;
+}
+
 int PokerState::active_players() const {
   int n = 0;
   for(const auto& p : _players) {
     if(!p.has_folded()) ++n;
+  }
+  return n;
+}
+
+int PokerState::vpip_players() const {
+  int n = 0;
+  for(int i = 0; i < get_players().size(); ++i) {
+    if(has_player_vpip(i)) ++n;
   }
   return n;
 }
@@ -204,11 +245,6 @@ int8_t find_winner(const PokerState& state) {
     }
   }
   return winner;
-}
-
-int big_blind_idx(const PokerState& state) {
-  if(state.get_players().size() == 2) return 0;
-  return state.is_straddle() ? 2 : 1;
 }
 
 int big_blind_size(const PokerState& state) {
@@ -354,7 +390,7 @@ int total_bet_size(const PokerState& state, const Action action) {
 }
 
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile) {
-  const std::vector<Action>& actions = profile.get_actions(state.get_round(), state.get_bet_level(), state.get_active(), state.get_pot());
+  const std::vector<Action>& actions = profile.get_actions(state);
   std::vector<Action> valid;
   valid.reserve(actions.size());
   const Player& player = state.get_players()[state.get_active()];

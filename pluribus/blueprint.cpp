@@ -298,7 +298,7 @@ SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossl
   LosslessBlueprint bp;
   cereal_load(bp, lossless_bp_fn);
   meta.config = bp.get_config();
-  meta.biases = bias_profile.get_actions(0, 0, 0, 150);
+  meta.biases = bias_profile.get_actions(meta.config.init_state);
   meta.n_clusters = bp.get_strategy().n_clusters();
   auto action_to_idx = build_compression_map(bp.get_config().action_profile);
   _idx_to_action = build_decompression_map(action_to_idx);
@@ -348,10 +348,10 @@ SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossl
   return meta;
 }
 
-std::unordered_map<Action, int> build_bias_offset_map(const ActionProfile& bias_profile) {
+std::unordered_map<Action, int> build_bias_offset_map(const PokerState& state, const ActionProfile& bias_profile) {
   Logger::log("Building bias offsets...");
   std::unordered_map<Action, int> bias_offset_map;
-  for(const std::vector<Action>& all_biases = bias_profile.get_actions(0, 0, 0, 0); const auto& bias : all_biases) {
+  for(const std::vector<Action>& all_biases = bias_profile.get_actions(state); const auto& bias : all_biases) {
     bias_offset_map[bias] = std::distance(all_biases.begin(), std::ranges::find(all_biases, bias));
     Logger::log(bias.to_string() + " -> " + std::to_string(bias_offset_map[bias]));
   }
@@ -380,7 +380,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   std::cout << "Stored histories: " << get_freq()->history_map().size() << "\n";
   std::cout << "Data size: " << get_freq()->data().size() << "\n";
   std::cout << "Sampled blueprint built.\n";
-  _bias_to_offset = build_bias_offset_map(bias_profile);
+  _bias_to_offset = build_bias_offset_map(meta.config.init_state, bias_profile);
 }
 
 }
