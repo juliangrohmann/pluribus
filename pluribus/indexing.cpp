@@ -47,7 +47,7 @@ long count(const PokerState& state, const ActionProfile& action_profile, const i
     return 0;
   }
   long c;
-  if(infosets) {
+  if(!infosets) {
     c = state.get_round() == 0 ? 169 : 200;
   }
   else {
