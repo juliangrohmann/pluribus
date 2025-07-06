@@ -139,14 +139,14 @@ std::string ActionProfile::to_string() const {
     for(int bet_level = 0; bet_level < _profile[round].size(); ++bet_level) {
       oss << "\tBet level " << bet_level << ":\n";
       for(int pos = 0; pos < _profile[round][bet_level].size(); ++pos) {
-        oss << "\t\t" << "Position " << pos << ", ";
+        oss << "\t" << "Position " << pos << ":";
         for(int ip = 0; ip < _profile[round][bet_level][pos].size(); ++ip) {
-          oss << (ip == 0 ? "OOP" : "IP") << ":  ";
+          oss << (ip == 0 ? "\t\tOOP:  " : "\t\tIP:  ");
           for(Action a : _profile[round][bet_level][pos][ip]) {
             oss << a.to_string() << "  ";
           }
+          oss << "\n";
         }
-        oss << "\n";
       }
     }
   }
