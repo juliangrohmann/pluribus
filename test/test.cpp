@@ -177,7 +177,7 @@ TEST_CASE("Simulate hands", "[poker][slow]") {
   int n_players = 9;
   int stack_size = 10'000;
   std::vector<RandomAgent> rng_agents;
-  for(int i = 0; i < n_players; ++i) rng_agents.push_back(RandomAgent{BlueprintActionProfile{n_players, stack_size}});
+  for(int i = 0; i < n_players; ++i) rng_agents.push_back(RandomAgent{RingBlueprintProfile{n_players, stack_size}});
   std::vector<Agent*> agents;
   for(int i = 0; i < n_players; ++i) agents.push_back(&rng_agents[i]);
   auto results = simulate(agents, PokerConfig{n_players, stack_size, 0}, 100'000);

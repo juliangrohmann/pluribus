@@ -15,6 +15,7 @@
 #include <pluribus/mccfr.hpp>
 #include <pluribus/range_viewer.hpp>
 #include <pluribus/rng.hpp>
+#include <pluribus/profiles.hpp>
 #include <pluribus/blueprint.hpp>
 
 namespace pluribus {

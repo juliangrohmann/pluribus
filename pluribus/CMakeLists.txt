@@ -25,6 +25,7 @@ add_library(
   ev.cpp
   calc.cpp
   config.cpp
+  profiles.cpp
   dist.cpp
   util.cpp
   debug.cpp

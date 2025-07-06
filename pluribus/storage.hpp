@@ -42,8 +42,7 @@ public:
   explicit StrategyStorage(const ActionProfile& action_profile, const int n_clusters = 200) :
                _action_profile{action_profile}, _n_clusters{n_clusters} {}
 
-  explicit StrategyStorage(const int n_players = 2, const int stack_size = 10'000, const int n_clusters = 200)
-      : StrategyStorage{BlueprintActionProfile{n_players, stack_size}, n_clusters} {}
+  explicit StrategyStorage() : StrategyStorage{ActionProfile{}, 0} {}
 
   StrategyStorage(const StrategyStorage& other) 
       : _data(other._data), 

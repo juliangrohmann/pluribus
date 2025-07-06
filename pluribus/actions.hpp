@@ -96,16 +96,6 @@ private:
   std::vector<Action> _iso_actions;
 };
 
-class BlueprintActionProfile : public ActionProfile {
-public:
-  explicit BlueprintActionProfile(int n_players, int stack_size);
-};
-
-class BiasActionProfile : public ActionProfile {
-public:
-  BiasActionProfile();
-};
-
 }
 
 namespace std {

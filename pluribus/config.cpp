@@ -3,13 +3,10 @@
 
 namespace pluribus {
 
-SolverConfig::SolverConfig(const PokerConfig& poker_) 
-    : poker{poker_}, action_profile{BlueprintActionProfile{poker_.n_players, poker_.n_chips}}, init_state{poker_} {
+SolverConfig::SolverConfig(const PokerConfig& poker_, const ActionProfile& action_profile)
+    : poker{poker_}, action_profile{action_profile}, init_state{poker_} {
   for(int i = 0; i < poker_.n_players; ++i) init_ranges.push_back(PokerRange::full());
 }
-
-SolverConfig::SolverConfig(const int n_players, const int n_chips, const int ante)
-    : SolverConfig{PokerConfig{n_players, n_chips, ante}} {}
 
 std::string SolverConfig::to_string() const {
   std::ostringstream oss;

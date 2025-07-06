@@ -2,13 +2,13 @@
 
 #include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/profiles.hpp>
 #include <pluribus/range.hpp>
 
 namespace pluribus {
 
 struct SolverConfig {
-  explicit SolverConfig(int n_players = 2, int n_chips = 10'000, int ante = 0);
-  explicit SolverConfig(const PokerConfig& poker_);
+  explicit SolverConfig(const PokerConfig& poker_ = PokerConfig{}, const ActionProfile& action_profile = ActionProfile{});
 
   std::string to_string() const;
 
