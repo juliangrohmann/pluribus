@@ -157,6 +157,7 @@ public:
   int get_betsize() const { return _betsize; }
   bool has_folded() const { return _folded; }
   void invest(int amount);
+  void post_ante(int amount);
   void next_round();
   void fold();
   void reset(int chips);

@@ -85,6 +85,10 @@ void Player::invest(const int amount) {
   _betsize += amount;
 }
 
+void Player::post_ante(const int amount) {
+  _chips -= amount;
+}
+
 void Player::next_round() {
   _betsize = 0;
 }
@@ -125,8 +129,8 @@ PokerState::PokerState(const int n_players, const int chips, const int ante, con
   }
 
   if(ante > 0) {
-    for(Player p : _players) {
-      p.invest(ante);
+    for(Player& p : _players) {
+      p.post_ante(ante);
     }
     _pot += _players.size() * ante;
   }
