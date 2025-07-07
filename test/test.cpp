@@ -241,7 +241,7 @@ TEST_CASE("Action profile", "[profile]") {
   const std::vector cutoff_ip = {Action::FOLD, Action{0.25f}, Action{1.20f}, Action{1.40f}, Action::ALL_IN};
   const std::vector bb_oop = {Action::FOLD, Action{0.65f}, Action{0.90f}, Action::ALL_IN};
   const std::vector bb_ip = {Action::FOLD, Action{0.30f}, Action{0.75f}, Action::ALL_IN};
-  profile.set_iso_actions(iso);
+  profile.set_iso_actions(iso, 0);
   profile.set_actions(sb, 0, 0, 0);
   profile.set_actions(bb_oop, 0, 0, 1);
   profile.set_actions(bb_ip, 0, 0, 1, true);
