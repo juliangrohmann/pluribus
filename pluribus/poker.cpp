@@ -150,7 +150,7 @@ PokerState::PokerState(const int n_players, const int chips, const int ante, con
   }
 }
 
-PokerState::PokerState(const PokerConfig& config) : PokerState{config.n_players, config.n_chips, config.ante} {}
+PokerState::PokerState(const PokerConfig& config) : PokerState{config.n_players, config.n_chips, config.ante, config.straddle} {}
 
 PokerState PokerState::next_state(const Action action) const {
   const Player& player = get_players()[get_active()];
