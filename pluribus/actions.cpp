@@ -8,6 +8,7 @@
 #include <pluribus/debug.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/logging.hpp>
 #include <sys/stat.h>
 
 namespace pluribus {
@@ -62,15 +63,14 @@ std::string ActionHistory::to_string() const {
 }
 
 template <class T>
-void grow_by_copy(std::vector<T>& vec, int size) {
-  if(vec.size() == 0) vec.resize(1);
-  while(vec.size() < size) vec.push_back(vec[vec.size() - 1]);
+void grow_to_size(std::vector<T>& vec, int size) {
+  if(vec.size() < size) vec.resize(size);
 }
 
 void ActionProfile::grow_to_fit(const int round, const int bet_level, const int pos, const bool in_position) {
-  grow_by_copy(_profile[round], bet_level + 1);
-  grow_by_copy(_profile[round][bet_level], pos + 1);
-  grow_by_copy(_profile[round][bet_level][pos], in_position + 1);
+  grow_to_size(_profile[round], bet_level + 1);
+  grow_to_size(_profile[round][bet_level], pos + 1);
+  grow_to_size(_profile[round][bet_level][pos], in_position + 1);
 }
 
 float sort_key(const Action a) {
@@ -93,13 +93,17 @@ void ActionProfile::add_action(const Action& action, const int round, const int 
   sort(round, bet_level, pos, in_position);
 }
 
+const std::vector<Action>& ActionProfile::get_actions_from_raw(const int round, const int bet_level, const int pos, const bool in_position) const {
+  const int level_idx = std::min(bet_level, static_cast<int>(_profile[round].size()) - 1);
+  const int pos_idx = std::min(pos, static_cast<int>(_profile[round][level_idx].size()) - 1);
+  const auto& ip_vec = _profile[round][level_idx][pos_idx];
+  if(ip_vec.size() == 1) return ip_vec[0];
+  return ip_vec[static_cast<int>(in_position)];
+}
+
 const std::vector<Action>& ActionProfile::get_actions(const PokerState& state) const {
   if(state.get_round() == 0 && state.get_bet_level() == 1 && state.vpip_players() > 0) return _iso_actions;
-  const int level_idx = std::min(static_cast<int>(state.get_bet_level()), static_cast<int>(_profile[state.get_round()].size()) - 1);
-  const int pos_idx = std::min(static_cast<int>(state.get_active()), static_cast<int>(_profile[state.get_round()][level_idx].size()) - 1);
-  const auto& ip_vec = _profile[state.get_round()][level_idx][pos_idx];
-  if(ip_vec.size() == 1) return ip_vec[0];
-  return ip_vec[static_cast<int>(state.is_in_position(state.get_active()))];
+  return get_actions_from_raw(state.get_round(), state.get_bet_level(), state.get_active(), state.is_in_position(state.get_active()));
 }
 
 std::unordered_set<Action> ActionProfile::all_actions() const {
@@ -132,6 +136,14 @@ int ActionProfile::max_actions() const {
   return std::max(ret, static_cast<int>(_iso_actions.size()));
 }
 
+int ActionProfile::max_bet_level() const {
+  int max_val = -1;
+  for(const auto& round : _profile) {
+    max_val = std::max(static_cast<int>(round.size()) - 1, max_val);
+  }
+  return max_val;
+}
+
 std::string actions_to_str(const std::vector<Action>& actions) {
   std::ostringstream oss;
   for(Action a : actions) {
@@ -148,18 +160,32 @@ std::string ActionProfile::to_string() const {
     for(int bet_level = 0; bet_level < _profile[round].size(); ++bet_level) {
       oss << "\tBet level " << bet_level << ":\n";
       for(int pos = 0; pos < _profile[round][bet_level].size(); ++pos) {
-        oss << "\t" << "Position " << pos << ":";
+        oss << "\t\t" << "Position " << pos << ":\n";
         for(int ip = 0; ip < _profile[round][bet_level][pos].size(); ++ip) {
-          oss << (ip == 0 ? "\t\tOOP:  " : "\t\tIP:  ");
-          for(Action a : _profile[round][bet_level][pos][ip]) {
-            oss << a.to_string() << "  ";
-          }
-          oss << "\n";
+          oss << "\t\t\t" << (ip == 0 ? "OOP:  " : " IP:  ") << actions_to_str(_profile[round][bet_level][pos][ip]) << "\n";
         }
       }
     }
   }
   return oss.str();
+}
+
+CombinedActionProfile::CombinedActionProfile(const int hero_pos, const ActionProfile& hero_profile, const ActionProfile& villain_profile, const int max_round)
+    : ActionProfile{std::max(hero_profile.n_players(), villain_profile.n_players())} {
+  if(hero_profile.n_players() == -1 || villain_profile.n_players() == -1) Logger::error("Combined profile required player amount information.");
+  set_raw_profile(villain_profile.get_raw_profile());
+  const int max_level = std::max(hero_profile.max_bet_level(), villain_profile.max_bet_level());
+  if(max_level == -1) Logger::error("Cannot combine profiles with empty bet levels.");
+  for(int round = 0; round < 4; ++round) {
+    for(int bet_level = round == 0 ? 1 : 0; bet_level <= max_level; ++bet_level) {
+      for(int pos = 0; pos <= n_players(); ++pos) {
+        for(int ip = 0; ip <= 1; ++ip) {
+          const auto& actions = (pos == hero_pos && round <= max_round ? hero_profile : villain_profile).get_actions_from_raw(round, bet_level, pos, ip);
+          set_actions(actions, round, bet_level, pos, ip);
+        }
+      }
+    }
+  }
 }
 
 }

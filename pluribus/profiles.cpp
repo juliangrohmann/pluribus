@@ -2,7 +2,7 @@
 
 namespace pluribus {
 
-BiasActionProfile::BiasActionProfile() {
+BiasActionProfile::BiasActionProfile() : ActionProfile{1} {
   const std::vector bias_actions = {Action::BIAS_FOLD, Action::BIAS_CALL, Action::BIAS_RAISE, Action::BIAS_NONE};
   set_iso_actions(bias_actions);
   for(int round = 0; round <= 3; ++round) {
@@ -10,7 +10,7 @@ BiasActionProfile::BiasActionProfile() {
   }
 }
 
-HeadsUpBlueprintProfile::HeadsUpBlueprintProfile(const int stack_size) {
+HeadsUpBlueprintProfile::HeadsUpBlueprintProfile(const int stack_size) : ActionProfile{2} {
   // preflop RFI
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.75f}, Action::ALL_IN}, 0, 1, 0);
   set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{2.00f}, Action::ALL_IN});
@@ -38,7 +38,7 @@ HeadsUpBlueprintProfile::HeadsUpBlueprintProfile(const int stack_size) {
   if(stack_size < 7'500) add_action(Action{0.33f}, 3, 0, 0);
 }
 
-RingBlueprintProfile::RingBlueprintProfile(int n_players, int stack_size) {
+RingBlueprintProfile::RingBlueprintProfile(const int n_players, const int stack_size) : ActionProfile{n_players} {
   // preflop RFI & isos
   for(int pos = 2; pos < n_players - 2; ++pos) {
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.40f}, Action::ALL_IN}, 0, 1, pos);
@@ -73,7 +73,7 @@ RingBlueprintProfile::RingBlueprintProfile(int n_players, int stack_size) {
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 3, 1, 0);
 }
 
-WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players) {
+WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players) : ActionProfile{n_players} {
   // preflop RFI & isos
   for(int pos = 0; pos < 3; ++pos) {
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.85f}, Action::ALL_IN}, 0, 1, pos);
@@ -111,7 +111,7 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players) {
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 3, 1, 0);
 }
 
-WPTGoldRingSimpleProfile::WPTGoldRingSimpleProfile(const int n_players) {
+WPTGoldRingSimpleProfile::WPTGoldRingSimpleProfile(const int n_players) : ActionProfile{n_players} {
   // preflop RFI & isos
   for(int pos = 0; pos < 3; ++pos) {
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.85f}, Action::ALL_IN}, 0, 1, pos);
@@ -128,8 +128,8 @@ WPTGoldRingSimpleProfile::WPTGoldRingSimpleProfile(const int n_players) {
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.075f}, Action::ALL_IN}, 0, 2, 2, false);
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.75f}, Action::ALL_IN}, 0, 2, 2, true);
   for(int pos = 3; pos < n_players; ++pos) {
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 0, 2, 3, false);
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.65}, Action::ALL_IN}, 0, 2, 3, true);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 0, 2, pos, false);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.65}, Action::ALL_IN}, 0, 2, pos, true);
   }
 
   // preflop 4-bet

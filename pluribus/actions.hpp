@@ -70,30 +70,46 @@ private:
 
 class PokerState;
 
+using ProfileStorage = std::array<std::vector<std::vector<std::vector<std::vector<Action>>>>, 4>;
+
 class ActionProfile {
 public:
+  explicit ActionProfile(const int n_players = -1) : _n_players{n_players} {}
   void set_actions(const std::vector<Action>& actions, int round, int bet_level, int pos, bool in_position = false);
   void set_iso_actions(const std::vector<Action>& actions) { _iso_actions = actions; }
   void add_action(const Action& action, int round, int bet_level, int pos, bool in_position = false);
+  const std::vector<Action>& get_actions_from_raw(int round, int bet_level, int pos, bool in_position) const;
   const std::vector<Action>& get_actions(const PokerState& state) const;
+  const ProfileStorage& get_raw_profile() const { return _profile; }
   int n_bet_levels(const int round) const { return static_cast<int>(_profile[round].size()); }
   std::unordered_set<Action> all_actions() const;
   int max_actions() const;
+  int max_bet_level() const;
+  int n_players() const { return _n_players; }
   std::string to_string() const;
 
   bool operator==(const ActionProfile&) const = default;
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_profile, _iso_actions);
+    ar(_profile, _iso_actions, _n_players);
   }
+
+protected:
+  void set_raw_profile(const ProfileStorage& raw_profile) { _profile = raw_profile; }
 
 private:
   void grow_to_fit(int round, int bet_level, int pos, bool in_position);
   void sort(int round, int bet_level, int pos, bool in_position);
 
-  std::array<std::vector<std::vector<std::vector<std::vector<Action>>>>, 4> _profile;
+  ProfileStorage _profile;
   std::vector<Action> _iso_actions;
+  int _n_players;
+};
+
+class CombinedActionProfile : public ActionProfile {
+public:
+  CombinedActionProfile(int hero_pos, const ActionProfile& hero_profile, const ActionProfile& villain_profile, int max_round = 3);
 };
 
 }
