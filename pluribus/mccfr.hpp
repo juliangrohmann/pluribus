@@ -121,11 +121,9 @@ protected:
 
 private:
   int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
-      std::ostringstream& debug);
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug);
   int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage,
-      std::ostringstream& debug);
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug);
   int external_sampling(const std::vector<Action>& actions, const PokerState& state, const Board& board, const std::vector<Hand>& hands,
       std::vector<CachedIndexer>& indexers, StorageT<int>* regret_storage, std::ostringstream& debug);
 #ifdef UNIT_TEST

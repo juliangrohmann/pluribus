@@ -140,11 +140,11 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         on_step(t, i, hands, debug);
         if(should_prune(t)) {
           if(_log_level == SolverLogLevel::DEBUG) debug << "============== Traverse MCCFR-P ==============\n";
-          traverse_mccfr_p(get_config().init_state, t, i, board, hands, indexers, eval, init_regret_storage(), init_avg_storage(), debug);
+          traverse_mccfr_p(get_config().init_state, t, i, board, hands, indexers, eval, init_regret_storage(), debug);
         }
         else {
           if(_log_level == SolverLogLevel::DEBUG) debug << "============== Traverse MCCFR ==============\n";
-          traverse_mccfr(get_config().init_state, t, i, board, hands, indexers, eval, init_regret_storage(), init_avg_storage(), debug);
+          traverse_mccfr(get_config().init_state, t, i, board, hands, indexers, eval, init_regret_storage(), debug);
         }
       }
       if(_log_level == SolverLogLevel::DEBUG) {
@@ -236,8 +236,7 @@ void log_external_sampling(const Action sampled, const std::vector<Action>& acti
 
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long t, const int i, const Board& board, const std::vector<Hand>& hands,
-    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
-    std::ostringstream& debug) {
+    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug) {
   if(is_terminal(state, i)) {
     const int u = terminal_utility(state, i, board, hands, get_config().poker.n_chips, indexers, eval);
     if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, get_config().init_state, hands, debug);
@@ -256,8 +255,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
       Action a = actions[a_idx];
       if(base_ptr[a_idx].load() > PRUNE_CUTOFF) {
         PokerState next_state = state.apply(a);
-        int v_a = traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), 
-            next_avg_storage(avg_storage, a_idx, next_state, i), debug);
+        int v_a = traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
         if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
@@ -284,14 +282,12 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
   auto actions = regret_node_actions(regret_storage, state, get_config().action_profile);
   int a_idx = external_sampling(actions, state, board, hands, indexers, regret_storage, debug);
   const PokerState next_state = state.apply(actions[a_idx]);
-  return traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i),
-                          next_avg_storage(avg_storage, a_idx, next_state, i), debug);
+  return traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
 }
 
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t, const int i, const Board& board, const std::vector<Hand>& hands,
-    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, StorageT<float>* avg_storage, 
-    std::ostringstream& debug) {
+    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug) {
   if(is_terminal(state, i)) {
     const int u = terminal_utility(state, i, board, hands, get_config().poker.n_chips, indexers, eval);
     if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, get_config().init_state, hands, debug);
@@ -308,8 +304,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t,
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       Action a = actions[a_idx];
       PokerState next_state = state.apply(a);
-      int v_a = traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i),
-                               next_avg_storage(avg_storage, a_idx, next_state, i), debug);
+      int v_a = traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
       if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
@@ -332,8 +327,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t,
   auto actions = regret_node_actions(regret_storage, state, get_config().action_profile);
   int a_idx = external_sampling(actions, state, board, hands, indexers, regret_storage, debug);
   const PokerState next_state = state.apply(actions[a_idx]);
-  return traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i),
-                        next_avg_storage(avg_storage, a_idx, next_state, i), debug);
+  return traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
 }
 
 template <template<typename> class StorageT>
