@@ -58,6 +58,7 @@ enum class SolverLogLevel : int {
 struct MetricsConfig { 
   int max_vpip = 2;
   int max_bet_level = 2;
+  std::function<bool(const PokerState&)> should_track = [](const PokerState&) { return true; };
 };
 
 template <template<typename> class StorageT>
