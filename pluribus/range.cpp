@@ -1,8 +1,10 @@
 #include <numeric>
+#include <omp/Hand.h>
 #include <pluribus/constants.hpp>
 #include <pluribus/rng.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/mccfr.hpp>
+#include <pluribus/logging.hpp>
 #include <pluribus/range.hpp>
 
 namespace pluribus {
@@ -100,6 +102,60 @@ PokerRange PokerRange::random() {
     }
   }
   return range;
+}
+
+std::vector<Hand> select_by_suit(const char primary, const char kicker, const bool suited) {
+  std::unordered_set<Hand> hands;
+  for(const auto& prim_suit : omp::SUITS) {
+    for(const auto& kick_suit : omp::SUITS) {
+      if(const bool match = prim_suit == kick_suit; match == suited) {
+        hands.insert(canonicalize(Hand{std::string{primary} + prim_suit + kicker + kick_suit}));
+      }
+    }
+  }
+  return std::vector<Hand>{hands.begin(), hands.end()};
+}
+
+std::vector<Hand> all_suits(const char primary, const char kicker) {
+  auto suited_hands = select_by_suit(primary, kicker, true);
+  auto offsuit_hands = select_by_suit(primary, kicker, false);
+  std::vector<Hand> hands{suited_hands.begin(), suited_hands.end()};
+  hands.insert(hands.end(), offsuit_hands.begin(), offsuit_hands.end());
+  return hands;
+}
+
+void set_hand(PokerRange& range, const std::string& hand, const double freq) {
+  if(hand.length() == 4) {
+    range.set_frequency(Hand{hand}, freq);
+  }
+  std::vector<Hand> hands;
+  if(hand.length() == 2) {
+    hands = all_suits(hand[0], hand[1]);
+  }
+  else if(hand.length() == 3) {
+    if(hand[2] != 's' && hand[2] != 'o') Logger::error("Invalid hand suit specifier: " + hand);
+    hands = select_by_suit(hand[0], hand[1], hand[2] == 's');
+  }
+  else {
+    Logger::error("Invalid hand: " + hand);
+  }
+  for(const auto& h : hands) {
+    range.set_frequency(h, freq);
+  }
+}
+
+int rank_index(const char rank) {
+  return std::ranges::distance(omp::RANKS.begin(), std::ranges::find(omp::RANKS, rank));
+}
+
+void set_hand_range(PokerRange& range, const char primary, const char start_kicker, const char end_kicker, const std::string& suit_spec, const double freq) {
+  if(!suit_spec.empty() && suit_spec != "s" && suit_spec != "o") Logger::error("invalid suit spec: " + suit_spec);
+  const int start_idx = rank_index(start_kicker);
+  const int end_idx = rank_index(end_kicker);
+  if(start_idx > end_idx) Logger::error("Invalid kicker range: " + primary + start_kicker + std::string{" to "} + primary + end_kicker);
+  for(int i = start_idx; i <= end_idx; ++i) {
+    set_hand(range, std::string{primary} + omp::RANKS[i] + suit_spec, freq);
+  }
 }
 
 }

@@ -71,4 +71,7 @@ private:
   std::vector<double> _weights;
 };
 
+void set_hand(PokerRange& range, const std::string& hand, double freq = 1.0);
+void set_hand_range(PokerRange& range, char primary, char start_kicker, char end_kicker, const std::string& suit_spec, double freq);
+
 }
