@@ -88,7 +88,7 @@ protected:
   virtual bool is_terminal(const PokerState& state, const int i) const { return state.is_terminal() || state.get_players()[i].has_folded(); }
   virtual std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const { return valid_actions(state, profile); }
   virtual void on_start() {}
-  virtual void on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) {}
+  virtual void on_step(long t,int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, std::ostringstream& debug) {}
 
   virtual bool should_prune(long t) const = 0;
   virtual bool should_discount(long t) const = 0;
@@ -223,11 +223,11 @@ public:
 protected:
   virtual bool is_update_terminal(const PokerState& state, int i) const;
 
-  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, StorageT<int>* regret_storage, 
-      StorageT<float>* avg_storage, std::ostringstream& debug);
+  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
+      StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug);
 
   void on_start() override { Logger::log("Blueprint solver config:\n" + _bp_config.to_string()); }
-  void on_step(long t,int i, const std::vector<Hand>& hands, std::ostringstream& debug) override;
+  void on_step(long t,int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, std::ostringstream& debug) override;
 
   bool should_prune(long t) const override;
   bool should_discount(const long t) const override { return _bp_config.is_discount_step(t); }

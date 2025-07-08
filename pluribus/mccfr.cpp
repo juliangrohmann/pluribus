@@ -128,7 +128,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
           indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes
         }
-        on_step(t, i, sample.hands, debug);
+        on_step(t, i, sample.hands, indexers, debug);
         if(should_prune(t)) {
           if(_log_level == SolverLogLevel::DEBUG) debug << "============== Traverse MCCFR-P ==============\n";
           traverse_mccfr_p(get_config().init_state, t, i, board, sample.hands, indexers, eval, init_regret_storage(), debug);
@@ -476,13 +476,13 @@ bool BlueprintSolver<StorageT>::is_update_terminal(const PokerState& state, cons
 
 template <template<typename> class StorageT>
 void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
-    StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug) {
+    std::vector<CachedIndexer>& indexers, StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug) {
   if(is_update_terminal(state, i)) {
     return;
   }
   if(state.get_active() == i) {
     auto actions = this->avg_node_actions(avg_storage, state, this->get_config().action_profile);
-    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hands[i]);
+    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     const std::atomic<int>* base_ptr = this->get_base_regret_ptr(regret_storage, state, cluster);
     auto freq = calculate_strategy(base_ptr, actions.size());
     int a_idx = sample_action_idx(freq);
@@ -496,24 +496,25 @@ void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, 
     }
     this->get_base_avg_ptr(avg_storage, state, cluster)[a_idx].fetch_add(1.0f);
     PokerState next_state = state.apply(actions[a_idx]);
-    update_strategy(next_state, i, board, hands, this->next_regret_storage(regret_storage, a_idx, next_state, i),
+    update_strategy(next_state, i, board, hands, indexers, this->next_regret_storage(regret_storage, a_idx, next_state, i),
                     this->next_avg_storage(avg_storage, a_idx, next_state, i), debug);
   }
   else {
     auto actions = this->avg_node_actions(avg_storage, state, this->get_config().action_profile);
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       PokerState next_state = state.apply(actions[a_idx]);
-      update_strategy(next_state, i, board, hands, this->next_regret_storage(regret_storage, a_idx, next_state, i),
+      update_strategy(next_state, i, board, hands, indexers, this->next_regret_storage(regret_storage, a_idx, next_state, i),
                       this->next_avg_storage(avg_storage, a_idx, next_state, i), debug);
     }
   }
 }
 
 template <template<typename> class StorageT>
-void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::vector<Hand>& hands, std::ostringstream& debug) {
+void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
+    std::ostringstream& debug) {
   if(t > 0 && t % get_blueprint_config().strategy_interval == 0 && t < get_blueprint_config().preflop_threshold) {
     if(this->get_log_level() == SolverLogLevel::DEBUG) debug << "============== Updating strategy ==============\n";
-    update_strategy(this->get_config().init_state, i, Board{this->get_config().init_board}, hands,
+    update_strategy(this->get_config().init_state, i, Board{this->get_config().init_board}, hands, indexers,
         this->init_regret_storage(), this->init_avg_storage(), debug);
   }
 }
