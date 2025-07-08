@@ -44,6 +44,17 @@ double PokerRange::n_combos() const {
   return std::reduce(_weights.begin(), _weights.end());
 }
 
+void PokerRange::normalize() {
+  const double sum = n_combos();
+  for(auto& w : _weights) w /= sum;
+}
+
+void PokerRange::make_relative() {
+  double max_w = 0.0;
+  for(const auto& w : _weights) max_w = std::max(w, max_w);
+  for(auto& w : _weights) w /= max_w;
+}
+
 void PokerRange::remove_cards(const std::vector<uint8_t>& cards) {
   for(const auto& hand : hands()) {
     if(collides(hand, cards)) {
