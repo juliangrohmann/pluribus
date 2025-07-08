@@ -77,7 +77,8 @@ public:
   explicit ActionProfile(const int n_players = -1) : _n_players{n_players} {}
   void set_actions(const std::vector<Action>& actions, int round, int bet_level, int pos, bool in_position = false);
   void set_iso_actions(const std::vector<Action>& actions, int pos);
-  void add_action(const Action& action, int round, int bet_level, int pos, bool in_position = false);
+  void add_action(Action action, int round, int bet_level, int pos, bool in_position = false);
+  void add_iso_action(Action action, int pos);
   const std::vector<Action>& get_actions_from_raw(int round, int bet_level, int pos, bool in_position) const;
   const std::vector<Action>& get_iso_actions(int pos) const;
   const std::vector<Action>& get_actions(const PokerState& state) const;

@@ -82,6 +82,7 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players) : 
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.52f}, Action::ALL_IN}, 0, 1, pos);
   }
   set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.70f}, Action::ALL_IN}, 0);
+  if(n_players <= 6) add_iso_action(Action{0.52f}, 0);
 
   // preflop 3-bet
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.83f}, Action{1.00f}, Action{1.17f}, Action::ALL_IN}, 0, 2, 0);
@@ -101,6 +102,10 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players) : 
   // flop
   set_actions({Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 1, 1, 0);
+  if(n_players <= 6) {
+    add_action(Action{0.33f}, 1, 0, 0);
+    add_action(Action{0.75f}, 1, 1, 0);
+  }
 
   // turn
   set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 2, 0, 0);
@@ -108,6 +113,7 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players) : 
 
   // river
   set_actions({Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 3, 0, 0);
+  if(n_players <= 6) add_action(Action{0.50f}, 3, 0, 0);
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 3, 1, 0);
 }
 

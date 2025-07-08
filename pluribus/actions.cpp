@@ -92,10 +92,15 @@ void ActionProfile::set_iso_actions(const std::vector<Action>& actions, const in
   _iso_actions[pos] = actions;
 }
 
-void ActionProfile::add_action(const Action& action, const int round, const int bet_level, const int pos, const bool in_position) {
+void ActionProfile::add_action(const Action action, const int round, const int bet_level, const int pos, const bool in_position) {
   grow_to_fit(round, bet_level, pos, in_position);
   _profile[round][bet_level][pos][in_position].push_back(action);
   sort(round, bet_level, pos, in_position);
+}
+
+void ActionProfile::add_iso_action(const Action action, const int pos) {
+  grow_to_size(_iso_actions, pos + 1);
+  _iso_actions[pos].push_back(action);
 }
 
 const std::vector<Action>& ActionProfile::get_actions_from_raw(const int round, const int bet_level, const int pos, const bool in_position) const {
