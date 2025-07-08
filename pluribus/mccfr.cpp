@@ -108,8 +108,8 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       thread_local omp::HandEvaluator eval;
       thread_local Deck deck{get_config().init_board};
       thread_local Board board;
-      thread_local std::vector<Hand> hands{static_cast<size_t>(get_config().poker.n_players)};
       thread_local std::ostringstream debug;
+      thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board};
       if(_log_level == SolverLogLevel::DEBUG) debug << "============== t = " << t << " ==============\n";
       if(should_log(t)) {
         std::ostringstream metrics_fn;
@@ -118,33 +118,20 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       }
       for(int i = 0; i < get_config().poker.n_players; ++i) {
         if(_log_level == SolverLogLevel::DEBUG) debug << "============== i = " << i << " ==============\n";
-        deck.shuffle();
-        board.deal(deck, get_config().init_board);
         std::vector<CachedIndexer> indexers(get_config().poker.n_players);
-        if(full_ranges) {
-          for(int h_idx = 0; h_idx < hands.size(); ++h_idx) { 
-            hands[h_idx].deal(deck);
-            indexers[h_idx].index(board, hands[h_idx], 3); // cache indexes
-          }
+        RoundSample sample = sampler.sample();
+        board = sample_board(get_config().init_board, sample.mask);
+        for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
+          indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes
         }
-        else {
-          std::unordered_set<uint8_t> dead_cards;
-          std::ranges::copy(board.cards(), std::inserter(dead_cards, dead_cards.end()));
-          for(int p_idx = 0; p_idx < get_config().poker.n_players; ++p_idx) {
-            Logger::error("Biased MCCFR sampling not implemented.");
-            dead_cards.insert(hands[p_idx].cards()[0]);
-            dead_cards.insert(hands[p_idx].cards()[1]);
-          }
-        }
-
-        on_step(t, i, hands, debug);
+        on_step(t, i, sample.hands, debug);
         if(should_prune(t)) {
           if(_log_level == SolverLogLevel::DEBUG) debug << "============== Traverse MCCFR-P ==============\n";
-          traverse_mccfr_p(get_config().init_state, t, i, board, hands, indexers, eval, init_regret_storage(), debug);
+          traverse_mccfr_p(get_config().init_state, t, i, board, sample.hands, indexers, eval, init_regret_storage(), debug);
         }
         else {
           if(_log_level == SolverLogLevel::DEBUG) debug << "============== Traverse MCCFR ==============\n";
-          traverse_mccfr(get_config().init_state, t, i, board, hands, indexers, eval, init_regret_storage(), debug);
+          traverse_mccfr(get_config().init_state, t, i, board, sample.hands, indexers, eval, init_regret_storage(), debug);
         }
       }
       if(_log_level == SolverLogLevel::DEBUG) {
