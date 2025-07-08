@@ -112,7 +112,7 @@ protected:
   virtual void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const = 0;
 
   std::string track_wandb_metrics(long t) const;
-  void track_strategy_by_decision(const PokerState& state, const std::vector<PokerRange>& ranges, const DecisionAlgorithm& decision, 
+  void track_strategy_by_decision(const PokerState& state, const std::vector<PokerRange>& ranges, const DecisionAlgorithm& decision,
       const MetricsConfig& metrics_config, bool phi, nlohmann::json& metrics) const;
 
   [[noreturn]] void error(const std::string& msg, const std::ostringstream& debug) const;

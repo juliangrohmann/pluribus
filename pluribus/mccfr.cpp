@@ -486,7 +486,7 @@ void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, 
     const std::atomic<int>* base_ptr = this->get_base_regret_ptr(regret_storage, state, cluster);
     auto freq = calculate_strategy(base_ptr, actions.size());
     int a_idx = sample_action_idx(freq);
-    if(this->get_log_level() != SolverLogLevel::NONE) {
+    if(this->get_log_level() == SolverLogLevel::DEBUG) {
       debug << "Update strategy: " << relative_history_str(state, this->get_config().init_state) << "\n";
       debug << "\t" << hands[i].to_string() << ": (cluster=" << cluster << ")\n\t";
       for(int ai = 0; ai < actions.size(); ++ai) {
@@ -512,7 +512,7 @@ void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, 
 template <template<typename> class StorageT>
 void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::vector<Hand>& hands, std::ostringstream& debug) {
   if(t > 0 && t % get_blueprint_config().strategy_interval == 0 && t < get_blueprint_config().preflop_threshold) {
-    if(this->get_log_level() != SolverLogLevel::NONE) debug << "============== Updating strategy ==============\n";
+    if(this->get_log_level() == SolverLogLevel::DEBUG) debug << "============== Updating strategy ==============\n";
     update_strategy(this->get_config().init_state, i, Board{this->get_config().init_board}, hands,
         this->init_regret_storage(), this->init_avg_storage(), debug);
   }
