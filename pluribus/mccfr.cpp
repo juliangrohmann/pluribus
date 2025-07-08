@@ -651,6 +651,7 @@ TreeBlueprintSolver::TreeBlueprintSolver(const SolverConfig& config, const Bluep
 
 void TreeBlueprintSolver::on_start() {
   TreeSolver::on_start();
+  BlueprintSolver::on_start();
   if(!_phi_root) {
     Logger::log("Initializing avg storage tree ...");
     _phi_tree_config = make_tree_config();
