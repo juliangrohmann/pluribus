@@ -8,16 +8,24 @@ SolverConfig::SolverConfig(const PokerConfig& poker_, const ActionProfile& actio
   for(int i = 0; i < poker_.n_players; ++i) init_ranges.push_back(PokerRange::full());
 }
 
+std::string ranges_to_config_str(const std::vector<PokerRange>& ranges) {
+  std::ostringstream oss;
+  for(int i = 0; i < ranges.size(); ++ i) oss << "Player " << i << ": " << ranges[i].n_combos() << " combos\n";
+  return oss.str();
+}
+
 std::string SolverConfig::to_string() const {
   std::ostringstream oss;
-  oss << "================ MCCFR Config ================\n";
-  oss << "Poker config: " << poker.to_string() << "\n";
-  oss << "Initial board: " << cards_to_str(init_board.data(), init_board.size()) << "\n";
-  oss << "Initial state:\n" << init_state.to_string() << "\n";
-  oss << "Initial ranges:\n";
-  for(int i = 0; i < init_ranges.size(); ++ i) oss << "Player " << i << ": " << init_ranges[i].n_combos() << " combos\n";
-  oss << "Action profile:\n" << action_profile.to_string();
-  oss << "----------------------------------------------------------\n";
+  oss << "================ MCCFR Config ================\n"
+      << "Poker config: " << poker.to_string() << "\n"
+      << "Initial board: " << cards_to_str(init_board.data(), init_board.size()) << "\n"
+      << "Initial state:\n" << init_state.to_string() << "\n"
+      << "Initial ranges:\n"
+      << ranges_to_config_str(init_ranges)
+      << "Dead ranges:\n"
+      << ranges_to_config_str(dead_ranges)
+      << "Action profile:\n" << action_profile.to_string()
+      << "----------------------------------------------------------\n";
   return oss.str();
 }
 
