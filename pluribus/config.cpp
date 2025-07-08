@@ -21,9 +21,9 @@ std::string SolverConfig::to_string() const {
       << "Initial board: " << cards_to_str(init_board.data(), init_board.size()) << "\n"
       << "Initial state:\n" << init_state.to_string() << "\n"
       << "Initial ranges:\n"
-      << ranges_to_config_str(init_ranges)
+      << ranges_to_config_str(init_ranges) << "\n"
       << "Dead ranges:\n"
-      << ranges_to_config_str(dead_ranges)
+      << ranges_to_config_str(dead_ranges) << "\n"
       << "Action profile:\n" << action_profile.to_string()
       << "----------------------------------------------------------\n";
   return oss.str();
