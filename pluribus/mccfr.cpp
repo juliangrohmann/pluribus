@@ -110,7 +110,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       thread_local Deck deck{get_config().init_board};
       thread_local Board board;
       thread_local std::ostringstream debug;
-      thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board};
+      thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board, get_config().dead_ranges};
       if(_log_level == SolverLogLevel::DEBUG) debug << "============== t = " << t << " ==============\n";
       if(should_log(t)) {
         std::ostringstream metrics_fn;

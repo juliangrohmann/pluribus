@@ -16,12 +16,13 @@ struct SolverConfig {
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(poker, action_profile, init_ranges, init_board, init_state);
+    ar(poker, action_profile, init_ranges, dead_ranges, init_board, init_state);
   }
 
   PokerConfig poker;
   ActionProfile action_profile;
   std::vector<PokerRange> init_ranges;
+  std::vector<PokerRange> dead_ranges;
   std::vector<uint8_t> init_board;
   PokerState init_state;
 };
