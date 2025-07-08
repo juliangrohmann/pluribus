@@ -96,7 +96,6 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
   bool full_ranges = are_full_ranges(get_config().init_ranges);
   Logger::log("Full ranges: " + std::string{full_ranges ? "true" : "false"});
   Logger::log("Training blueprint from " + std::to_string(_t) + " to " + std::to_string(T));
-  omp_set_num_threads(1);
   std::ostringstream buf;
   while(_t < T) {
     long init_t = _t;
