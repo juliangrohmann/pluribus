@@ -254,11 +254,32 @@ private:
   void next_bias();
 };
 
+class RakeStructure {
+public:
+  RakeStructure(const double percent, const double cap) : _percent{percent}, _cap{cap} {}
+
+  int payoff(const PokerState& state) const {
+    return state.get_round() == 0 ? state.get_pot() : round(std::max(state.get_pot() * (1.0 - _percent), state.get_pot() - _cap));
+  }
+
+  bool operator==(const RakeStructure& other) const = default;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_percent, _cap);
+  }
+
+private:
+  double _percent;
+  double _cap;
+};
+
 int total_bet_size(const PokerState& state, Action action);
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile);
 int round_of_last_action(const PokerState& state);
 std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval);
-int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval);
+int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
+    const omp::HandEvaluator& eval);
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands);
 void deal_board(Deck& deck, std::array<uint8_t, 5>& board);
 }

@@ -434,10 +434,11 @@ std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& h
   return winners;
 }
 
-int showdown_payoff(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const omp::HandEvaluator& eval) {
+int showdown_payoff(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
+    const omp::HandEvaluator& eval) {
   if(state.get_players()[i].has_folded()) return 0;
   std::vector<uint8_t> win_idxs = winners(state, hands, board, eval);
-  return std::ranges::find(win_idxs, i) != win_idxs.end() ? state.get_pot() / win_idxs.size() : 0;
+  return std::ranges::find(win_idxs, i) != win_idxs.end() ? rake.payoff(state) / win_idxs.size() : 0;
 }
 
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands) {

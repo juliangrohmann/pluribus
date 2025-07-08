@@ -25,7 +25,7 @@ namespace pluribus {
 static constexpr int PRUNE_CUTOFF = -300'000'000;
 static constexpr int REGRET_FLOOR = -310'000'000;
 
-int utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size,
+int utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size, const RakeStructure& rake,
     const omp::HandEvaluator& eval) {
   if(state.get_players()[i].has_folded()) {
     return state.get_players()[i].get_chips() - stack_size;
@@ -34,7 +34,7 @@ int utility(const PokerState& state, const int i, const Board& board, const std:
     return state.get_players()[i].get_chips() - stack_size + (state.get_winner() == i ? state.get_pot() : 0);
   }
   if(state.get_round() >= 4) {
-    return state.get_players()[i].get_chips() - stack_size + showdown_payoff(state, i, board, hands, eval);
+    return state.get_players()[i].get_chips() - stack_size + showdown_payoff(state, i, board, hands, rake, eval);
   }
   Logger::error("Non-terminal state does not have utility.");
 }
@@ -545,7 +545,7 @@ int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const in
   while(!state.is_terminal() && !state.get_players()[i].has_folded()) {
     curr_state = curr_state.apply(_action_provider.next_action(indexers[state.get_active()], state, hands, board, _bp.get()));
   }
-  return utility(curr_state, i, board, hands, stack_size, eval);
+  return utility(curr_state, i, board, hands, stack_size, this->get_config().rake, eval);
 }
 
 template <template<typename> class StorageT>

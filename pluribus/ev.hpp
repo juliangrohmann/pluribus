@@ -38,7 +38,7 @@ public:
 private:
   bool _should_terminate(long t, double std_err, Duration dt) const;
   
-  template <class BlueprintT>
+  template <typename BlueprintT>
   ResultEV _monte_carlo_ev(const PokerState& init_state, const int i, const std::vector<PokerRange>& ranges,
     const std::vector<uint8_t>& init_board, const int stack_size, const ActionProvider<BlueprintT>& action_provider, const BlueprintT* bp) {
     _validate_ev_inputs(init_state, i, ranges, init_board);
@@ -57,7 +57,7 @@ private:
       while(!state.is_terminal() && !state.get_players()[i].has_folded()) {
         state = state.apply(action_provider.next_action(indexers[state.get_active()], state, sample.hands, board, bp));
       }
-      const int u = utility(state, i, board, sample.hands, stack_size, eval);
+      const int u = utility(state, i, board, sample.hands, stack_size, bp->get_config().rake, eval);
       update_stats(u, sample.weight, mean, w_sum, w_sum2, S);
       std_err = pow(S / (pow(w_sum, 2) - w_sum2), 0.5);
       if(_verbose && t > 0 && t % 100'000 == 0) {

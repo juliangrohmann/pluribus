@@ -76,7 +76,7 @@ void _validate_ev_inputs(const PokerState& state, const int i, const std::vector
 double node_ev(const LosslessBlueprint& bp, const PokerState& state, const int i, const std::vector<Hand>& hands, const Board& board,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) {
   if(state.is_terminal()) {
-    const int hu = utility(state, i, Board{board}, hands, bp.get_config().poker.n_chips, eval);
+    const int hu = utility(state, i, Board{board}, hands, bp.get_config().poker.n_chips, bp.get_config().rake, eval);
     return hu;
   }
   const auto& strat = bp.get_strategy();

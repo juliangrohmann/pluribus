@@ -19,7 +19,8 @@
 
 namespace pluribus {
 
-int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, const omp::HandEvaluator& eval);
+int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, const RakeStructure& rake,
+    const omp::HandEvaluator& eval);
 
 enum class SolverState {
   UNDEFINED, INTERRUPT, SOLVING, SOLVED
@@ -83,7 +84,7 @@ protected:
   void _solve(long t_plus) override;
   
   virtual int terminal_utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size,
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const { return utility(state, i, board, hands, stack_size, eval); }
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const { return utility(state, i, board, hands, stack_size, get_config().rake, eval); }
   virtual bool is_terminal(const PokerState& state, const int i) const { return state.is_terminal() || state.get_players()[i].has_folded(); }
   virtual std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const { return valid_actions(state, profile); }
   virtual void on_start() {}
