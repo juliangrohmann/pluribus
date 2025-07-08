@@ -44,6 +44,15 @@ double PokerRange::n_combos() const {
   return std::reduce(_weights.begin(), _weights.end());
 }
 
+std::string PokerRange::to_string() const {
+  std::ostringstream oss;
+  for(int i = 0; i < MAX_COMBOS; ++i) {
+    Hand hand = HoleCardIndexer::get_instance()->hand(i);
+    oss << hand.to_string() << ": " << frequency(hand) << "\n";
+  }
+  return oss.str();
+}
+
 void PokerRange::normalize() {
   const double sum = n_combos();
   for(auto& w : _weights) w /= sum;
@@ -52,6 +61,7 @@ void PokerRange::normalize() {
 void PokerRange::make_relative() {
   double max_w = 0.0;
   for(const auto& w : _weights) max_w = std::max(w, max_w);
+  std::cout << std::fixed << std::setprecision(8) << max_w << "\n";
   for(auto& w : _weights) w /= max_w;
 }
 

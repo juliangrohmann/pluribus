@@ -55,6 +55,7 @@ public:
   PokerRange bayesian_update(const PokerRange& prior_range, const PokerRange& action_range) const;
   std::vector<Hand> hands() const;
   double n_combos() const;
+  std::string to_string() const;
 
   PokerRange& operator+=(const PokerRange& other);
   PokerRange& operator*=(const PokerRange& other);
@@ -69,6 +70,7 @@ public:
 
   static PokerRange full() { return PokerRange{1.0f}; }
   static PokerRange random();
+
 private:
   std::vector<double> _weights;
 };

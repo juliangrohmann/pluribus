@@ -96,6 +96,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
   bool full_ranges = are_full_ranges(get_config().init_ranges);
   Logger::log("Full ranges: " + std::string{full_ranges ? "true" : "false"});
   Logger::log("Training blueprint from " + std::to_string(_t) + " to " + std::to_string(T));
+  omp_set_num_threads(1);
   std::ostringstream buf;
   while(_t < T) {
     long init_t = _t;
@@ -120,6 +121,10 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         if(_log_level == SolverLogLevel::DEBUG) debug << "============== i = " << i << " ==============\n";
         std::vector<CachedIndexer> indexers(get_config().poker.n_players);
         RoundSample sample = sampler.sample();
+        // for(const auto& hand : sample.hands) {
+        //   std::cout << hand.to_string() << "  ";
+        // }
+        // std::cout << "\n";
         board = sample_board(get_config().init_board, sample.mask);
         for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
           indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes

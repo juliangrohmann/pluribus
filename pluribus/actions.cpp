@@ -70,7 +70,7 @@ void grow_to_size(std::vector<T>& vec, int size) {
 void ActionProfile::grow_to_fit(const int round, const int bet_level, const int pos, const bool in_position) {
   grow_to_size(_profile[round], bet_level + 1);
   grow_to_size(_profile[round][bet_level], pos + 1);
-  grow_to_size(_profile[round][bet_level][pos], in_position + 1);
+  grow_to_size(_profile[round][bet_level][pos], static_cast<int>(in_position) + 1);
 }
 
 float sort_key(const Action a) {

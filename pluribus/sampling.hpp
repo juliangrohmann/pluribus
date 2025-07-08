@@ -32,13 +32,15 @@ private:
 
 class MarginalRejectionSampler : public SamplingAlgorithm {
 public:
-  explicit MarginalRejectionSampler(const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& dead_cards = {});
+  explicit MarginalRejectionSampler(const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& dead_cards = {},
+      const std::vector<PokerRange>& dead_ranges = {});
 
   RoundSample sample() override;
 
 private:
   std::vector<GSLDiscreteDist> _hand_dists;
   int _hand_idxs[MAX_PLAYERS]{};
+  int _n_players;
 };
 
 class ImportanceSampler : public SamplingAlgorithm {

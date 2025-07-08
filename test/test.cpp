@@ -237,6 +237,7 @@ TEST_CASE("Action profile", "[profile]") {
   ActionProfile profile;
   const std::vector iso = {Action::FOLD, Action{2.00f}, Action::ALL_IN};
   const std::vector sb = {Action::FOLD, Action{0.50f}, Action{0.80f}, Action::ALL_IN};
+  const std::vector lowjack = {Action::FOLD, Action{0.22f}, Action{0.33f}, Action::ALL_IN};
   const std::vector cutoff_oop = {Action::FOLD, Action{0.60f}, Action::ALL_IN};
   const std::vector cutoff_ip = {Action::FOLD, Action{0.25f}, Action{1.20f}, Action{1.40f}, Action::ALL_IN};
   const std::vector bb_oop = {Action::FOLD, Action{0.65f}, Action{0.90f}, Action::ALL_IN};
@@ -245,10 +246,12 @@ TEST_CASE("Action profile", "[profile]") {
   profile.set_actions(sb, 0, 0, 0);
   profile.set_actions(bb_oop, 0, 0, 1);
   profile.set_actions(bb_ip, 0, 0, 1, true);
+  profile.set_actions(lowjack, 0, 0, 2);
   profile.set_actions(cutoff_oop, 0, 0, 4);
   profile.set_actions(cutoff_ip, 0, 0, 4, true);
+
   const PokerState state{6, 10'000, 0}; // pos == 2
-  REQUIRE(profile.get_actions(state) == bb_ip); // skipped position fill-in
+  REQUIRE(profile.get_actions(state) == lowjack);
 
   const PokerState limp_state = state.apply(Action::CHECK_CALL);
   REQUIRE(profile.get_actions(limp_state) == iso);
@@ -405,7 +408,7 @@ TEST_CASE("Round sampler", "[sampling][slow]") {
   RoundSampler sampler{ranges, dead_cards};
   auto sample_fun = [&sampler](auto& dist) {  
     auto sample = sampler.sample();
-    dist[sample.hands[0]] += sample.weight;
+    dist.add_hand(sample.hands[0], sample.weight);
   };
   sampler.set_mode(SamplingMode::MARGINAL_REJECTION);
   auto marginal_rejection_1 = build_distribution(n_samples, sample_fun, false);
@@ -470,7 +473,7 @@ TEST_CASE("Serialize ActionHistory", "[serialize]") {
 }
 
 TEST_CASE("Serialize StrategyStorage, BlueprintSolver", "[serialize][blueprint][slow]") {
-  MappedBlueprintSolver trainer{};
+  MappedBlueprintSolver trainer{SolverConfig{PokerConfig{2, 10'000, 0, false}, HeadsUpBlueprintProfile{10'000}}};
   trainer.solve(100'000);
 
   REQUIRE(test_serialization(trainer.get_strategy()));
@@ -478,7 +481,7 @@ TEST_CASE("Serialize StrategyStorage, BlueprintSolver", "[serialize][blueprint][
 }
 
 TEST_CASE("Serialize TreeBlueprintSolver", "[serialize][blueprint][slow][inconsistent]") {
-  TreeBlueprintSolver trainer{};
+  TreeBlueprintSolver trainer{SolverConfig{PokerConfig{2, 10'000, 0, false}, HeadsUpBlueprintProfile{10'000}}};
   trainer.solve(1'000'000);
   
   REQUIRE(test_serialization(trainer));

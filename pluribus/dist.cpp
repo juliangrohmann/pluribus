@@ -2,11 +2,13 @@
 #include <pluribus/range.hpp>
 #include <pluribus/dist.hpp>
 
+#include "range_viewer.hpp"
+
 namespace pluribus {
 
-std::unordered_map<Hand, double> build_distribution(const long n, const std::function<void(std::unordered_map<Hand, double>&)>& sampler,
+PokerRange build_distribution(const long n, const std::function<void(PokerRange&)>& sampler,
     const bool verbose) {
-  std::unordered_map<Hand, double> dist;
+  PokerRange dist;
   const long log_interval = n / 10;
   for(long i = 0; i < n; ++i) {
     if(verbose && i % log_interval == 0) {
@@ -14,30 +16,27 @@ std::unordered_map<Hand, double> build_distribution(const long n, const std::fun
     }
     sampler(dist);
   }
-  double sum = 0.0;
-  for(const auto& val: dist | std::views::values) sum += val;
-  for(auto& val : dist | std::views::values) val /= sum;
+  dist.normalize();
   return dist;
 }
 
-void print_distribution(const std::unordered_map<Hand, double>& dist) {
-  for(int i = 0; i < MAX_COMBOS; ++i) {
-    Hand hand = HoleCardIndexer::get_instance()->hand(i);
-    if(auto it = dist.find(hand); it != dist.end()) {
-      std::cout << hand.to_string() << ": " << it->second * 100.0 << "%\n";
-    }
-  }
+void distribution_to_png(const PokerRange& dist, const std::string& fn) {
+  PokerRange range = dist;
+  range.make_relative();
+  std::cout << range.to_string() << "\n";
+  auto renderer = PngRangeViewer(fn);
+  renderer.render({RenderableRange{range, "Hand Distribution", Color::RED, false}});
 }
 
-double distribution_rmse(const std::unordered_map<Hand, double>& dist_1, const std::unordered_map<Hand, double>& dist_2) {
+double distribution_rmse(const PokerRange& dist_1, const PokerRange& dist_2) {
+  auto norm_dist_1 = dist_1;
+  auto norm_dist_2 = dist_2;
+  norm_dist_1.normalize();
+  norm_dist_2.normalize();
   double rmse = 0.0;
   for(int i = 0; i < MAX_COMBOS; ++i) {
     Hand hand = HoleCardIndexer::get_instance()->hand(i);
-    auto it_1 = dist_1.find(hand);
-    auto it_2 = dist_2.find(hand);
-    const auto p_1 = it_1 != dist_1.end() ? it_1->second : 0.0;
-    const auto p_2 = it_2 != dist_2.end() ? it_2->second : 0.0;
-    rmse += pow(p_1 - p_2, 2);
+    rmse += pow(norm_dist_1.frequency(hand) - norm_dist_2.frequency(hand), 2);
   }
   return pow(rmse, 0.5);
 }

@@ -8,12 +8,11 @@ SamplingAlgorithm::SamplingAlgorithm(const uint64_t init_mask) : _init_mask{init
 
 SamplingAlgorithm::SamplingAlgorithm(const std::vector<uint8_t>& dead_cards) : _init_mask{card_mask(dead_cards)} {}
 
-MarginalRejectionSampler::MarginalRejectionSampler(const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& dead_cards) 
-    : SamplingAlgorithm{dead_cards} {
+MarginalRejectionSampler::MarginalRejectionSampler(const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& dead_cards,
+    const std::vector<PokerRange>& dead_ranges) : SamplingAlgorithm{dead_cards}, _n_players{static_cast<int>(ranges.size())} {
   _hand_dists.reserve(ranges.size());
-  for(const auto& r : ranges) {
-    _hand_dists.emplace_back(r.weights());
-  }
+  for(const auto& r : ranges) _hand_dists.emplace_back(r.weights());
+  for(const auto& r : dead_ranges) _hand_dists.emplace_back(r.weights());
 }
 
 RoundSample sample_rejection(const int n_players, const uint64_t mask, int* indexes, const std::function<int(int)>& idx_sampler,
@@ -37,8 +36,10 @@ RoundSample sample_rejection(const int n_players, const uint64_t mask, int* inde
 }
 
 RoundSample MarginalRejectionSampler::sample() {
-  return sample_rejection(_hand_dists.size(), init_mask(), _hand_idxs, [this](const int i) { return this->_hand_dists[i].sample(); },
+  RoundSample sample = sample_rejection(_hand_dists.size(), init_mask(), _hand_idxs, [this](const int i) { return this->_hand_dists[i].sample(); },
       [](int, const int h_idx) { return HoleCardIndexer::get_instance()->hand(h_idx); });
+  sample.hands.resize(_n_players);
+  return sample;
 }
 
 ImportanceSampler::ImportanceSampler(const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& dead_cards) 

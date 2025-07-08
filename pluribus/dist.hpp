@@ -5,10 +5,9 @@
 
 namespace pluribus {
 
-std::unordered_map<Hand, double> build_distribution(long n, const std::function<void(std::unordered_map<Hand, double>&)> &sampler, 
-    bool verbose = true);
-double distribution_rmse(const std::unordered_map<Hand, double>& dist_1, const std::unordered_map<Hand, double>& dist_2);
-void print_distribution(const std::unordered_map<Hand, double>& dist);
+PokerRange build_distribution(long n, const std::function<void(PokerRange&)> &sampler, bool verbose = true);
+void distribution_to_png(const PokerRange& dist, const std::string& fn);
+double distribution_rmse(const PokerRange& dist_1, const PokerRange& dist_2);
 
 }
 
