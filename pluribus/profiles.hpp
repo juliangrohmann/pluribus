@@ -29,4 +29,9 @@ public:
   explicit WPTGoldRingSimpleProfile(int n_players);
 };
 
+class WPTGoldRingPreflopProfile : public ActionProfile {
+public:
+  explicit WPTGoldRingPreflopProfile(int n_players);
+};
+
 }
