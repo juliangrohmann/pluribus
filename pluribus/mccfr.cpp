@@ -363,11 +363,12 @@ std::string MCCFRSolver<StorageT>::track_wandb_metrics(const long t) const {
   return metrics.dump();
 }
 
-bool should_track_strategy(const PokerState& state, const PokerState& init_state, const MetricsConfig& metrics_config) {
+bool should_track_strategy(const PokerState& state, const SolverConfig& solver_config, const MetricsConfig& metrics_config) {
   return state.active_players() > 1 &&
-      state.get_round() == init_state.get_round() &&
+      state.get_round() == solver_config.init_state.get_round() &&
       (state.get_round() > 0 || state.vpip_players() - (state.has_player_vpip(state.get_active()) ? 1 : 0) <= metrics_config.max_vpip) &&
       state.get_bet_level() <= metrics_config.max_bet_level &&
+      !should_restrict(state.get_action_history().get_history(), solver_config.restrict_players) &&
       metrics_config.should_track(state);
 }
 
@@ -390,7 +391,7 @@ std::string strategy_label(const PokerState& state, const PokerState& init_state
 template <template<typename> class StorageT>
 void MCCFRSolver<StorageT>::track_strategy_by_decision(const PokerState& state, const std::vector<PokerRange>& ranges, 
     const DecisionAlgorithm& decision, const MetricsConfig& metrics_config, const bool phi, nlohmann::json& metrics) const {
-  if(!should_track_strategy(state, get_config().init_state, metrics_config)) return;
+  if(!should_track_strategy(state, get_config(), metrics_config)) return;
   PokerRange base_range = ranges[state.get_active()];
   base_range.remove_cards(get_config().init_board);
   for(Action a : available_actions(state, get_config().action_profile)) {
