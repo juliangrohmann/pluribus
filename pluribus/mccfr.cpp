@@ -295,6 +295,9 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t,
     if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, get_config().init_state, hands, debug);
     return u;
   }
+  if(i > get_config().restrict_players - 1 && should_restrict(state.get_action_history().get_history(), get_config().restrict_players)) {
+    return 0;
+  }
   if(state.get_active() == i) {
     auto actions = regret_node_actions(regret_storage, state, get_config().action_profile);
     const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
