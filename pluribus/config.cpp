@@ -24,6 +24,7 @@ std::string SolverConfig::to_string() const {
       << ranges_to_config_str(init_ranges) << "\n"
       << "Dead ranges:\n"
       << ranges_to_config_str(dead_ranges) << "\n"
+      << "Restrict players: " << restrict_players << "\n"
       << "Action profile:\n" << action_profile.to_string()
       << "----------------------------------------------------------\n";
   return oss.str();
