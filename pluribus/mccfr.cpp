@@ -225,6 +225,14 @@ void log_external_sampling(const Action sampled, const std::vector<Action>& acti
   debug << "\tSampled: " << sampled.to_string() << "\n";
 }
 
+bool should_restrict(const std::vector<Action>& actions, int restrict_players) {
+  if(actions.size() < restrict_players) return false;
+  for(int i = 0; i < restrict_players; ++i) {
+    if(actions[i] != Action::FOLD) return false;
+  }
+  return true;
+}
+
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long t, const int i, const Board& board, const std::vector<Hand>& hands,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug) {
@@ -232,6 +240,9 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
     const int u = terminal_utility(state, i, board, hands, get_config().poker.n_chips, indexers, eval);
     if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, get_config().init_state, hands, debug);
     return u;
+  }
+  if(i > get_config().restrict_players - 1 && should_restrict(state.get_action_history().get_history(), get_config().restrict_players)) {
+    return 0;
   }
   if(state.get_active() == i) {
     auto actions = regret_node_actions(regret_storage, state, get_config().action_profile);

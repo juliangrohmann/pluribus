@@ -16,7 +16,7 @@ struct SolverConfig {
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(poker, rake, action_profile, init_ranges, dead_ranges, init_board, init_state);
+    ar(poker, rake, action_profile, init_ranges, dead_ranges, init_board, init_state, restrict_players);
   }
 
   PokerConfig poker;
@@ -26,6 +26,7 @@ struct SolverConfig {
   std::vector<PokerRange> dead_ranges;
   std::vector<uint8_t> init_board;
   PokerState init_state;
+  int restrict_players;
 };
 
 class ConfigProvider {
