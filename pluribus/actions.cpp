@@ -197,14 +197,14 @@ std::string ActionProfile::to_string() const {
 CombinedActionProfile::CombinedActionProfile(const int hero_pos, const ActionProfile& hero_profile, const ActionProfile& villain_profile, const int max_round)
     : ActionProfile{std::max(hero_profile.n_players(), villain_profile.n_players())} {
   if(hero_profile.n_players() == -1 || villain_profile.n_players() == -1) Logger::error("Combined profile required player amount information.");
-  for(int pos = 0; pos <= n_players(); ++pos) {
+  for(int pos = 0; pos < n_players(); ++pos) {
     set_iso_actions((pos == hero_pos ? hero_profile : villain_profile).get_iso_actions(pos), pos);
   }
   const int max_level = std::max(hero_profile.max_bet_level(), villain_profile.max_bet_level());
   if(max_level == -1) Logger::error("Cannot combine profiles with empty bet levels.");
   for(int round = 0; round < 4; ++round) {
     for(int bet_level = round == 0 ? 1 : 0; bet_level <= max_level; ++bet_level) {
-      for(int pos = 0; pos <= n_players(); ++pos) {
+      for(int pos = 0; pos < n_players(); ++pos) {
         for(int ip = 0; ip <= 1; ++ip) {
           const auto& actions = (pos == hero_pos && round <= max_round ? hero_profile : villain_profile).get_actions_from_raw(round, bet_level, pos, ip);
           set_actions(actions, round, bet_level, pos, ip);
