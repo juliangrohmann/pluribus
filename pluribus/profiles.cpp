@@ -16,12 +16,42 @@ HeadsUpBlueprintProfile::HeadsUpBlueprintProfile(const int stack_size) : ActionP
   set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{2.00f}, Action::ALL_IN}, 0);
 
   // preflop 3-bet
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.333f}, Action{1.667f}, Action{2.00f}}, 0, 2, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.25f}, Action{1.50f}, Action{1.75f}, Action{2.00f}}, 0, 2, 0);
   if(stack_size < 10'000) add_action(Action{0.75f}, 0, 2, 0);
 
   // preflop 4-bet+
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.70f}, Action{0.80f}, Action{0.90f}, Action{1.00f}, Action::ALL_IN}, 0, 3, 0);
   if(stack_size < 10'000) add_action(Action{0.50f}, 0, 3, 0);
+
+  // flop
+  set_actions({Action::CHECK_CALL, Action{0.16f}, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 1, 1, 0);
+
+  // turn
+  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 2, 0, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 2, 1, 0);
+  if(stack_size < 10'000) add_action(Action{0.33f}, 2, 0, 0);
+
+  // river
+  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 3, 0, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 3, 1, 0);
+  if(stack_size < 7'500) add_action(Action{0.33f}, 3, 0, 0);
+}
+
+HeadsUpSimpleProfile::HeadsUpSimpleProfile(const int stack_size) : ActionProfile{2} {
+  // preflop RFI
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.75f}, Action::ALL_IN}, 0, 1, 0);
+  set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 0);
+
+  // preflop 3-bet
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.50f}}, 0, 2, 0);
+
+  // preflop 4-bet+
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action::ALL_IN}, 0, 3, 0);
+  if(stack_size < 10'000) add_action(Action{0.55f}, 0, 3, 0);
+  else if(stack_size < 15'000) add_action(Action{0.70f}, 0, 3, 0);
+  else if(stack_size < 20'000) add_action(Action{0.80f}, 0, 3, 0);
+  else add_action(Action{0.85f}, 0, 3, 0);
 
   // flop
   set_actions({Action::CHECK_CALL, Action{0.16f}, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);

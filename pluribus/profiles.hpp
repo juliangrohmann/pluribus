@@ -14,6 +14,11 @@ public:
   explicit HeadsUpBlueprintProfile(int stack_size);
 };
 
+class HeadsUpSimpleProfile : public ActionProfile {
+public:
+  explicit HeadsUpSimpleProfile(int stack_size);
+};
+
 class RingBlueprintProfile : public ActionProfile {
 public:
   explicit RingBlueprintProfile(int n_players, int stack_size);
