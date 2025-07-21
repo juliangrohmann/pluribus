@@ -458,6 +458,11 @@ void TreeSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out
 // ==========================================================================================
 
 template <template<typename> class StorageT>
+BlueprintSolver<StorageT>::BlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config)
+    : MCCFRSolver<StorageT>{config}, _bp_config{bp_config},
+    _state_actions_provider{[](const PokerState& state, const ActionProfile& profile) { return valid_actions(state, profile); }} {}
+
+template <template<typename> class StorageT>
 bool BlueprintSolver<StorageT>::is_update_terminal(const PokerState& state, const int i) const {
   return state.get_winner() != -1 || state.get_round() > 0 || state.get_players()[i].has_folded();
 }
@@ -524,6 +529,16 @@ long BlueprintSolver<StorageT>::next_step(const long t, const long T) const {
 // ==========================================================================================
 
 template <template<typename> class StorageT>
+RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlueprint>& bp, const RealTimeSolverConfig& rt_config)
+    : _bp{bp}, _rt_config{rt_config},
+    _state_actions_provider{[rt_conf = rt_config](const PokerState& state, const ActionProfile& profile) {
+      if(state.get_round() >= rt_conf.terminal_round || state.get_bet_level() >= rt_conf.terminal_bet_level) {
+        return rt_conf.bias_profile.get_actions(state);
+      }
+      return valid_actions(state, profile);
+    }} {}
+
+template <template<typename> class StorageT>
 int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
   if(state.has_biases() && state.get_active() != state._first_bias) {
@@ -532,17 +547,9 @@ int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const in
   }
   PokerState curr_state = state;
   while(!state.is_terminal() && !state.get_players()[i].has_folded()) {
-    curr_state = curr_state.apply(_action_provider.next_action(indexers[state.get_active()], state, hands, board, _bp.get()));
+    curr_state = curr_state.apply(_rollout_action_provider.next_action(indexers[state.get_active()], state, hands, board, _bp.get()));
   }
   return utility(curr_state, i, board, hands, stack_size, this->get_config().rake, eval);
-}
-
-template <template<typename> class StorageT>
-std::vector<Action> RealTimeSolver<StorageT>::available_actions(const PokerState& state, const ActionProfile& profile) const {
-  if(state.get_round() >= _rt_config.terminal_round || state.get_bet_level() >= _rt_config.terminal_bet_level) {
-    return _rt_config.bias_profile.get_actions(state);
-  }
-  return valid_actions(state, profile);
 }
 
 // ==========================================================================================
@@ -552,7 +559,7 @@ std::vector<Action> RealTimeSolver<StorageT>::available_actions(const PokerState
 const std::shared_ptr<const TreeStorageConfig> TreeBlueprintSolver::make_tree_config() const {
   return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
     [](const PokerState& state) { return state.get_round() == 0 ? 169 : 200; },
-    [this](const PokerState& state) { return available_actions(state, this->get_config().action_profile); }
+    [fn = get_state_actions_provider(), profile = this->get_config().action_profile](const PokerState& state) { return fn(state, profile); }
   });
 }
 

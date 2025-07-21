@@ -33,6 +33,7 @@ public:
         _values{std::make_unique<std::atomic<T>[]>(_actions.size() * _n_clusters)}, 
         _nodes{std::make_unique<std::atomic<TreeStorageNode*>[]>(_actions.size())},
         _locks{std::make_unique<SpinLock[]>(_actions.size())} {
+    std::cout << "Constructed.\n";
     for(int i = 0; i < _actions.size() * _n_clusters; ++i) _values[i].store(T{0}, std::memory_order_relaxed);
     for(int i = 0; i < _actions.size(); ++i) _nodes[i].store(nullptr, std::memory_order_relaxed);
   }

@@ -94,7 +94,7 @@ protected:
   virtual bool should_snapshot(long t, long T) const = 0;
   virtual bool should_log(long t) const = 0;
   virtual long next_step(long t, long T) const = 0;
-  
+
   virtual std::atomic<int>* get_base_regret_ptr(StorageT<int>* storage, const PokerState& state, int cluster) = 0;
   virtual std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, const PokerState& state, int cluster) = 0;
   virtual StorageT<int>* init_regret_storage() = 0;
@@ -148,13 +148,16 @@ public:
   float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const override;
   const TreeStorageNode<int>* get_strategy() const override { return _regrets_root.get(); }
   const SolverConfig& get_config() const override { return Solver::get_config(); }
+  std::shared_ptr<const TreeStorageConfig> get_regrets_tree_config() { return _regrets_tree_config; }
 
   bool operator==(const TreeSolver& other) const { return MCCFRSolver::operator==(other) && *_regrets_root == *other._regrets_root; }
   
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_regrets_root);
-    _regrets_root->set_config(make_tree_config());
+    std::cout << "Serialize: Setting regrets tree config.\n";
+    _regrets_tree_config = make_tree_config();
+    _regrets_root->set_config(_regrets_tree_config);
   }
 
 protected:
@@ -170,18 +173,18 @@ protected:
 
   virtual const std::shared_ptr<const TreeStorageConfig> make_tree_config() const = 0;
 
-  std::shared_ptr<const TreeStorageConfig> get_regrets_tree_config() { return _regrets_tree_config; }
-
 private:
   std::shared_ptr<const TreeStorageConfig> _regrets_tree_config = nullptr;
   std::unique_ptr<TreeStorageNode<int>> _regrets_root = nullptr;
 };
 
+using StateActionsProvider = std::function<std::vector<Action>(const PokerState&, const ActionProfile&)>;
+
 template <template<typename> class StorageT>
 class BlueprintSolver : virtual public MCCFRSolver<StorageT> {
 public:
-  BlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config) : MCCFRSolver<StorageT>{config}, _bp_config{bp_config} {}
-  
+  BlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config);
+
   const BlueprintSolverConfig& get_blueprint_config() const { return _bp_config; }
   void set_avg_metrics_config(const MetricsConfig& metrics_config) { _avg_metrics_config = metrics_config; }
 
@@ -194,6 +197,7 @@ public:
 
 protected:
   virtual bool is_update_terminal(const PokerState& state, int i) const;
+  std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const override { return _state_actions_provider(state, profile); }
 
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
       StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug);
@@ -210,6 +214,7 @@ protected:
   double get_discount_factor(const long t) const override { return _bp_config.get_discount_factor(t); }
 
   MetricsConfig get_avg_metrics_config() const { return _avg_metrics_config; }
+  StateActionsProvider get_state_actions_provider() const { return _state_actions_provider; }
   
   #ifdef UNIT_TEST
   template <template<typename> class T>
@@ -218,21 +223,21 @@ protected:
   #endif
 
 private:
-  BlueprintSolverConfig _bp_config;
+  const StateActionsProvider _state_actions_provider;
   MetricsConfig _avg_metrics_config;
+  BlueprintSolverConfig _bp_config;
 };
 
 template <template<typename> class StorageT>
 class RealTimeSolver : virtual public MCCFRSolver<StorageT> {
 public:
-  RealTimeSolver(const std::shared_ptr<const SampledBlueprint>& bp, const RealTimeSolverConfig& rt_config)
-      : _bp{bp}, _rt_config{rt_config} {}
+  RealTimeSolver(const std::shared_ptr<const SampledBlueprint>& bp, const RealTimeSolverConfig& rt_config);
 
 protected:
   int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const override;
   bool is_terminal(const PokerState& state, const int i) const override { return state.has_biases() || state.is_terminal() || state.get_players()[i].has_folded(); }
-  std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const override;
+  std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const override { return _state_actions_provider(state, profile); }
 
   void on_start() override { Logger::log("Real time solver config:\n" + _rt_config.to_string()); }
   bool should_prune(long t) const override { return false; /* TODO: test pruning */ }
@@ -250,7 +255,8 @@ protected:
 private:
   const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
   const RealTimeSolverConfig _rt_config;
-  const SampledActionProvider _action_provider;
+  const SampledActionProvider _rollout_action_provider;
+  const StateActionsProvider _state_actions_provider;
 };
 
 class TreeBlueprintSolver : virtual public TreeSolver, virtual public BlueprintSolver<TreeStorageNode> {
@@ -265,7 +271,9 @@ public:
   void serialize(Archive& ar) {
     ar(_phi_root, cereal::base_class<TreeSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this), 
         cereal::base_class<Solver>(this));
-    _phi_root->set_config(make_tree_config());
+    std::cout << "Serialize: Setting phi tree config.\n";
+    _phi_tree_config = make_tree_config();
+    _phi_root->set_config(_phi_tree_config);
   }
 
 protected:
