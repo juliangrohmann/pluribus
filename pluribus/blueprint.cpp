@@ -128,6 +128,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
     Logger::log("Storing tree as buffers...");
     tree_to_lossless_buffers(tree_root, free_gb, max_gb, buffer_dir, meta.config.init_state.get_action_history(), buffer, buf_idx, meta.buffer_fns);
   }
+  Logger::log("Successfully built lossless buffers.");
   return meta;
 }
 
@@ -195,6 +196,7 @@ void normalize_tree(TreeStorageNode<float>* node, const PokerState& state) {
 }
 
 void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
+  Logger::log("Building lossless blueprint from meta data...");
   set_config(meta.config);
   assign_freq(new TreeStorageNode<float>{meta.config.init_state, meta.tree_config});
   for(std::string buf_fn : meta.buffer_fns) {
@@ -337,7 +339,7 @@ SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossl
   int buf_idx = 0;
   Logger::log("Storing tree as sampled buffers...");
   tree_to_sampled_buffers(bp.get_strategy(), free_gb, max_gb, buffer_dir, action_to_idx, meta.biases, factor, meta.config.init_state.get_action_history(), buffer, buf_idx, meta.buffer_fns);
-  std::cout << "Buffers built.\n";
+  Logger::log("Successfully built sampled buffers.");
   return meta;
 }
 
@@ -365,6 +367,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   const SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, max_gb, bias_profile, bias_factor);
   const std::filesystem::path buffer_dir = buf_dir;
 
+  Logger::log("Initializing sampled blueprint...");
   assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta.tree_config, meta.biases)));
   for(const auto& buf_fn : meta.buffer_fns) {
     BlueprintBuffer<uint8_t> buf;
