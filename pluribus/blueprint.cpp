@@ -20,13 +20,17 @@
 
 namespace pluribus {
 
-struct LosslessBuffer {
-  std::vector<float> freqs;
-  size_t offset{};
+template<class T>
+struct BlueprintBuffer {
+  std::vector<std::pair<ActionHistory, std::vector<T>>> entries;
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(freqs, offset);
+    ar(entries);
+  }
+
+  void reset() {
+    entries.clear();
   }
 };
 
@@ -34,24 +38,18 @@ bool validate_preflop_fn(const std::string& preflop_fn, const std::vector<std::s
   return std::ranges::any_of(all_fns, [&preflop_fn](const std::string& fn) { return fn == preflop_fn; });
 }
 
-void set_meta_config(LosslessMetadata& meta, const MappedBlueprintSolver& bp) {
+void set_meta_config(LosslessMetadata& meta, const TreeBlueprintSolver& bp) {
   meta.config = bp.get_config();
-  meta.n_clusters = bp.get_strategy().n_clusters();
+  meta.n_clusters = bp.get_strategy()->get_n_clusters();
+  meta.tree_config = bp.get_strategy()->make_config_ptr();
   Logger::log("Initialized blueprint config:");
   Logger::log("n_clusters=" + std::to_string(meta.n_clusters));
   Logger::log("max_actions=" + std::to_string(meta.config.action_profile.max_actions()));
   Logger::log(meta.config.to_string());
 }
 
-void set_meta_strategy_info(LosslessMetadata& meta, const StrategyStorage<int>& regrets) {
-  meta.max_regrets = regrets.data().size();
-  Logger::log("New max regrets: " + std::to_string(meta.max_regrets));
-  meta.history_map = regrets.history_map();
-  Logger::log("New history map size: " + std::to_string(meta.history_map.size()));
-}
-
 template<class T>
-std::vector<size_t> _collect_base_indexes(const StrategyStorage<T>& strategy) {
+std::vector<size_t> _collect_base_indexes(const TreeStorageNode<T>& strategy) {
   std::vector<size_t> base_idxs;
   base_idxs.reserve(strategy.history_map().size());
   for(const auto& entry : strategy.history_map()) {
@@ -62,7 +60,42 @@ std::vector<size_t> _collect_base_indexes(const StrategyStorage<T>& strategy) {
   return base_idxs;
 }
 
-LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, const int max_gb) {
+template<class T>
+void store_if_out_of_memory(const double free_gb, const double max_gb, const std::string& buffer_prefix, BlueprintBuffer<T>& buffer,
+    int& buf_idx, std::vector<std::string>& buffer_fns) {
+  if(get_free_ram() < static_cast<long long>(std::max(4.0, free_gb - max_gb) * pow(1024LL, 3LL))) {
+    Logger::log("Saving buffer " + std::to_string(buf_idx) + "...");
+    const std::string fn = buffer_prefix + std::to_string(buf_idx++) + ".bin";
+    buffer_fns.push_back(fn);
+    cereal_save(buffer, fn);
+    Logger::log("Saved buffer " + std::to_string(buf_idx - 1) + " successfully.");
+    buffer.reset();
+  }
+}
+
+void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const double free_gb, const double max_gb, const std::filesystem::path& buffer_dir,
+    const ActionHistory& history, BlueprintBuffer<float>& buffer, int& buf_idx, std::vector<std::string>& buffer_fns) {
+  std::vector<float> values(node->get_n_values(), 0.0);
+  for(int c = 0; c < node->get_n_clusters(); ++c) {
+    const std::atomic<int>* base_ptr = node->get(c, 0);
+    auto freq = calculate_strategy(base_ptr, node->get_actions().size());
+    for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+      values[node_value_index(node->get_actions().size(), c, a_idx)] = freq[a_idx];
+    }
+  }
+  buffer.entries.push_back({history, values});
+  store_if_out_of_memory(free_gb, max_gb, (buffer_dir / "lossless_buf_").string(), buffer, buf_idx, buffer_fns);
+
+  for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+    if(node->is_allocated(a_idx)) {
+      ActionHistory next_history = history;
+      next_history.push_back(node->get_actions()[a_idx]);
+      tree_to_lossless_buffers(node->apply_index(a_idx), free_gb, max_gb, buffer_dir, next_history, buffer, buf_idx, buffer_fns);
+    }
+  }
+}
+
+LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, const double max_gb) {
   Logger::log("Building lossless buffers...");
   Logger::log("Preflop filename: " + preflop_fn);
   if(!validate_preflop_fn(preflop_fn, all_fns)) Logger::error("Preflop filename not found in all filenames.");
@@ -76,67 +109,24 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
   int buf_idx = 0;
   for(int bp_idx = 0; bp_idx < all_fns.size(); ++bp_idx) {
     Logger::log("Loading blueprint " + std::to_string(bp_idx) + "...");
-    MappedBlueprintSolver bp;
+    TreeBlueprintSolver bp;
     cereal_load(bp, all_fns[bp_idx]);
-    const auto& regrets = bp.get_strategy();
+    const auto& tree_root = bp.get_strategy();
     if(bp_idx == 0) {
       set_meta_config(meta, bp);
     }
-    if(regrets.data().size() > meta.max_regrets) {
-      set_meta_strategy_info(meta, regrets);
-    }
     if(all_fns[bp_idx] == preflop_fn) {
       Logger::log("Found preflop blueprint. Storing phi...");
-      cereal_save(bp.get_phi(), meta.preflop_buf_fn);
+      cereal_save(*bp.get_phi(), meta.preflop_buf_fn);
     }
 
-    std::vector<size_t> base_idxs = _collect_base_indexes(regrets);
-    const size_t free_ram = std::min(get_free_ram(), max_gb * 1000LL * 1000LL * 1000LL);
-    if(static_cast<double>(free_ram) < 8 * pow(1024, 3)) {
-      Logger::error("At least 8G free RAM required to build blueprint. Available (bytes): " + std::to_string(free_ram));
+    const double free_gb = static_cast<double>(get_free_ram()) / pow(1024.0, 3.0);
+    if(std::min(free_gb, max_gb) < 8) {
+      Logger::error("At least 8G free RAM required to build blueprint. Available (G): " + std::to_string(free_gb));
     }
-    const auto buf_sz = static_cast<size_t>((static_cast<double>(free_ram) - 8 * pow(1024, 3)) / sizeof(float));
-    Logger::log("Buffer element cutoff: " + std::to_string(buf_sz));
-
-    size_t bidx_start = 0;
-    size_t bidx_end = 0;
-    while(bidx_start < base_idxs.size() - 1) {
-      for(; bidx_end < base_idxs.size() - 1; ++bidx_end) {
-        if(base_idxs[bidx_end] - base_idxs[bidx_start] > buf_sz) break;
-      }
-      if(bidx_end == bidx_start) Logger::error("Failed to increase bidx_end");
-
-      LosslessBuffer buffer;
-      buffer.offset = base_idxs[bidx_start];
-      buffer.freqs.resize(base_idxs[bidx_end] - base_idxs[bidx_start]);
-
-      Logger::log("Storing buffer: base_idxs[" + std::to_string(bidx_start) + ", " + std::to_string(bidx_end) + "), indeces: [" 
-                + std::to_string(base_idxs[bidx_start]) + ", " + std::to_string(base_idxs[bidx_end]) + ")");
-      #pragma omp parallel for schedule(dynamic)
-      for(size_t curr_idx = bidx_start; curr_idx < bidx_end; ++curr_idx) {
-        if(curr_idx + 1 >= base_idxs.size()) Logger::error("Buffering: Indexing base indeces out of range!");
-        const size_t n_entries = base_idxs[curr_idx + 1] - base_idxs[curr_idx];
-        if(n_entries % meta.n_clusters != 0) Logger::error("Buffering: Indivisible regret section!");
-        const size_t n_actions = n_entries / meta.n_clusters;
-        if(n_actions > meta.config.action_profile.max_actions()) Logger::error("Buffering: Too many actions in storage section:" + 
-            std::to_string(n_actions) + " > " + std::to_string(meta.config.action_profile.max_actions()));
-
-        for(int c = 0; c < meta.n_clusters; ++c) {
-          const size_t base_idx = base_idxs[curr_idx] + c * n_actions;
-          auto freq = calculate_strategy(&regrets[base_idx], n_actions);
-          for(int fidx = 0; fidx < freq.size(); ++fidx) {
-            buffer.freqs[base_idx - base_idxs[bidx_start] + fidx] = freq[fidx];
-          }
-        }
-      }
-      bidx_start = bidx_end;
-
-      Logger::log("Saving buffer " + std::to_string(buf_idx) + "...");
-      std::string fn = (buffer_dir / ("lossless_buf_" + std::to_string(buf_idx++) + ".bin")).string();
-      meta.buffer_fns.push_back(fn);
-      cereal_save(buffer, fn);
-      Logger::log("Saved buffer " + std::to_string(buf_idx - 1) + " successfully.");
-    }
+    BlueprintBuffer<float> buffer;
+    Logger::log("Storing tree as buffers...");
+    tree_to_lossless_buffers(tree_root, free_gb, max_gb, buffer_dir, meta.config.init_state.get_action_history(), buffer, buf_idx, meta.buffer_fns);
   }
   return meta;
 }
@@ -148,10 +138,9 @@ LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std:
   LosslessMetadata meta;
   meta.preflop_buf_fn = preflop_buf_fn;
   meta.buffer_fns = buffer_fns;
-  MappedBlueprintSolver final_bp;
+  TreeBlueprintSolver final_bp;
   cereal_load(final_bp, final_bp_fn);
   set_meta_config(meta, final_bp);
-  set_meta_strategy_info(meta, final_bp.get_strategy());
   return meta;
 }
 
@@ -165,68 +154,78 @@ void LosslessBlueprint::build_cached(const std::string& preflop_buf_fn, const st
   build_from_meta_data(collect_meta_data(preflop_buf_fn, final_bp_fn, buffer_fns));
 }
 
-void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
-  set_config(meta.config);
-  assign_freq(new StrategyStorage<float>{meta.config.action_profile, meta.n_clusters});
-  get_freq()->allocate(meta.max_regrets);
-  for(std::string buf_fn : meta.buffer_fns) {
-    LosslessBuffer buf;
-    cereal_load(buf, buf_fn);
-    Logger::log("Accumulating " + buf_fn + ": [" + std::to_string(buf.offset) + ", " + std::to_string(buf.offset + buf.freqs.size()) + ")");
-    #pragma omp parallel for schedule(static)
-    for(size_t idx = 0; idx < buf.freqs.size(); ++idx) {
-      auto& entry = get_freq()->operator[](buf.offset + idx);
-      entry.fetch_add(buf.freqs[idx]);
+void set_preflop_strategy(TreeStorageNode<float>* node, const TreeStorageNode<float>* preflop_node, const PokerState& state) {
+  if(state.get_round() > 0) return;
+  if(node->get_n_values() != preflop_node->get_n_values()) {
+    Logger::error("Preflop strategy size mismatch. Strategy values=" + std::to_string(node->get_n_values()) +
+      ", Preflop values=" + std::to_string(node->get_n_values()));
+  }
+  if(node->get_actions() != preflop_node->get_actions()) {
+    Logger::error("Preflop actions mismatch. Strategy actions=" + std::to_string(node->get_actions().size()) +
+      ", Preflop actions=" + std::to_string(node->get_actions().size()));
+  }
+  for(int v_idx = 0; v_idx < preflop_node->get_n_values(); ++v_idx) {
+    node->get_by_index(v_idx)->store(preflop_node->get_by_index(v_idx)->load());
+  }
+  for(int a_idx = 0; a_idx < preflop_node->get_actions().size(); ++a_idx) {
+    if(node->is_allocated(a_idx) != preflop_node->is_allocated(a_idx)) {
+      Logger::error("Preflop allocation mismatch for action " + preflop_node->get_actions()[a_idx].to_string() + ".");
+    }
+    if(node->is_allocated(a_idx)) {
+      PokerState next_state = state.apply(preflop_node->get_actions()[a_idx]);
+      set_preflop_strategy(node->apply_index(a_idx, next_state), preflop_node->apply_index(a_idx), next_state);
     }
   }
+}
 
-  Logger::log("Inserting histories...");
-  for(const auto& [history, idx] : meta.history_map) {
-    get_freq()->history_map()[history] = idx;
+void normalize_tree(TreeStorageNode<float>* node, const PokerState& state) {
+  for(int c = 0; c < node->get_n_clusters(); ++c) {
+    std::atomic<float>* base_ptr = node->get(c, 0);
+    auto freq = calculate_strategy(base_ptr, node->get_actions().size());
+    for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+      base_ptr[a_idx].store(freq[a_idx]);
+    }
+  }
+  for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+    if(node->is_allocated(a_idx)) {
+      PokerState next_state = state.apply(node->get_actions()[a_idx]);
+      normalize_tree(node->apply_index(a_idx, next_state), next_state);
+    }
+  }
+}
+
+void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
+  set_config(meta.config);
+  assign_freq(new TreeStorageNode<float>{meta.config.init_state, meta.tree_config});
+  for(std::string buf_fn : meta.buffer_fns) {
+    BlueprintBuffer<float> buf;
+    cereal_load(buf, buf_fn);
+    Logger::log("Accumulating " + buf_fn + ": " + std::to_string(buf.entries.size()) + " nodes");
+    #pragma omp parallel for schedule(static)
+    for(size_t idx = 0; idx < buf.entries.size(); ++idx) {
+      TreeStorageNode<float>* node = get_freq().get();
+      PokerState state = meta.config.init_state;
+      for(const Action a : buf.entries[idx].first.get_history()) {
+        state = state.apply(a);
+        node = node->apply(a, state);
+      }
+      if(node->get_n_values() != buf.entries[idx].second.size()) {
+        Logger::error("Lossless buffer size mismatch. Buffer values=" + std::to_string(buf.entries[idx].second.size()) +
+          ", Tree values=" + std::to_string(node->get_n_values()));
+      }
+      for(int v_idx = 0; v_idx < buf.entries[idx].second.size(); ++v_idx) {
+        node->get_by_index(v_idx)->fetch_add(buf.entries[idx].second[v_idx]);
+      }
+    }
   }
 
   Logger::log("Setting preflop strategy to phi...");
-  StrategyStorage<float> phi;
+  TreeStorageNode<float> phi;
   cereal_load(phi, meta.preflop_buf_fn);
-  for(const auto history: phi.history_map() | std::views::keys) {
-    PokerState state = meta.config.init_state;
-    state = state.apply(history);
-    const int n_actions = valid_actions(state, meta.config.action_profile).size();
-    for(int c = 0; c < phi.n_clusters(); ++c) {
-      const size_t phi_base_idx = phi.index(state, c);
-      const size_t freq_base_idx = get_freq()->index(state, c);
-      for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
-        get_freq()->operator[](freq_base_idx + a_idx).store(phi[phi_base_idx + a_idx].load());
-      }
-    }
-  }
+  set_preflop_strategy(get_freq().get(), &phi, meta.config.init_state);
 
   Logger::log("Normalizing frequencies...");
-  const std::vector<size_t> base_idxs = _collect_base_indexes(*get_freq());
-  for(size_t curr_idx = 0; curr_idx < base_idxs.size() - 1; ++curr_idx) {
-    const size_t n_entries = base_idxs[curr_idx + 1] - base_idxs[curr_idx];
-    if(n_entries % meta.n_clusters != 0) Logger::error("Renorm: Indivisible storage section!");
-    const size_t n_actions = n_entries / meta.n_clusters;
-    if(n_actions > get_config().action_profile.max_actions()) Logger::error("Renorm: Too many actions in storage section!");
-    for(int c = 0; c < meta.n_clusters; ++c) {
-      const size_t base_idx = base_idxs[curr_idx] + c * n_actions;
-      float total = 0.0f;
-      for(size_t aidx = 0; aidx < n_actions; ++aidx) {
-        total += get_freq()->operator[](base_idx + aidx);
-      }
-      if(total > 0) {
-        for(size_t aidx = 0; aidx < n_actions; ++aidx) {
-          auto& entry = get_freq()->operator[](base_idx + aidx);
-          entry.store(entry.load() / total);
-        }
-      }
-      else {
-        for(size_t aidx = 0; aidx < n_actions; ++aidx) {
-          get_freq()->operator[](base_idx + aidx).store(1.0 / n_actions);
-        }
-      }
-    }
-  }
+  normalize_tree(get_freq().get(), meta.config.init_state);
   Logger::log("Lossless blueprint built.");
 }
 
@@ -291,60 +290,53 @@ Action sample_biased(const std::vector<Action>& actions, const std::vector<float
   return actions[dist(GlobalRNG::instance())];
 }
 
-SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, 
-    const ActionProfile& bias_profile, float factor) {
+void tree_to_sampled_buffers(const TreeStorageNode<float>* node, const double free_gb, const double max_gb, const std::filesystem::path& buffer_dir,
+    const std::unordered_map<Action, uint8_t>& action_to_idx, const std::vector<Action>& biases, const float factor, const ActionHistory& history,
+    BlueprintBuffer<uint8_t>& buffer, int& buf_idx, std::vector<std::string>& buffer_fns) {
+  std::vector<uint8_t> sampled(node->get_n_clusters() * biases.size(), 0);
+  for(int c = 0; c < node->get_n_clusters(); ++c) {
+    const std::atomic<float>* base_ptr = node->get(c, 0);
+    auto freq = calculate_strategy(base_ptr, node->get_actions().size());
+    for(int a_idx = 0; a_idx < biases.size(); ++a_idx) {
+      sampled[node_value_index(biases.size(), c, a_idx)] = action_to_idx.at(sample_biased(node->get_actions(), freq, biases[a_idx], factor));
+    }
+  }
+  buffer.entries.push_back({history, sampled});
+  store_if_out_of_memory(free_gb, max_gb, (buffer_dir / "sampled_buf_").string(), buffer, buf_idx, buffer_fns);
+
+  for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+    if(node->is_allocated(a_idx)) {
+      ActionHistory next_history = history;
+      next_history.push_back(node->get_actions()[a_idx]);
+      tree_to_sampled_buffers(node->apply_index(a_idx), free_gb, max_gb, buffer_dir, action_to_idx, biases, factor, next_history, buffer, buf_idx, buffer_fns);
+    }
+  }
+}
+
+SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, const double max_gb,
+    const ActionProfile& bias_profile, const float factor) {
   std::cout << "Building sampled buffers...\n";
   SampledMetadata meta;
-  std::filesystem::path buffer_dir = buf_dir;
+  const std::filesystem::path buffer_dir = buf_dir;
   LosslessBlueprint bp;
   cereal_load(bp, lossless_bp_fn);
   meta.config = bp.get_config();
+  meta.tree_config = bp.get_strategy()->make_config_ptr();
   meta.biases = bias_profile.get_actions(meta.config.init_state);
-  meta.n_clusters = bp.get_strategy().n_clusters();
-  auto action_to_idx = build_compression_map(bp.get_config().action_profile);
+  meta.n_clusters = bp.get_strategy()->get_n_clusters();
+  std::cout << "Clusters=" << meta.n_clusters << ", Biases=" << meta.biases.size() << "\n";
+
+  const auto action_to_idx = build_compression_map(bp.get_config().action_profile);
   _idx_to_action = build_decompression_map(action_to_idx);
 
-  std::cout << "Collecting histories... " << std::flush;
-  meta.histories.reserve(bp.get_strategy().history_map().size());
-  PokerState init_state{meta.config.poker};
-  for(const auto& history: bp.get_strategy().history_map() | std::views::keys) {
-    if(PokerState state = init_state.apply(history); !state.is_terminal()) {
-      meta.histories.push_back(history);
-    }
-    else {
-      Logger::error("Found terminal state.");
-    }
+  const double free_gb = static_cast<double>(get_free_ram()) / pow(1024.0, 3.0);
+  if(std::min(free_gb, max_gb) < 8) {
+    Logger::error("At least 8G free RAM required to build blueprint. Available (G): " + std::to_string(free_gb));
   }
-  std::cout << "Collected " << meta.histories.size() << " (" << meta.n_clusters << " clusters).\n";
-
-  std::cout << "Clusters=" << meta.n_clusters << ", Biases=" << meta.biases.size() << "\n";
-  std::cout << "Building buffers...\n";
-  std::unordered_map<ActionHistory, std::vector<uint8_t>> buffer;
-  long long min_ram = 4 * pow(1024, 3);
+  BlueprintBuffer<uint8_t> buffer;
   int buf_idx = 0;
-  for(size_t hidx = 0; hidx < meta.histories.size(); ++hidx) {
-    std::vector<uint8_t> sampled;
-    sampled.reserve(meta.n_clusters * meta.biases.size());
-    for(int c = 0; c < meta.n_clusters; ++c) {
-      PokerState state = init_state.apply(meta.histories[hidx]);
-      auto actions = valid_actions(state, bp.get_config().action_profile);
-      size_t base_idx = bp.get_strategy().index(state, c);
-      auto freq = calculate_strategy(&bp.get_strategy()[base_idx], actions.size());
-      for(Action bias : meta.biases) {
-        sampled.push_back(action_to_idx[sample_biased(actions, freq, bias, factor)]);
-      }
-    }
-    buffer[meta.histories[hidx]] = sampled;
-
-    if(get_free_ram() < min_ram || hidx == meta.histories.size() - 1) {
-      std::cout << "Buffered " << buffer.size() << " histories.\n";
-      if(buffer.size() == 0) Logger::error("Out of RAM but buffer is empty.");
-      std::string fn = "sampled_buf_" + std::to_string(buf_idx++) + ".bin";
-      meta.buffer_fns.push_back(fn);
-      cereal_save(buffer, (buffer_dir / fn).string());
-      buffer.clear();
-    }
-  }
+  Logger::log("Storing tree as sampled buffers...");
+  tree_to_sampled_buffers(bp.get_strategy(), free_gb, max_gb, buffer_dir, action_to_idx, meta.biases, factor, meta.config.init_state.get_action_history(), buffer, buf_idx, meta.buffer_fns);
   std::cout << "Buffers built.\n";
   return meta;
 }
@@ -359,27 +351,42 @@ std::unordered_map<Action, int> build_bias_offset_map(const PokerState& state, c
   return bias_offset_map;
 }
 
-void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::string& buf_dir, const float bias_factor) {
+std::shared_ptr<const TreeStorageConfig> make_sampled_tree_config(const std::shared_ptr<const TreeStorageConfig>& lossless_tree_config,
+    const std::vector<Action>& biases) {
+  return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
+    [=](const PokerState& state) { return lossless_tree_config->n_clusters_provider(state); },
+    [=](const PokerState&) { return biases; }
+  });
+}
+
+void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::string& buf_dir, const int max_gb, const float bias_factor) {
   Logger::log("Building sampled blueprint...");
   const BiasActionProfile bias_profile;
-  const SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, bias_profile, bias_factor);
+  const SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, max_gb, bias_profile, bias_factor);
   const std::filesystem::path buffer_dir = buf_dir;
-  assign_freq(new StrategyStorage<Action>(bias_profile, meta.n_clusters));
-  for(const auto& fn : meta.buffer_fns) {
-    std::unordered_map<ActionHistory, std::vector<Action>> buffer;
-    cereal_load(buffer, (buffer_dir / fn).string());
-    for(size_t hidx = 0; hidx < meta.histories.size(); ++hidx) {
-      PokerState state{meta.config.poker};
-      state = state.apply(meta.histories[hidx]);
-      const size_t base_idx = get_freq()->index(state, 0);
-      auto sampled = buffer[meta.histories[hidx]];
-      for(int idx = 0; idx < sampled.size(); ++idx) {
-        get_freq()->operator[](base_idx + idx) = sampled[idx];
+
+  assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta.tree_config, meta.biases)));
+  for(const auto& buf_fn : meta.buffer_fns) {
+    BlueprintBuffer<uint8_t> buf;
+    cereal_load(buf, buf_fn);
+    Logger::log("Setting sampled actions from buffer " + buf_fn + ": " + std::to_string(buf.entries.size()) + " nodes");
+    #pragma omp parallel for schedule(static)
+    for(size_t idx = 0; idx < buf.entries.size(); ++idx) {
+      TreeStorageNode<uint8_t>* node = get_freq().get();
+      PokerState state = meta.config.init_state;
+      for(const Action a : buf.entries[idx].first.get_history()) {
+        state = state.apply(a);
+        node = node->apply(a, state);
+      }
+      if(node->get_n_values() != buf.entries[idx].second.size()) {
+        Logger::error("Sampled buffer size mismatch. Buffer values=" + std::to_string(buf.entries[idx].second.size()) +
+          ", Tree values=" + std::to_string(node->get_n_values()));
+      }
+      for(int v_idx = 0; v_idx < buf.entries[idx].second.size(); ++v_idx) {
+        node->get_by_index(v_idx)->store(buf.entries[idx].second[v_idx]);
       }
     }
   }
-  std::cout << "Stored histories: " << get_freq()->history_map().size() << "\n";
-  std::cout << "Data size: " << get_freq()->data().size() << "\n";
   std::cout << "Sampled blueprint built.\n";
   _bias_to_offset = build_bias_offset_map(meta.config.init_state, bias_profile);
 }

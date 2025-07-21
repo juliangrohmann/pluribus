@@ -8,17 +8,16 @@
 #include <pluribus/rng.hpp>
 #include <pluribus/sampling.hpp>
 #include <pluribus/cereal_ext.hpp>
-#include <pluribus/storage.hpp>
 #include <pluribus/config.hpp>
+#include <pluribus/tree_storage.hpp>
 
 namespace pluribus {
 
 struct LosslessMetadata {
   SolverConfig config;
-  tbb::concurrent_unordered_map<ActionHistory, HistoryEntry> history_map;
+  std::shared_ptr<const TreeStorageConfig> tree_config;
   std::vector<std::string> buffer_fns;
   std::string preflop_buf_fn;
-  size_t max_regrets = 0;
   int n_clusters = -1;
 };
 
@@ -27,8 +26,8 @@ class Blueprint : public Strategy<T> {
 public:
   Blueprint() : _freq{nullptr} {}
 
-  const StrategyStorage<T>& get_strategy() const override {
-    if(_freq) return *_freq;
+  const TreeStorageNode<T>* get_strategy() const override {
+    if(_freq) return _freq.get();
     throw std::runtime_error("Blueprint strategy is null.");
   }
   const SolverConfig& get_config() const override { return _config; }
@@ -39,12 +38,12 @@ public:
   }
 
 protected:
-  void assign_freq(StrategyStorage<T>* freq) { _freq = std::unique_ptr<StrategyStorage<T>>{freq}; }
-  std::unique_ptr<StrategyStorage<T>>& get_freq() { return _freq; }
+  void assign_freq(TreeStorageNode<T>* freq) { _freq = std::unique_ptr<TreeStorageNode<T>>{freq}; }
+  std::unique_ptr<TreeStorageNode<T>>& get_freq() { return _freq; }
   void set_config(const SolverConfig& config) { _config = config; }
 
 private:
-  std::unique_ptr<StrategyStorage<T>> _freq;
+  std::unique_ptr<TreeStorageNode<T>> _freq;
   SolverConfig _config;
 };
 
@@ -62,20 +61,21 @@ void _validate_ev_inputs(const PokerState& state, int i, const std::vector<Poker
 
 struct SampledMetadata {
   SolverConfig config;
+  std::shared_ptr<const TreeStorageConfig> tree_config;
   std::vector<std::string> buffer_fns;
-  std::vector<ActionHistory> histories;
   std::vector<Action> biases;
   int n_clusters = -1;
 };
 
-class SampledBlueprint : public Blueprint<Action> {
+class SampledBlueprint : public Blueprint<uint8_t> {
 public:
-  void build(const std::string& lossless_bp_fn, const std::string& buf_dir, float bias_factor = 5.0f);
+  void build(const std::string& lossless_bp_fn, const std::string& buf_dir, int max_gb = 50, float bias_factor = 5.0f);
   Action decompress_action(const uint8_t action_idx) const { return _idx_to_action[action_idx]; }
   int bias_offset(const Action bias) const { return _bias_to_offset.at(bias); }
 
 private:
-  SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, const ActionProfile& bias_profile, float factor);
+  SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, double max_gb,
+    const ActionProfile& bias_profile, float factor);
 
   std::vector<Action> _idx_to_action;
   std::unordered_map<Action, int> _bias_to_offset;

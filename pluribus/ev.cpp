@@ -73,20 +73,18 @@ void _validate_ev_inputs(const PokerState& state, const int i, const std::vector
   if(board.size() > n_board_cards(round)) throw std::runtime_error("Too many board cards!");
 }
 
-double node_ev(const LosslessBlueprint& bp, const PokerState& state, const int i, const std::vector<Hand>& hands, const Board& board,
+double node_ev(const TreeStorageNode<float>* node, const SolverConfig& config, const PokerState& state, const int i, const std::vector<Hand>& hands, const Board& board,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) {
   if(state.is_terminal()) {
-    const int hu = utility(state, i, Board{board}, hands, bp.get_config().poker.n_chips, bp.get_config().rake, eval);
+    const int hu = utility(state, i, Board{board}, hands, config.poker.n_chips, config.rake, eval);
     return hu;
   }
-  const auto& strat = bp.get_strategy();
   const hand_index_t cached_idx = indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round());
   const int cached_cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), cached_idx);
-  const int base_idx = strat.index(state, cached_cluster);
-  const auto actions = valid_actions(state, bp.get_config().action_profile);
+  const auto& actions = node->get_actions();
   double ev = 0.0;
   for(int aidx = 0; aidx < actions.size(); ++aidx) {
-    ev += strat[base_idx + aidx] * node_ev(bp, state.apply(actions[aidx]), i, hands, board, indexers, eval);
+    ev += node->get(cached_cluster, aidx)->load() * node_ev(node->apply_index(aidx), config, state.apply(actions[aidx]), i, hands, board, indexers, eval);
   }
   return ev;
 }
@@ -128,7 +126,7 @@ double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, const 
         std::vector<CachedIndexer> indexers;
         for(int _ = 0; i < hands.size(); ++_) indexers.push_back(CachedIndexer{});
         const double freq = ranges[i].frequency(hh) * ranges[pos_v].frequency(vh);
-        ev += freq * node_ev(bp, state, i, hands, board, indexers, eval);
+        ev += freq * node_ev(bp.get_strategy(), bp.get_config(), state, i, hands, board, indexers, eval);
         total += freq;
       }
     }

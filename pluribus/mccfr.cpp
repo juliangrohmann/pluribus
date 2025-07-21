@@ -407,34 +407,7 @@ void MCCFRSolver<StorageT>::track_strategy_by_decision(const PokerState& state, 
 
 // to allow use of MCCFRSolver::traverse_mccfr friend in benchmark_mccfr.cpp without moving MCCFRSolver::traverse_mccfr to the header mccfr.hpp 
 // (because it's a template and used in a different translation unit)
-template class MCCFRSolver<StrategyStorage>;
-
-// ==========================================================================================
-// || MappedSolver
-// ==========================================================================================
-
-float MappedSolver::frequency(const Action action, const PokerState& state, const Board& board, const Hand& hand) const {
-  const StrategyDecision decision{get_strategy(), get_config().action_profile};
-  return decision.frequency(action, state, board, hand);
-}
-
-std::atomic<int>* MappedSolver::get_base_regret_ptr(StrategyStorage<int>* storage, const PokerState& state, const int cluster) {
-  return &storage->get(state, cluster);
-}
-
-std::vector<Action> MappedSolver::regret_node_actions(StrategyStorage<int>* storage, const PokerState& state, const ActionProfile& profile) const {
-  return available_actions(state, profile);
-}
-
-std::vector<Action> MappedSolver::avg_node_actions(StrategyStorage<float>* storage, const PokerState& state, const ActionProfile& profile) const {
-  return available_actions(state, profile);
-}
-
-void MappedSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
-  const auto init_ranges = get_config().init_ranges;
-  track_strategy_by_decision(get_config().init_state, init_ranges, StrategyDecision{get_strategy(), get_config().action_profile}, 
-      get_regret_metrics_config(), false, metrics);
-}
+template class MCCFRSolver<TreeStorageNode>;
 
 // ==========================================================================================
 // || TreeSolver
@@ -573,85 +546,6 @@ std::vector<Action> RealTimeSolver<StorageT>::available_actions(const PokerState
 }
 
 // ==========================================================================================
-// || MappedBlueprintSolver
-// ==========================================================================================
-
-MappedBlueprintSolver::MappedBlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config) 
-    : MappedSolver{config, 200}, MCCFRSolver{config}, BlueprintSolver{config, bp_config}, _phi{config.action_profile, 169} {}
-
-std::atomic<float>* MappedBlueprintSolver::get_base_avg_ptr(StrategyStorage<float>* storage, const PokerState& state, const int cluster) {
-  return &storage->get(state, cluster);
-}
-
-bool MappedBlueprintSolver::operator==(const MappedBlueprintSolver& other) const {
-  return MappedSolver::operator==(other) && BlueprintSolver::operator==(other) && _phi == other._phi;
-}
-
-void MappedBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
-  MappedSolver::track_strategy(metrics, out_str);
-  const auto init_ranges = get_config().init_ranges;
-  track_strategy_by_decision(get_config().init_state, init_ranges, StrategyDecision{get_phi(), get_config().action_profile}, 
-      get_avg_metrics_config(), true, metrics);
-}
-
-void MappedBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str, const long t) const {
-  long avg_regret = 0;
-  for(auto& r : get_strategy().data()) avg_regret += std::max(r.load(), 0); // should be sum of the maximum regret at each infoset, not sum of all regrets
-  avg_regret /= t;
-  long regret_nodes = get_strategy().history_map().size();
-  long regret_values = get_strategy().data().size();
-  long phi_nodes = get_phi().history_map().size();
-  long phi_values = get_phi().data().size();
-  const double free_ram = static_cast<double>(get_free_ram()) / 1'000'000'000.0;
-  out_str << std::setw(8) << avg_regret << " avg regret   ";
-  out_str << std::setw(12) << regret_nodes << " regret nodes   ";
-  out_str << std::setw(12) << regret_values << " regret values   ";
-  out_str << std::setw(12) << phi_nodes << " avg nodes   ";
-  out_str << std::setw(12) << phi_values << " avg values   ";
-  out_str << std::setw(8) << std::fixed << std::setprecision(2) << free_ram << " GB free ram   ";
-  metrics["avg_regret"] = static_cast<int>(avg_regret);
-  metrics["regret_nodes"] = regret_nodes;
-  metrics["regret_values"] = regret_values;
-  metrics["avg_nodes"] = phi_nodes;
-  metrics["avg_values"] = phi_values;
-  metrics["free_ram"] = free_ram;
-}
-
-
-// ==========================================================================================
-// || MappedRealTimeSolver
-// ==========================================================================================
-
-MappedRealTimeSolver::MappedRealTimeSolver(const std::shared_ptr<const SampledBlueprint>& bp, const RealTimeSolverConfig& rt_config)
-    : MappedSolver{bp->get_config(), MAX_COMBOS}, MCCFRSolver{bp->get_config()}, RealTimeSolver{bp, rt_config} {
-  if(rt_config.terminal_round < 1 || rt_config.terminal_round > 4) 
-    Logger::error("Invalid terminal round: " + std::to_string(rt_config.terminal_round));
-  if(rt_config.terminal_bet_level < 1) Logger::error("Invalid terminal bet level: " + std::to_string(rt_config.terminal_bet_level));
-  if(rt_config.discount_interval < 1) Logger::error("Invalid discount interval: " + std::to_string(rt_config.discount_interval));
-  if(rt_config.log_interval < 1) Logger::error("Invalid log interval: " + std::to_string(rt_config.log_interval));
-}
-
-void MappedRealTimeSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const {
-  long max_regret_sum = 0;
-  for(const auto& [history, entry] : get_strategy().history_map()) {
-    PokerState state{get_config().poker};
-    state = state.apply(history);
-    auto actions = available_actions(state, get_config().action_profile);
-    for(int c = 0; c < get_strategy().n_clusters(); ++c) {
-      int max_regret = 0;
-      const size_t base_idx = entry.idx + c * actions.size();
-      for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-        max_regret = std::max(get_strategy()[base_idx + a_idx].load(), max_regret);
-      }
-      max_regret_sum += max_regret;
-    }
-  }
-  const double avg_max_regrets = max_regret_sum / static_cast<double>(get_iteration());
-  out_str << std::setw(8) << std::fixed << std::setprecision(2) << avg_max_regrets << " avg max regret   ";
-  metrics["avg_regret"] = static_cast<int>(avg_max_regrets);
-}
-
-// ==========================================================================================
 // || TreeBlueprintSolver
 // ==========================================================================================
 
@@ -727,7 +621,7 @@ NodeMetrics collect_node_metrics(const TreeStorageNode<T>* node) {
 }
 
 void TreeBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str, const long t) const {
-  NodeMetrics regret_metrics = collect_node_metrics(get_regrets_root());
+  NodeMetrics regret_metrics = collect_node_metrics(get_strategy());
   NodeMetrics phi_metrics = collect_node_metrics(get_phi_root());
   const long avg_regret = regret_metrics.max_value_sum / t; // should be sum of the maximum regret at each infoset, not sum of all regrets
   const double free_ram = static_cast<double>(get_free_ram()) / 1'000'000'000.0;

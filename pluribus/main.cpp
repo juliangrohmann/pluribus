@@ -8,11 +8,7 @@
 using namespace pluribus;
 
 void traverse_strategy(RangeViewer* viewer_p, const std::string& fn, const std::string& type) {
-  if(type == "--trainer") {
-    Logger::log("Traversing trainer: " + fn);
-    traverse_trainer(viewer_p, fn);
-  }
-  else if(type == "--blueprint"){
+  if(type == "--blueprint"){
     Logger::log("Traversing blueprint: " + fn);
     traverse_blueprint(viewer_p, fn);
   }

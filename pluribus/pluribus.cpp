@@ -7,7 +7,7 @@ namespace pluribus {
 class RealTimeDecision : public DecisionAlgorithm {
 public:
   RealTimeDecision(const LosslessBlueprint& preflop_bp, const std::shared_ptr<const Solver>& solver)
-      : _preflop_decision{StrategyDecision{preflop_bp.get_strategy(), preflop_bp.get_config().action_profile}}, _solver{solver} {}
+      : _preflop_decision{TreeDecision{preflop_bp.get_strategy(), preflop_bp.get_config().init_state}}, _solver{solver} {}
 
   float frequency(const Action a, const PokerState& state, const Board& board, const Hand& hand) const override {
     if(_solver) return _solver->frequency(a, state, board, hand);
@@ -16,7 +16,7 @@ public:
   }
 
 private:
-  const StrategyDecision<float> _preflop_decision;
+  const TreeDecision<float> _preflop_decision;
   const std::shared_ptr<const Solver> _solver;
 };
 
@@ -103,7 +103,7 @@ void Pluribus::_init_solver() {
   RealTimeSolverConfig rt_config;
   rt_config.terminal_round = terminal_round(_root_state);
   rt_config.terminal_bet_level = 999;
-  _solver = std::unique_ptr<Solver>{new MappedRealTimeSolver{_sampled_bp, rt_config}};
+  // _solver = std::unique_ptr<Solver>{new TreeRealTimeSolver{_sampled_bp, rt_config}}; TODO
 }
 
 bool can_solve(const PokerState& root) {

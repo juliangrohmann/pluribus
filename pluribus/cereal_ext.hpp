@@ -40,6 +40,11 @@ void serialize(Archive& ar, std::atomic<T>& atomic) {
   }
 }
 
+template<class Archive, class FirstT, class SecondT>
+void serialize(Archive& ar, std::pair<FirstT, SecondT>& pair) {
+  ar(pair.first, pair.second);
+}
+
 template<class Archive, class T>
 void save(Archive& ar, const tbb::concurrent_vector<T>& vec) {
   size_t size = vec.size();

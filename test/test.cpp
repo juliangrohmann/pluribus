@@ -20,7 +20,6 @@
 #include <pluribus/agent.hpp>
 #include <pluribus/simulate.hpp>
 #include <pluribus/actions.hpp>
-#include <pluribus/storage.hpp>
 #include <pluribus/blueprint.hpp>
 #include <pluribus/traverse.hpp>
 #include <pluribus/sampling.hpp>
@@ -472,15 +471,7 @@ TEST_CASE("Serialize ActionHistory", "[serialize]") {
   REQUIRE(test_serialization(actions));
 }
 
-TEST_CASE("Serialize StrategyStorage, BlueprintSolver", "[serialize][blueprint][slow]") {
-  MappedBlueprintSolver trainer{SolverConfig{PokerConfig{2, 10'000, 0, false}, HeadsUpBlueprintProfile{10'000}}};
-  trainer.solve(100'000);
-
-  REQUIRE(test_serialization(trainer.get_strategy()));
-  REQUIRE(test_serialization(trainer));
-}
-
-TEST_CASE("Serialize TreeBlueprintSolver", "[serialize][blueprint][slow][inconsistent]") {
+TEST_CASE("Serialize TreeBlueprintSolver", "[serialize][blueprint][slow]") {
   TreeBlueprintSolver trainer{SolverConfig{PokerConfig{2, 10'000, 0, false}, HeadsUpBlueprintProfile{10'000}}};
   trainer.solve(1'000'000);
   

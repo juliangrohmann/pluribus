@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include <pluribus/storage.hpp>
+#include <atomic>
 
 namespace pluribus {
 

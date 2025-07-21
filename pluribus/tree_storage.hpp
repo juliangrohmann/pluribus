@@ -5,6 +5,7 @@
 #include <functional>
 #include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/config.hpp>
 #include <pluribus/concurrency.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/logging.hpp>
@@ -20,7 +21,7 @@ inline int _compute_action_index(const Action a, const std::vector<Action>& acti
   return std::distance(actions.begin(), std::ranges::find(actions, a));
 }
 
-inline int _value_index(const int n_actions, const int cluster, const int action_idx) {
+inline int node_value_index(const int n_actions, const int cluster, const int action_idx) {
   return n_actions * cluster + action_idx;
 }
 
@@ -62,21 +63,22 @@ public:
     return next;
   }
 
-  TreeStorageNode* apply(const Action a, const PokerState& next_state) {
-    return apply_index(_compute_action_index(a, _actions), next_state);
+  TreeStorageNode* apply(const Action a, const PokerState& next_state) { return apply_index(_compute_action_index(a, _actions), next_state); }
+  const TreeStorageNode* apply(const Action a) const { return apply_index(_compute_action_index(a, _actions)); }
+
+  const TreeStorageNode* apply(const std::vector<Action>& actions) const {
+    const TreeStorageNode* node = this;
+    for(const Action a : actions) {
+      node = node->apply(a);
+    }
+    return node;
   }
 
-  const TreeStorageNode* apply(const Action a) const {
-    return apply_index(_compute_action_index(a, _actions));
-  }
+  std::atomic<T>* get(const int cluster, const int action_idx = 0) { return &_values[node_value_index(_actions.size(), cluster, action_idx)]; }
+  const std::atomic<T>* get(const int cluster, const int action_idx = 0) const { return &_values[node_value_index(_actions.size(), cluster, action_idx)]; }
 
-  std::atomic<T>* get(const int cluster, const int action_idx = 0) {
-    return &_values[_value_index(_actions.size(), cluster, action_idx)];
-  }
-
-  const std::atomic<T>* get(const int cluster, const int action_idx = 0) const {
-    return &_values[_value_index(_actions.size(), cluster, action_idx)];
-  }
+  const std::atomic<T>* get_by_index(const int index) const { return &_values[index]; }
+  std::atomic<T>* get_by_index(const int index) { return &_values[index]; }
 
   bool is_allocated(int action_idx) const {
     return _nodes[action_idx].load() != nullptr;
@@ -89,6 +91,8 @@ public:
   const std::vector<Action>& get_actions() const { return _actions; }
 
   int get_n_clusters() const { return _n_clusters; }
+  int get_n_values() const { return _n_clusters * get_actions().size(); }
+  std::shared_ptr<const TreeStorageConfig> make_config_ptr() const { return _config; }
 
   void set_config(const std::shared_ptr<const TreeStorageConfig>& config) {
     _config = config;
@@ -135,7 +139,7 @@ public:
     ar(_actions, _n_clusters);
     for(int c = 0; c < _n_clusters; ++c) {
       for(int a = 0; a < _actions.size(); ++a) {
-        ar(_values[_value_index(_actions.size(), c, a)]);
+        ar(_values[node_value_index(_actions.size(), c, a)]);
       }
     }
     for(int a = 0; a < _actions.size(); ++a) {
@@ -159,7 +163,7 @@ public:
       for(int a = 0; a < n; ++a) {
         T val;
         ar(val);
-        _values[_value_index(n, c, a)].store(val);
+        _values[node_value_index(n, c, a)].store(val);
       }
     }
 
@@ -197,6 +201,12 @@ private:
   std::unique_ptr<std::atomic<T>[]> _values;
   std::unique_ptr<std::atomic<TreeStorageNode*>[]> _nodes;
   std::unique_ptr<SpinLock[]> _locks;
+};
+
+template<class T>
+class Strategy : public ConfigProvider {
+public:
+  virtual const TreeStorageNode<T>* get_strategy() const = 0;
 };
 
 }

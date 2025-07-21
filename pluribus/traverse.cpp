@@ -63,20 +63,12 @@ void traverse(RangeViewer* viewer_p, const DecisionAlgorithm& decision, const So
   }
 }
 
-void traverse_trainer(RangeViewer* viewer_p, const std::string& bp_fn) {
-  std::cout << "Loading trainer from " << bp_fn << " for traversal... " << std::flush;
-  MappedBlueprintSolver bp;
-  cereal_load(bp, bp_fn);
-  std::cout << "Success.\n";
-  traverse(viewer_p, StrategyDecision{bp.get_strategy(), bp.get_config().action_profile}, bp.get_config());
-}
-
 void traverse_tree(RangeViewer* viewer_p, const std::string& bp_fn) {
-  std::cout << "Loading trainer from " << bp_fn << " for traversal... " << std::flush;
+  std::cout << "Loading tree blueprint solver from " << bp_fn << " for traversal... " << std::flush;
   TreeBlueprintSolver bp;
   cereal_load(bp, bp_fn);
   std::cout << "Success.\n";
-  traverse(viewer_p, TreeDecision{bp.get_regrets_root(), bp.get_config().init_state}, bp.get_config());
+  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_config());
 }
 
 void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn) {
@@ -84,7 +76,7 @@ void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn) {
   LosslessBlueprint bp;
   cereal_load(bp, bp_fn);
   std::cout << "Success.\n";
-  traverse(viewer_p, StrategyDecision{bp.get_strategy(), bp.get_config().action_profile}, bp.get_config());
+  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_config());
 }
 
 Action str_to_action(const std::string& str) {
@@ -119,7 +111,7 @@ void update_ranges(std::vector<PokerRange>& ranges, const Action a, const PokerS
 std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const Board& board, const Strategy<float>& strat) {
   PokerState curr_state = strat.get_config().init_state;
   std::vector<PokerRange> ranges = strat.get_config().init_ranges;
-  const StrategyDecision decision{strat.get_strategy(), strat.get_config().action_profile};
+  const TreeDecision decision{strat.get_strategy(), strat.get_config().init_state};
   for(int aidx = 0; aidx < actions.size(); ++aidx) {
     update_ranges(ranges, actions[aidx], curr_state, board, decision);
     if(aidx != actions.size() - 1) {
