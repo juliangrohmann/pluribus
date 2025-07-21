@@ -60,17 +60,18 @@ std::vector<size_t> _collect_base_indexes(const TreeStorageNode<T>& strategy) {
   return base_idxs;
 }
 
+bool is_out_of_memory(const double free_gb, const double max_gb) {
+  return get_free_ram() < static_cast<long long>(std::max(4.0, free_gb - max_gb) * pow(1024LL, 3LL));
+}
+
 template<class T>
-void store_if_out_of_memory(const double free_gb, const double max_gb, const std::string& buffer_prefix, BlueprintBuffer<T>& buffer,
-    int& buf_idx, std::vector<std::string>& buffer_fns) {
-  if(get_free_ram() < static_cast<long long>(std::max(4.0, free_gb - max_gb) * pow(1024LL, 3LL))) {
-    Logger::log("Saving buffer " + std::to_string(buf_idx) + "...");
-    const std::string fn = buffer_prefix + std::to_string(buf_idx++) + ".bin";
-    buffer_fns.push_back(fn);
-    cereal_save(buffer, fn);
-    Logger::log("Saved buffer " + std::to_string(buf_idx - 1) + " successfully.");
-    buffer.reset();
-  }
+void serialize_buffer(const std::string& buffer_prefix, BlueprintBuffer<T>& buffer, int& buf_idx, std::vector<std::string>& buffer_fns) {
+  Logger::log("Saving buffer " + std::to_string(buf_idx) + "...");
+  const std::string fn = buffer_prefix + std::to_string(buf_idx++) + ".bin";
+  buffer_fns.push_back(fn);
+  cereal_save(buffer, fn);
+  Logger::log("Saved buffer " + std::to_string(buf_idx - 1) + " successfully.");
+  buffer.reset();
 }
 
 void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const double free_gb, const double max_gb, const std::filesystem::path& buffer_dir,
@@ -84,7 +85,9 @@ void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const double fre
     }
   }
   buffer.entries.push_back({history, values});
-  store_if_out_of_memory(free_gb, max_gb, (buffer_dir / "lossless_buf_").string(), buffer, buf_idx, buffer_fns);
+  if(is_out_of_memory(free_gb, max_gb)) {
+    serialize_buffer((buffer_dir / "lossless_buf_").string(), buffer, buf_idx, buffer_fns);
+  }
 
   for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
     if(node->is_allocated(a_idx)) {
@@ -127,6 +130,9 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
     BlueprintBuffer<float> buffer;
     Logger::log("Storing tree as buffers...");
     tree_to_lossless_buffers(tree_root, free_gb, max_gb, buffer_dir, meta.config.init_state.get_action_history(), buffer, buf_idx, meta.buffer_fns);
+    if(!buffer.entries.empty()) {
+      serialize_buffer("lossless_buf_", buffer, buf_idx, meta.buffer_fns);
+    }
   }
   Logger::log("Successfully built lossless buffers.");
   return meta;
@@ -304,7 +310,9 @@ void tree_to_sampled_buffers(const TreeStorageNode<float>* node, const double fr
     }
   }
   buffer.entries.push_back({history, sampled});
-  store_if_out_of_memory(free_gb, max_gb, (buffer_dir / "sampled_buf_").string(), buffer, buf_idx, buffer_fns);
+  if(is_out_of_memory(free_gb, max_gb)) {
+    serialize_buffer((buffer_dir / "sampled_buf_").string(), buffer, buf_idx, buffer_fns);
+  }
 
   for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
     if(node->is_allocated(a_idx)) {
@@ -339,6 +347,9 @@ SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossl
   int buf_idx = 0;
   Logger::log("Storing tree as sampled buffers...");
   tree_to_sampled_buffers(bp.get_strategy(), free_gb, max_gb, buffer_dir, action_to_idx, meta.biases, factor, meta.config.init_state.get_action_history(), buffer, buf_idx, meta.buffer_fns);
+  if(!buffer.entries.empty()) {
+    serialize_buffer("sampled_buf_", buffer, buf_idx, meta.buffer_fns);
+  }
   Logger::log("Successfully built sampled buffers.");
   return meta;
 }
