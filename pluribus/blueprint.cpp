@@ -396,6 +396,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
       TreeStorageNode<uint8_t>* node = get_freq().get();
       PokerState state = meta.config.init_state;
       Logger::log("DEBUG: Applying history...");
+      Logger::log(buf.entries[idx].first.to_string());
       for(const Action a : buf.entries[idx].first.get_history()) {
         state = state.apply(a);
         node = node->apply(a, state);
