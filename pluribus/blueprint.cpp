@@ -379,7 +379,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   const BiasActionProfile bias_profile;
   SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, max_gb, bias_profile, bias_factor);
   {
-    Logger::log("Loading tree config   from final snapshot...");
+    Logger::log("Loading tree config from final snapshot...");
     TreeBlueprintSolver final_snapshot;
     cereal_load(final_snapshot, final_snapshot_fn);
     meta.tree_config = final_snapshot.get_strategy()->make_config_ptr();
@@ -401,6 +401,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
         node = node->apply(a, state);
       }
       Logger::log("DEBUG: Applied history");
+      std::cout << "node null=" << (node == nullptr) << "\n";
       std::cout << "n_values=" << node->get_n_values() << "\n";
       std::cout << "vec size=" << buf.entries[idx].second.size() << "\n";
       if(node->get_n_values() != buf.entries[idx].second.size()) {
