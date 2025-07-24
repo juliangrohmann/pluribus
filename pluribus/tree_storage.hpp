@@ -14,11 +14,14 @@ namespace pluribus {
 
 struct TreeStorageConfig {
   std::function<int(const PokerState&)> n_clusters_provider;
-  std::function<std::vector<Action>(const PokerState&)> action_provider;
+  std::function<std::vector<Action>(const PokerState&)> branching_actions;
+  int value_actions = -1;
 };
 
 inline int _compute_action_index(const Action a, const std::vector<Action>& actions) {
-  return std::distance(actions.begin(), std::ranges::find(actions, a));
+  const auto it = std::ranges::find(actions, a);
+  if(it == actions.end()) Logger::error("Failed to compute action index for action: " + a.to_string());
+  return std::distance(actions.begin(), it);
 }
 
 inline int node_value_index(const int n_actions, const int cluster, const int action_idx) {
@@ -29,8 +32,8 @@ template <class T>
 class TreeStorageNode {
 public:
   TreeStorageNode(const PokerState& state, const std::shared_ptr<const TreeStorageConfig>& config)
-      : _actions{config->action_provider(state)}, _n_clusters{config->n_clusters_provider(state)}, _config{std::move(config)},
-        _values{std::make_unique<std::atomic<T>[]>(_actions.size() * _n_clusters)}, 
+      : _actions{config->branching_actions(state)}, _n_clusters{config->n_clusters_provider(state)}, _config{std::move(config)},
+        _values{std::make_unique<std::atomic<T>[]>(config->value_actions == -1 ? _actions.size() * _n_clusters : config->value_actions * _n_clusters)},
         _nodes{std::make_unique<std::atomic<TreeStorageNode*>[]>(_actions.size())},
         _locks{std::make_unique<SpinLock[]>(_actions.size())} {
     for(int i = 0; i < _actions.size() * _n_clusters; ++i) _values[i].store(T{0}, std::memory_order_relaxed);
@@ -91,7 +94,7 @@ public:
   const std::vector<Action>& get_actions() const { return _actions; }
 
   int get_n_clusters() const { return _n_clusters; }
-  int get_n_values() const { return _n_clusters * get_actions().size(); }
+  int get_n_values() const { return _config->value_actions == -1 ? _actions.size() * _n_clusters : _config->value_actions * _n_clusters; }
   std::shared_ptr<const TreeStorageConfig> make_config_ptr() const { return _config; }
 
   void set_config(const std::shared_ptr<const TreeStorageConfig>& config) {

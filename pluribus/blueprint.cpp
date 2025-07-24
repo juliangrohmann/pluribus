@@ -365,10 +365,12 @@ std::unordered_map<Action, int> build_bias_offset_map(const PokerState& state, c
   return bias_offset_map;
 }
 
-std::shared_ptr<const TreeStorageConfig> make_sampled_tree_config(const std::vector<Action>& biases) {
+std::shared_ptr<const TreeStorageConfig> make_sampled_tree_config(const std::shared_ptr<const TreeStorageConfig>& lossless_tree_config,
+    const int n_biases) {
   return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
-    [=](const PokerState& state) { return state.get_round() == 0 ? 169 : 200; }, // TODO: use cluster config object
-    [=](const PokerState&) { return biases; }
+    [=](const PokerState& state) { return lossless_tree_config->n_clusters_provider(state); },
+    [=](const PokerState& state) { return lossless_tree_config->branching_actions(state); },
+    n_biases
   });
 }
 
@@ -385,33 +387,23 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   }
 
   Logger::log("Initializing sampled blueprint...");
-  assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta.biases)));
+  assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta.tree_config, meta.biases.size())));
   for(const auto& buf_fn : meta.buffer_fns) {
     BlueprintBuffer<uint8_t> buf;
     cereal_load(buf, buf_fn);
     Logger::log("Setting sampled actions from buffer " + buf_fn + ": " + std::to_string(buf.entries.size()) + " nodes");
-    // #pragma omp parallel for schedule(static)
-    for(size_t idx = 1; idx < buf.entries.size(); ++idx) {
+    #pragma omp parallel for schedule(static)
+    for(size_t idx = 0; idx < buf.entries.size(); ++idx) {
       TreeStorageNode<uint8_t>* node = get_freq().get();
       PokerState state = meta.config.init_state;
-      Logger::log("DEBUG: Applying history...");
-      Logger::log(buf.entries[idx].first.to_string());
       for(const Action a : buf.entries[idx].first.get_history()) {
         state = state.apply(a);
         node = node->apply(a, state);
-        if (!node->make_config_ptr()) Logger::error("node->_config is null after history apply");
       }
-      Logger::log("DEBUG: Applied history");
-      std::cout << "node null=" << (node == nullptr) << "\n";
-      std::cout << "n_actions=" << node->get_actions().size() << "\n";
-      std::cout << "n_clusters=" << node->get_n_clusters() << "\n";
-      std::cout << "n_values=" << node->get_n_values() << "\n";
-      std::cout << "vec size=" << buf.entries[idx].second.size() << "\n";
       if(node->get_n_values() != buf.entries[idx].second.size()) {
         Logger::error("Sampled buffer size mismatch. Buffer values=" + std::to_string(buf.entries[idx].second.size()) +
           ", Tree values=" + std::to_string(node->get_n_values()));
       }
-      Logger::log("DEBUG: Writing values");
       for(int v_idx = 0; v_idx < buf.entries[idx].second.size(); ++v_idx) {
         node->get_by_index(v_idx)->store(buf.entries[idx].second[v_idx]);
       }

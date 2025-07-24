@@ -564,7 +564,8 @@ int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const in
 const std::shared_ptr<const TreeStorageConfig> TreeBlueprintSolver::make_tree_config() const {
   return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
     [](const PokerState& state) { return state.get_round() == 0 ? 169 : 200; },
-    [fn = get_state_actions_provider(), profile = this->get_config().action_profile](const PokerState& state) { return fn(state, profile); }
+    [fn = get_state_actions_provider(), profile = this->get_config().action_profile](const PokerState& state) { return fn(state, profile); },
+    -1
   });
 }
 
