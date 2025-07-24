@@ -400,6 +400,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
         state = state.apply(a);
         node = node->apply(a, state);
       }
+      Logger::log("Here");
       if(node->get_n_values() != buf.entries[idx].second.size()) {
         Logger::error("Sampled buffer size mismatch. Buffer values=" + std::to_string(buf.entries[idx].second.size()) +
           ", Tree values=" + std::to_string(node->get_n_values()));
