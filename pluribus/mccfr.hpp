@@ -155,9 +155,6 @@ public:
   template <class Archive>
   void serialize(Archive& ar) {
     ar(_regrets_root);
-    std::cout << "Serialize: Setting regrets tree config.\n";
-    _regrets_tree_config = make_tree_config();
-    _regrets_root->set_config(_regrets_tree_config);
   }
 
 protected:
@@ -172,6 +169,7 @@ protected:
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
   virtual const std::shared_ptr<const TreeStorageConfig> make_tree_config() const = 0;
+  void set_regrets_tree_config(const std::shared_ptr<const TreeStorageConfig>& regrets_tree_config);
 
 private:
   std::shared_ptr<const TreeStorageConfig> _regrets_tree_config = nullptr;
@@ -271,9 +269,11 @@ public:
   void serialize(Archive& ar) {
     ar(_phi_root, cereal::base_class<TreeSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this), 
         cereal::base_class<Solver>(this));
-    std::cout << "Serialize: Setting phi tree config.\n";
-    _phi_tree_config = make_tree_config();
-    _phi_root->set_config(_phi_tree_config);
+    if(Archive::is_loading::value) {
+      _phi_tree_config = make_tree_config();
+      if(_phi_root) _phi_root->set_config(_phi_tree_config);
+      set_regrets_tree_config(_phi_tree_config);
+    }
   }
 
 protected:

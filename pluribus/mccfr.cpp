@@ -453,6 +453,11 @@ void TreeSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out
       get_regret_metrics_config(), false, metrics);
 }
 
+void TreeSolver::set_regrets_tree_config(const std::shared_ptr<const TreeStorageConfig>& regrets_tree_config) {
+  _regrets_tree_config = regrets_tree_config;
+  if(_regrets_root) _regrets_root->set_config(regrets_tree_config);
+}
+
 // ==========================================================================================
 // || BlueprintSolver
 // ==========================================================================================

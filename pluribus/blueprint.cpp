@@ -131,7 +131,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
     Logger::log("Storing tree as buffers...");
     tree_to_lossless_buffers(tree_root, free_gb, max_gb, buffer_dir, meta.config.init_state.get_action_history(), buffer, buf_idx, meta.buffer_fns);
     if(!buffer.entries.empty()) {
-      serialize_buffer("lossless_buf_", buffer, buf_idx, meta.buffer_fns);
+      serialize_buffer((buffer_dir / "lossless_buf_").string(), buffer, buf_idx, meta.buffer_fns);
     }
   }
   Logger::log("Successfully built lossless buffers.");
@@ -175,11 +175,13 @@ void set_preflop_strategy(TreeStorageNode<float>* node, const TreeStorageNode<fl
     node->get_by_index(v_idx)->store(preflop_node->get_by_index(v_idx)->load());
   }
   for(int a_idx = 0; a_idx < preflop_node->get_actions().size(); ++a_idx) {
+    PokerState next_state = state.apply(preflop_node->get_actions()[a_idx]);
     if(node->is_allocated(a_idx) != preflop_node->is_allocated(a_idx)) {
-      Logger::error("Preflop allocation mismatch for action " + preflop_node->get_actions()[a_idx].to_string() + ".");
+      if(next_state.get_round() == 0) {
+        Logger::error("Preflop allocation mismatch for action " + preflop_node->get_actions()[a_idx].to_string() + ".");
+      }
     }
-    if(node->is_allocated(a_idx)) {
-      PokerState next_state = state.apply(preflop_node->get_actions()[a_idx]);
+    else if(node->is_allocated(a_idx)) {
       set_preflop_strategy(node->apply_index(a_idx, next_state), preflop_node->apply_index(a_idx), next_state);
     }
   }
@@ -204,8 +206,6 @@ void normalize_tree(TreeStorageNode<float>* node, const PokerState& state) {
 void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
   Logger::log("Building lossless blueprint from meta data...");
   set_config(meta.config);
-  Logger::log("Assigning freq...");
-  std::cout << "config null=" << (meta.tree_config == nullptr) << "\n";
   assign_freq(new TreeStorageNode<float>{meta.config.init_state, meta.tree_config});
   for(std::string buf_fn : meta.buffer_fns) {
     BlueprintBuffer<float> buf;
