@@ -365,8 +365,7 @@ std::unordered_map<Action, int> build_bias_offset_map(const PokerState& state, c
   return bias_offset_map;
 }
 
-std::shared_ptr<const TreeStorageConfig> make_sampled_tree_config(const std::shared_ptr<const TreeStorageConfig>& lossless_tree_config,
-    const std::vector<Action>& biases) {
+std::shared_ptr<const TreeStorageConfig> make_sampled_tree_config(const std::vector<Action>& biases) {
   return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
     [=](const PokerState& state) { return state.get_round() == 0 ? 169 : 200; }, // TODO: use cluster config object
     [=](const PokerState&) { return biases; }
@@ -400,6 +399,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
       for(const Action a : buf.entries[idx].first.get_history()) {
         state = state.apply(a);
         node = node->apply(a, state);
+        if (!node->make_config_ptr()) Logger::error("node->_config is null after history apply");
       }
       Logger::log("DEBUG: Applied history");
       std::cout << "node null=" << (node == nullptr) << "\n";
