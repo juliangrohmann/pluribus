@@ -368,7 +368,7 @@ std::unordered_map<Action, int> build_bias_offset_map(const PokerState& state, c
 std::shared_ptr<const TreeStorageConfig> make_sampled_tree_config(const std::shared_ptr<const TreeStorageConfig>& lossless_tree_config,
     const std::vector<Action>& biases) {
   return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
-    [=](const PokerState& state) { return lossless_tree_config->n_clusters_provider(state); },
+    [=](const PokerState& state) { return state.get_round() == 0 ? 169 : 200; }, // TODO: use cluster config object
     [=](const PokerState&) { return biases; }
   });
 }
