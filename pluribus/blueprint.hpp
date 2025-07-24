@@ -64,7 +64,6 @@ struct SampledMetadata {
   std::shared_ptr<const TreeStorageConfig> tree_config;
   std::vector<std::string> buffer_fns;
   std::vector<Action> biases;
-  int n_clusters = -1;
 };
 
 class SampledBlueprint : public Blueprint<uint8_t> {

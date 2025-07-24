@@ -334,8 +334,7 @@ SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossl
   SampledMetadata meta;
   meta.config = bp.get_config();
   meta.biases = bias_profile.get_actions(meta.config.init_state);
-  meta.n_clusters = bp.get_strategy()->get_n_clusters();
-  std::cout << "Clusters=" << meta.n_clusters << ", Biases=" << meta.biases.size() << "\n";
+  Logger::log("Biases=" + std::to_string(meta.biases.size()));
 
   const auto action_to_idx = build_compression_map(bp.get_config().action_profile);
   _idx_to_action = build_decompression_map(action_to_idx);
@@ -392,7 +391,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
     BlueprintBuffer<uint8_t> buf;
     cereal_load(buf, buf_fn);
     Logger::log("Setting sampled actions from buffer " + buf_fn + ": " + std::to_string(buf.entries.size()) + " nodes");
-    #pragma omp parallel for schedule(static)
+    // #pragma omp parallel for schedule(static)
     for(size_t idx = 0; idx < buf.entries.size(); ++idx) {
       TreeStorageNode<uint8_t>* node = get_freq().get();
       PokerState state = meta.config.init_state;

@@ -94,7 +94,7 @@ public:
   const std::vector<Action>& get_actions() const { return _actions; }
 
   int get_n_clusters() const { return _n_clusters; }
-  int get_n_values() const { return _config->value_actions == -1 ? _actions.size() * _n_clusters : _config->value_actions * _n_clusters; }
+  int get_n_values() const { return !_config || _config->value_actions == -1 ? _actions.size() * _n_clusters : _config->value_actions * _n_clusters; }
   std::shared_ptr<const TreeStorageConfig> make_config_ptr() const { return _config; }
 
   void set_config(const std::shared_ptr<const TreeStorageConfig>& config) {
