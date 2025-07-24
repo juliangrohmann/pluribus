@@ -385,7 +385,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   }
 
   Logger::log("Initializing sampled blueprint...");
-  assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta.tree_config, meta.biases)));
+  assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta.biases)));
   for(const auto& buf_fn : meta.buffer_fns) {
     BlueprintBuffer<uint8_t> buf;
     cereal_load(buf, buf_fn);
