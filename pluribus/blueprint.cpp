@@ -327,7 +327,7 @@ void tree_to_sampled_buffers(const TreeStorageNode<float>* node, const double fr
 
 SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, const double max_gb,
     const ActionProfile& bias_profile, const float factor) {
-  Logger::log("Building sampled buffers...\n");
+  Logger::log("Building sampled buffers...");
   const std::filesystem::path buffer_dir = buf_dir;
   LosslessBlueprint bp;
   cereal_load(bp, lossless_bp_fn);
@@ -379,7 +379,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   const BiasActionProfile bias_profile;
   SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, max_gb, bias_profile, bias_factor);
   {
-    Logger::log("Loading tree config from final snapshot...");
+    Logger::log("Loading tree config   from final snapshot...");
     TreeBlueprintSolver final_snapshot;
     cereal_load(final_snapshot, final_snapshot_fn);
     meta.tree_config = final_snapshot.get_strategy()->make_config_ptr();
@@ -395,14 +395,17 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
     for(size_t idx = 0; idx < buf.entries.size(); ++idx) {
       TreeStorageNode<uint8_t>* node = get_freq().get();
       PokerState state = meta.config.init_state;
+      Logger::log("DEBUG: Applying history...");
       for(const Action a : buf.entries[idx].first.get_history()) {
         state = state.apply(a);
         node = node->apply(a, state);
       }
+      Logger::log("DEBUG: Applied history");
       if(node->get_n_values() != buf.entries[idx].second.size()) {
         Logger::error("Sampled buffer size mismatch. Buffer values=" + std::to_string(buf.entries[idx].second.size()) +
           ", Tree values=" + std::to_string(node->get_n_values()));
       }
+      Logger::log("DEBUG: Writing values");
       for(int v_idx = 0; v_idx < buf.entries[idx].second.size(); ++v_idx) {
         node->get_by_index(v_idx)->store(buf.entries[idx].second[v_idx]);
       }
