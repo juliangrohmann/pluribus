@@ -402,8 +402,8 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
       }
       Logger::log("DEBUG: Applied history");
       std::cout << "node null=" << (node == nullptr) << "\n";
-      std::cout << "n_clusters=" << node->get_n_clusters() << "\n";
       std::cout << "n_actions=" << node->get_actions().size() << "\n";
+      std::cout << "n_clusters=" << node->get_n_clusters() << "\n";
       std::cout << "n_values=" << node->get_n_values() << "\n";
       std::cout << "vec size=" << buf.entries[idx].second.size() << "\n";
       if(node->get_n_values() != buf.entries[idx].second.size()) {
