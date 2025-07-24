@@ -395,6 +395,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
     for(size_t idx = 0; idx < buf.entries.size(); ++idx) {
       TreeStorageNode<uint8_t>* node = get_freq().get();
       PokerState state = meta.config.init_state;
+      Logger::log("History: " + state.get_action_history().to_string());
       for(const Action a : buf.entries[idx].first.get_history()) {
         state = state.apply(a);
         node = node->apply(a, state);
@@ -403,6 +404,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
         Logger::error("Sampled buffer size mismatch. Buffer values=" + std::to_string(buf.entries[idx].second.size()) +
           ", Tree values=" + std::to_string(node->get_n_values()));
       }
+      Logger::log("Buffer values=" + std::to_string(buf.entries[idx].second.size()) + ", Tree values=" + std::to_string(node->get_n_values()));
       for(int v_idx = 0; v_idx < buf.entries[idx].second.size(); ++v_idx) {
         node->get_by_index(v_idx)->store(buf.entries[idx].second[v_idx]);
       }
