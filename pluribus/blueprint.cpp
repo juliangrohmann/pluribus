@@ -79,9 +79,9 @@ void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const double fre
   std::vector<float> values(node->get_n_values(), 0.0);
   for(int c = 0; c < node->get_n_clusters(); ++c) {
     const std::atomic<int>* base_ptr = node->get(c, 0);
-    auto freq = calculate_strategy(base_ptr, node->get_actions().size());
-    for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
-      values[node_value_index(node->get_actions().size(), c, a_idx)] = freq[a_idx];
+    auto freq = calculate_strategy(base_ptr, node->get_value_actions().size());
+    for(int a_idx = 0; a_idx < node->get_value_actions().size(); ++a_idx) {
+      values[node_value_index(node->get_value_actions().size(), c, a_idx)] = freq[a_idx];
     }
   }
   buffer.entries.push_back({history, values});
@@ -89,10 +89,10 @@ void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const double fre
     serialize_buffer((buffer_dir / "lossless_buf_").string(), buffer, buf_idx, buffer_fns);
   }
 
-  for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+  for(int a_idx = 0; a_idx < node->get_branching_actions().size(); ++a_idx) {
     if(node->is_allocated(a_idx)) {
       ActionHistory next_history = history;
-      next_history.push_back(node->get_actions()[a_idx]);
+      next_history.push_back(node->get_branching_actions()[a_idx]);
       tree_to_lossless_buffers(node->apply_index(a_idx), free_gb, max_gb, buffer_dir, next_history, buffer, buf_idx, buffer_fns);
     }
   }
@@ -167,18 +167,18 @@ void set_preflop_strategy(TreeStorageNode<float>* node, const TreeStorageNode<fl
     Logger::error("Preflop strategy size mismatch. Strategy values=" + std::to_string(node->get_n_values()) +
       ", Preflop values=" + std::to_string(node->get_n_values()));
   }
-  if(node->get_actions() != preflop_node->get_actions()) {
-    Logger::error("Preflop actions mismatch. Strategy actions=" + std::to_string(node->get_actions().size()) +
-      ", Preflop actions=" + std::to_string(node->get_actions().size()));
+  if(node->get_branching_actions() != preflop_node->get_branching_actions()) {
+    Logger::error("Preflop branching actions mismatch. Strategy actions=" + std::to_string(node->get_branching_actions().size()) +
+      ", Preflop actions=" + std::to_string(node->get_branching_actions().size()));
   }
   for(int v_idx = 0; v_idx < preflop_node->get_n_values(); ++v_idx) {
     node->get_by_index(v_idx)->store(preflop_node->get_by_index(v_idx)->load());
   }
-  for(int a_idx = 0; a_idx < preflop_node->get_actions().size(); ++a_idx) {
-    PokerState next_state = state.apply(preflop_node->get_actions()[a_idx]);
+  for(int a_idx = 0; a_idx < preflop_node->get_branching_actions().size(); ++a_idx) {
+    PokerState next_state = state.apply(preflop_node->get_branching_actions()[a_idx]);
     if(node->is_allocated(a_idx) != preflop_node->is_allocated(a_idx)) {
       if(next_state.get_round() == 0) {
-        Logger::error("Preflop allocation mismatch for action " + preflop_node->get_actions()[a_idx].to_string() + ".");
+        Logger::error("Preflop allocation mismatch for action " + preflop_node->get_branching_actions()[a_idx].to_string() + ".");
       }
     }
     else if(node->is_allocated(a_idx)) {
@@ -190,14 +190,14 @@ void set_preflop_strategy(TreeStorageNode<float>* node, const TreeStorageNode<fl
 void normalize_tree(TreeStorageNode<float>* node, const PokerState& state) {
   for(int c = 0; c < node->get_n_clusters(); ++c) {
     std::atomic<float>* base_ptr = node->get(c, 0);
-    auto freq = calculate_strategy(base_ptr, node->get_actions().size());
-    for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+    auto freq = calculate_strategy(base_ptr, node->get_value_actions().size());
+    for(int a_idx = 0; a_idx < node->get_value_actions().size(); ++a_idx) {
       base_ptr[a_idx].store(freq[a_idx]);
     }
   }
-  for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+  for(int a_idx = 0; a_idx < node->get_branching_actions().size(); ++a_idx) {
     if(node->is_allocated(a_idx)) {
-      PokerState next_state = state.apply(node->get_actions()[a_idx]);
+      PokerState next_state = state.apply(node->get_branching_actions()[a_idx]);
       normalize_tree(node->apply_index(a_idx, next_state), next_state);
     }
   }
@@ -306,9 +306,9 @@ void tree_to_sampled_buffers(const TreeStorageNode<float>* node, const double fr
   std::vector<uint8_t> sampled(node->get_n_clusters() * biases.size(), 0);
   for(int c = 0; c < node->get_n_clusters(); ++c) {
     const std::atomic<float>* base_ptr = node->get(c, 0);
-    auto freq = calculate_strategy(base_ptr, node->get_actions().size());
+    auto freq = calculate_strategy(base_ptr, node->get_value_actions().size());
     for(int a_idx = 0; a_idx < biases.size(); ++a_idx) {
-      sampled[node_value_index(biases.size(), c, a_idx)] = action_to_idx.at(sample_biased(node->get_actions(), freq, biases[a_idx], factor));
+      sampled[node_value_index(biases.size(), c, a_idx)] = action_to_idx.at(sample_biased(node->get_value_actions(), freq, biases[a_idx], factor));
     }
   }
   buffer.entries.push_back({history, sampled});
@@ -316,10 +316,10 @@ void tree_to_sampled_buffers(const TreeStorageNode<float>* node, const double fr
     serialize_buffer((buffer_dir / "sampled_buf_").string(), buffer, buf_idx, buffer_fns);
   }
 
-  for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+  for(int a_idx = 0; a_idx < node->get_branching_actions().size(); ++a_idx) {
     if(node->is_allocated(a_idx)) {
       ActionHistory next_history = history;
-      next_history.push_back(node->get_actions()[a_idx]);
+      next_history.push_back(node->get_branching_actions()[a_idx]);
       tree_to_sampled_buffers(node->apply_index(a_idx), free_gb, max_gb, buffer_dir, action_to_idx, biases, factor, next_history, buffer, buf_idx, buffer_fns);
     }
   }
@@ -364,12 +364,10 @@ std::unordered_map<Action, int> build_bias_offset_map(const PokerState& state, c
   return bias_offset_map;
 }
 
-std::shared_ptr<const TreeStorageConfig> make_sampled_tree_config(const std::shared_ptr<const TreeStorageConfig>& lossless_tree_config,
-    const int n_biases) {
+std::shared_ptr<const TreeStorageConfig> make_sampled_tree_config(const SampledMetadata& meta) {
   return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
-    [=](const PokerState& state) { return lossless_tree_config->n_clusters_provider(state); },
-    [=](const PokerState& state) { return lossless_tree_config->branching_actions(state); },
-    n_biases
+    meta.tree_config->cluster_spec,
+    ActionMode::make_sampled_mode(meta.config.action_profile, meta.biases)
   });
 }
 
@@ -386,7 +384,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   }
 
   Logger::log("Initializing sampled blueprint...");
-  assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta.tree_config, meta.biases.size())));
+  assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta)));
   for(const auto& buf_fn : meta.buffer_fns) {
     BlueprintBuffer<uint8_t> buf;
     cereal_load(buf, buf_fn);

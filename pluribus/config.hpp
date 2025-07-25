@@ -93,6 +93,13 @@ struct RealTimeSolverConfig : DiscountConfig {
   std::string to_string() const;
   void set_iterations(const RealTimeTimingConfig& timings, long it_per_min);
 
+  bool operator==(const RealTimeSolverConfig& other) const = default;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(bias_profile, log_interval, terminal_round, terminal_bet_level);
+  }
+
   ActionProfile bias_profile = BiasActionProfile{};
   long log_interval;
   int terminal_round = -1;

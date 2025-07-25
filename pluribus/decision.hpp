@@ -31,8 +31,8 @@ public:
       node = node->apply(state.get_action_history().get(i));
     }
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
-    auto freq = calculate_strategy(node->get(cluster), node->get_actions().size());
-    return freq[index_of(a, node->get_actions())];
+    auto freq = calculate_strategy(node->get(cluster), node->get_value_actions().size());
+    return freq[index_of(a, node->get_value_actions())];
   }
 
 private:
@@ -56,8 +56,8 @@ public:
     const std::vector<Action> history = state.get_action_history().slice(bp->get_config().init_state.get_action_history().size()).get_history();
     const TreeStorageNode<float>* node = bp->get_strategy()->apply(history);
     const std::atomic<float>* base_ptr = node->get(cluster);
-    const auto freq = calculate_strategy(base_ptr, node->get_actions().size());
-    return node->get_actions()[sample_action_idx(freq)];
+    const auto freq = calculate_strategy(base_ptr, node->get_value_actions().size());
+    return node->get_value_actions()[sample_action_idx(freq)];
   }
 };
 

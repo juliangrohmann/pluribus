@@ -245,16 +245,16 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
     return 0;
   }
   if(state.get_active() == i) {
-    auto actions = regret_node_actions(regret_storage, state, get_config().action_profile);
+    auto value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
     const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     if(_log_level == SolverLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
     std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
-    auto freq = calculate_strategy(base_ptr, actions.size());
+    auto freq = calculate_strategy(base_ptr, value_actions.size());
 
     std::unordered_map<Action, int> values;
     float v_exact = 0;
-    for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-      Action a = actions[a_idx];
+    for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
+      Action a = value_actions[a_idx];
       if(base_ptr[a_idx].load() > PRUNE_CUTOFF) {
         PokerState next_state = state.apply(a);
         int v_a = traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
@@ -265,8 +265,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
     }
     const int v = round(v_exact);
     if(_log_level == SolverLogLevel::DEBUG) log_net_ev(v, v_exact, state, get_config().init_state, debug);
-    for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-      Action a = actions[a_idx];
+    for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
+      Action a = value_actions[a_idx];
       if(auto it = values.find(a); it != values.end()) {
         auto& r_atom = base_ptr[a_idx];
         const int prev_r = r_atom.load();
@@ -276,14 +276,14 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
         if(next_r > REGRET_FLOOR) {
           r_atom.fetch_add(d_r);
         }
-        if(_log_level == SolverLogLevel::DEBUG) log_regret(actions[a_idx], d_r, next_r, debug);
+        if(_log_level == SolverLogLevel::DEBUG) log_regret(value_actions[a_idx], d_r, next_r, debug);
       }
     }
     return v;
   }
-  auto actions = regret_node_actions(regret_storage, state, get_config().action_profile);
-  int a_idx = external_sampling(actions, state, board, hands, indexers, regret_storage, debug);
-  const PokerState next_state = state.apply(actions[a_idx]);
+  auto branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
+  int a_idx = external_sampling(branching_actions, state, board, hands, indexers, regret_storage, debug);
+  const PokerState next_state = state.apply(branching_actions[a_idx]);
   return traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
 }
 
@@ -299,15 +299,15 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t,
     return 0;
   }
   if(state.get_active() == i) {
-    auto actions = regret_node_actions(regret_storage, state, get_config().action_profile);
+    auto value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
     const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     if(_log_level == SolverLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
     std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
-    auto freq = calculate_strategy(base_ptr, actions.size());
+    auto freq = calculate_strategy(base_ptr, value_actions.size());
     std::unordered_map<Action, int> values;
     float v_exact = 0;
-    for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-      Action a = actions[a_idx];
+    for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
+      Action a = value_actions[a_idx];
       PokerState next_state = state.apply(a);
       int v_a = traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
       values[a] = v_a;
@@ -316,28 +316,29 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t,
     }
     int v = round(v_exact);
     if(_log_level == SolverLogLevel::DEBUG) log_net_ev(v, v_exact, state, get_config().init_state, debug);
-    for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
+    for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       auto& r_atom = base_ptr[a_idx];
       const int prev_r = r_atom.load();
-      int d_r = values[actions[a_idx]] - v;
+      int d_r = values[value_actions[a_idx]] - v;
       int next_r = prev_r + d_r;
       if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
       if(next_r > REGRET_FLOOR) {
         r_atom.fetch_add(d_r);
       }
-      if(_log_level == SolverLogLevel::DEBUG) log_regret(actions[a_idx], d_r, next_r, debug);
+      if(_log_level == SolverLogLevel::DEBUG) log_regret(value_actions[a_idx], d_r, next_r, debug);
     }
     return v;
   }
-  auto actions = regret_node_actions(regret_storage, state, get_config().action_profile);
-  int a_idx = external_sampling(actions, state, board, hands, indexers, regret_storage, debug);
-  const PokerState next_state = state.apply(actions[a_idx]);
+  auto branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
+  int a_idx = external_sampling(branching_actions, state, board, hands, indexers, regret_storage, debug);
+  const PokerState next_state = state.apply(branching_actions[a_idx]);
   return traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
 }
 
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const PokerState& state, const Board& board,
     const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, StorageT<int>* regret_storage, std::ostringstream& debug) {
+  if(actions.size() == 1) return 0;
   const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()],
       state.get_round()));
   const std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
@@ -394,7 +395,7 @@ void MCCFRSolver<StorageT>::track_strategy_by_decision(const PokerState& state, 
   if(!should_track_strategy(state, get_config(), metrics_config)) return;
   PokerRange base_range = ranges[state.get_active()];
   base_range.remove_cards(get_config().init_board);
-  for(Action a : available_actions(state, get_config().action_profile)) {
+  for(Action a : valid_actions(state, get_config().action_profile)) {
     PokerRange action_range = build_action_range(base_range, a, state, Board{get_config().init_board}, decision);
     PokerRange next_range = base_range * action_range;
     const std::string data_label = strategy_label(state, get_config().init_state, a, phi);
@@ -438,24 +439,26 @@ TreeStorageNode<int>* TreeSolver::next_regret_storage(TreeStorageNode<int>* stor
   return !is_terminal(next_state, i) ? storage->apply_index(action_idx, next_state) : nullptr;
 }
 
-std::vector<Action> TreeSolver::regret_node_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const {
-  return storage->get_actions();
+std::vector<Action> TreeSolver::regret_branching_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const {
+  return storage->get_branching_actions();
 }
 
-std::vector<Action> TreeSolver::avg_node_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const {
-  return storage->get_actions();
+std::vector<Action> TreeSolver::regret_value_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const {
+  return storage->get_value_actions();
 }
 
+std::vector<Action> TreeSolver::avg_branching_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const {
+  return storage->get_branching_actions();
+}
+
+std::vector<Action> TreeSolver::avg_value_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const {
+  return storage->get_value_actions();
+}
 
 void TreeSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
   const auto init_ranges = get_config().init_ranges;
   track_strategy_by_decision(get_config().init_state, init_ranges, TreeDecision{_regrets_root.get(), get_config().init_state},
       get_regret_metrics_config(), false, metrics);
-}
-
-void TreeSolver::set_regrets_tree_config(const std::shared_ptr<const TreeStorageConfig>& regrets_tree_config) {
-  _regrets_tree_config = regrets_tree_config;
-  if(_regrets_root) _regrets_root->set_config(regrets_tree_config);
 }
 
 // ==========================================================================================
@@ -464,8 +467,7 @@ void TreeSolver::set_regrets_tree_config(const std::shared_ptr<const TreeStorage
 
 template <template<typename> class StorageT>
 BlueprintSolver<StorageT>::BlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config)
-    : MCCFRSolver<StorageT>{config}, _bp_config{bp_config},
-    _state_actions_provider{[](const PokerState& state, const ActionProfile& profile) { return valid_actions(state, profile); }} {}
+    : MCCFRSolver<StorageT>{config}, _bp_config{bp_config} {}
 
 template <template<typename> class StorageT>
 bool BlueprintSolver<StorageT>::is_update_terminal(const PokerState& state, const int i) const {
@@ -479,7 +481,7 @@ void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, 
     return;
   }
   if(state.get_active() == i) {
-    auto actions = this->avg_node_actions(avg_storage, state, this->get_config().action_profile);
+    auto actions = this->avg_value_actions(avg_storage, state, this->get_config().action_profile);
     int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     const std::atomic<int>* base_ptr = this->get_base_regret_ptr(regret_storage, state, cluster);
     auto freq = calculate_strategy(base_ptr, actions.size());
@@ -498,7 +500,7 @@ void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, 
                     this->next_avg_storage(avg_storage, a_idx, next_state, i), debug);
   }
   else {
-    auto actions = this->avg_node_actions(avg_storage, state, this->get_config().action_profile);
+    auto actions = this->avg_branching_actions(avg_storage, state, this->get_config().action_profile);
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       PokerState next_state = state.apply(actions[a_idx]);
       update_strategy(next_state, i, board, hands, indexers, this->next_regret_storage(regret_storage, a_idx, next_state, i),
@@ -535,13 +537,7 @@ long BlueprintSolver<StorageT>::next_step(const long t, const long T) const {
 
 template <template<typename> class StorageT>
 RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlueprint>& bp, const RealTimeSolverConfig& rt_config)
-    : _bp{bp}, _rt_config{rt_config},
-    _state_actions_provider{[rt_conf = rt_config](const PokerState& state, const ActionProfile& profile) {
-      if(state.get_round() >= rt_conf.terminal_round || state.get_bet_level() >= rt_conf.terminal_bet_level) {
-        return rt_conf.bias_profile.get_actions(state);
-      }
-      return valid_actions(state, profile);
-    }} {}
+    : _bp{bp}, _rt_config{rt_config} {}
 
 template <template<typename> class StorageT>
 int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size,
@@ -563,9 +559,8 @@ int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const in
 
 const std::shared_ptr<const TreeStorageConfig> TreeBlueprintSolver::make_tree_config() const {
   return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
-    [](const PokerState& state) { return state.get_round() == 0 ? 169 : 200; },
-    [fn = get_state_actions_provider(), profile = this->get_config().action_profile](const PokerState& state) { return fn(state, profile); },
-    -1
+    ClusterSpec{169, 200, 200, 200},
+    ActionMode::make_blueprint_mode(get_config().action_profile)
   });
 }
 
@@ -620,14 +615,14 @@ NodeMetrics collect_node_metrics(const TreeStorageNode<T>* node) {
   NodeMetrics metrics;
   for(int c = 0; c < node->get_n_clusters(); ++c) {
     T max_v = 0L;
-    for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+    for(int a_idx = 0; a_idx < node->get_value_actions().size(); ++a_idx) {
       max_v = std::max(node->get(c, a_idx)->load(), max_v);
     }
     metrics.max_value_sum += max_v;
   }
   ++metrics.nodes;
-  metrics.values = node->get_actions().size() * node->get_n_clusters();
-  for(int a_idx = 0; a_idx < node->get_actions().size(); ++a_idx) {
+  metrics.values = node->get_n_values();
+  for(int a_idx = 0; a_idx < node->get_branching_actions().size(); ++a_idx) {
     if(node->is_allocated(a_idx)) metrics += collect_node_metrics(node->apply_index(a_idx));
   }
   return metrics;

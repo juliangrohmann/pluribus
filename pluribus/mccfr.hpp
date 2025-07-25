@@ -85,7 +85,6 @@ protected:
   virtual int terminal_utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size,
       std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const { return utility(state, i, board, hands, stack_size, get_config().rake, eval); }
   virtual bool is_terminal(const PokerState& state, const int i) const { return state.is_terminal() || state.get_players()[i].has_folded(); }
-  virtual std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const { return valid_actions(state, profile); }
   virtual void on_start() {}
   virtual void on_step(long t,int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, std::ostringstream& debug) {}
 
@@ -101,8 +100,10 @@ protected:
   virtual StorageT<float>* init_avg_storage() = 0;
   virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, int action_idx, const PokerState& next_state, int i) = 0;
   virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const PokerState& next_state, int i) = 0;
-  virtual std::vector<Action> regret_node_actions(StorageT<int>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
-  virtual std::vector<Action> avg_node_actions(StorageT<float>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
+  virtual std::vector<Action> regret_branching_actions(StorageT<int>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
+  virtual std::vector<Action> regret_value_actions(StorageT<int>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
+  virtual std::vector<Action> avg_branching_actions(StorageT<float>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
+  virtual std::vector<Action> avg_value_actions(StorageT<float>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
   virtual void save_snapshot(const std::string& fn) const = 0;
   
   virtual double get_discount_factor(long t) const = 0;
@@ -154,7 +155,10 @@ public:
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_regrets_root);
+    ar(_regrets_root, _regrets_tree_config);
+    if(Archive::is_loading::value) {
+      if(_regrets_root) _regrets_root->set_config(_regrets_tree_config);
+    }
   }
 
 protected:
@@ -163,13 +167,14 @@ protected:
   std::atomic<int>* get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) override;
   TreeStorageNode<int>* init_regret_storage() override;
   TreeStorageNode<int>* next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state, int i) override;
-  std::vector<Action> regret_node_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const override;
-  std::vector<Action> avg_node_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const override;
+  std::vector<Action> regret_branching_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const override;
+  std::vector<Action> regret_value_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const override;
+  std::vector<Action> avg_branching_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const override;
+  std::vector<Action> avg_value_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const override;
 
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
   virtual const std::shared_ptr<const TreeStorageConfig> make_tree_config() const = 0;
-  void set_regrets_tree_config(const std::shared_ptr<const TreeStorageConfig>& regrets_tree_config);
 
 private:
   std::shared_ptr<const TreeStorageConfig> _regrets_tree_config = nullptr;
@@ -195,7 +200,6 @@ public:
 
 protected:
   virtual bool is_update_terminal(const PokerState& state, int i) const;
-  std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const override { return _state_actions_provider(state, profile); }
 
   void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
       StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug);
@@ -235,7 +239,6 @@ protected:
   int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const override;
   bool is_terminal(const PokerState& state, const int i) const override { return state.has_biases() || state.is_terminal() || state.get_players()[i].has_folded(); }
-  std::vector<Action> available_actions(const PokerState& state, const ActionProfile& profile) const override { return _state_actions_provider(state, profile); }
 
   void on_start() override { Logger::log("Real time solver config:\n" + _rt_config.to_string()); }
   bool should_prune(long t) const override { return false; /* TODO: test pruning */ }
@@ -254,7 +257,6 @@ private:
   const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
   const RealTimeSolverConfig _rt_config;
   const SampledActionProvider _rollout_action_provider;
-  const StateActionsProvider _state_actions_provider;
 };
 
 class TreeBlueprintSolver : virtual public TreeSolver, virtual public BlueprintSolver<TreeStorageNode> {
@@ -267,12 +269,10 @@ public:
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_phi_root, cereal::base_class<TreeSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this), 
+    ar(_phi_root, _phi_tree_config, cereal::base_class<TreeSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this),
         cereal::base_class<Solver>(this));
     if(Archive::is_loading::value) {
-      _phi_tree_config = make_tree_config();
       if(_phi_root) _phi_root->set_config(_phi_tree_config);
-      set_regrets_tree_config(_phi_tree_config);
     }
   }
 
