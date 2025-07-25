@@ -57,7 +57,13 @@ std::vector<size_t> _collect_base_indexes(const TreeStorageNode<T>& strategy) {
 }
 
 bool is_out_of_memory(const double free_gb, const double max_gb) {
-  return get_free_ram() < static_cast<long long>(std::max(4.0, free_gb - max_gb) * pow(1024LL, 3LL));
+  const auto free_ram = get_free_ram();
+  const auto limit = static_cast<long long>(std::max(4.0, free_gb - max_gb) * pow(1024LL, 3LL));
+  const bool ret = free_ram < limit;
+  if(ret) {
+    std::cout << std::fixed << std::setprecision(2) << "OOM: free_gb=" << free_gb << ", max_gb=" << max_gb << ", free_ram=" << free_ram << ", limit=" << limit << "\n";
+  }
+  return ret;
 }
 
 template<class T>
@@ -67,7 +73,9 @@ void serialize_buffer(const std::string& buffer_prefix, BlueprintBuffer<T>& buff
   buffer_fns.push_back(fn);
   cereal_save(buffer, fn);
   Logger::log("Saved buffer " + std::to_string(buf_idx - 1) + " successfully.");
+  std::cout << "before dealloc: free_ram=" << get_free_ram() << "\n";
   buffer = BlueprintBuffer<T>{};
+  std::cout << "after dealloc: free_ram=" << get_free_ram() << "\n";
 }
 
 void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const double free_gb, const double max_gb, const std::filesystem::path& buffer_dir,
