@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
   }
   else if(command == "traverse") {
     // ./Pluribus traverse --blueprint --png out.png lossless_bp_fn
-    // ./Pluribus traverse --trainer --png out.png lossless_bp_fn
+    // ./Pluribus traverse --tree --png out.png snapshot_fn
     if(argc > 4 && strcmp(argv[3], "--png") == 0) {
       PngRangeViewer viewer{argv[4]};
       traverse_strategy(&viewer, argv[5], argv[2]);
