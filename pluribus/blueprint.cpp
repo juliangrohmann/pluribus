@@ -30,7 +30,7 @@ struct BlueprintBuffer {
   }
 
   void reset() {
-    std::vector<T>().swap(entries);
+    std::vector<std::pair<ActionHistory, std::vector<T>>>().swap(entries);
   }
 };
 
