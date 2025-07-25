@@ -31,6 +31,7 @@ struct BlueprintBuffer {
 
   void reset() {
     entries.clear();
+    entries.shrink_to_fit();
   }
 };
 
