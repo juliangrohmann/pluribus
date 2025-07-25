@@ -12,14 +12,29 @@
 
 namespace pluribus {
 
-enum class CommandType { NewGame, UpdateState, UpdateBoard };
+enum class CommandType { NewGame, UpdateState, UpdateBoard, Solution };
 
 struct Command {
   CommandType type;
   std::vector<std::string> players;
+  std::vector<int> stacks;
   std::vector<uint8_t> board;
+  Hand hand;
   Action action;
   int pos;
+
+  static Command make_new_game(const std::vector<std::string>& players_, const std::vector<int>& stacks_) {
+    return Command{CommandType::NewGame, players_, stacks_, {}, {}, Action::UNDEFINED, -1};
+  }
+  static Command make_update_state(const Action action_, const int pos_) {
+    return Command{CommandType::UpdateState, {}, {}, {}, {}, action_, pos_};
+  }
+  static Command make_update_board(const std::vector<uint8_t>& board_) {
+    return Command{CommandType::UpdateBoard, {}, {}, board_, {}, Action::UNDEFINED, -1};
+  }
+  static Command make_solution(const Hand& hand_) {
+    return Command{CommandType::Solution, {}, {}, {}, hand_, Action::UNDEFINED, -1};
+  }
 };
 
 class PluribusServer {
@@ -33,12 +48,11 @@ private:
   void stop();
   void dispatch_commands();
 
-  static void receive_commands();
   void configure_server();
 
   std::unique_ptr<Pluribus> _engine;
-  std::shared_ptr<const LosslessBlueprint> _preflop_bp;
-  std::shared_ptr<const SampledBlueprint> _sampled_bp;
+  std::shared_ptr<LosslessBlueprint> _preflop_bp;
+  std::shared_ptr<SampledBlueprint> _sampled_bp;
 
   httplib::Server _server;
   std::thread _dispatch_thread;

@@ -18,6 +18,7 @@ add_library(
   mccfr.cpp
   pluribus.cpp
   blueprint.cpp
+  server.cpp
   traverse.cpp
   range.cpp
   range_viewer.cpp

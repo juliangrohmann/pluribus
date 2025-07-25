@@ -5,6 +5,8 @@
 #include <pluribus/traverse.hpp>
 #include <pluribus/blueprint.hpp>
 
+#include "server.hpp"
+
 using namespace pluribus;
 
 void traverse_strategy(RangeViewer* viewer_p, const std::string& fn, const std::string& type) {
@@ -27,7 +29,12 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  if(std::string command = argv[1]; command == "cluster") {
+  if(std::string command = argv[1]; command == "server") {
+    // Pluribus server lossless_bp_fn sampled_bp_fn
+    PluribusServer server{argv[2], argv[3]};
+    server.start();
+  }
+  else if(command == "cluster") {
     // ./Pluribus cluster round
     if(int round = atoi(argv[2]); round < 1 || round > 3) {
       std::cout << "1 <= round <= 3 required. Given: " << round << std::endl;

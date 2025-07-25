@@ -9,15 +9,15 @@ PluribusServer::PluribusServer(const std::string& preflop_fn, const std::string&
     : _preflop_bp{std::make_shared<LosslessBlueprint>()}, _sampled_bp{std::make_shared<SampledBlueprint>()} {
   cereal_load(*_preflop_bp, preflop_fn);
   cereal_load(*_sampled_bp, sampled_fn);
-  _engine = std::make_unique{_preflop_bp, _sampled_bp};
+  _engine = std::make_unique<Pluribus>(_preflop_bp, _sampled_bp);
   configure_server();
 }
 
-
-
 void PluribusServer::start() {
+  Logger::log("Starting HTTP server on port 8080...");
+  _running = true;
   _dispatch_thread = std::thread{[this] { this->dispatch_commands(); }};
-  receive_commands();
+  _server.listen("0.0.0.0", 8080);
   stop();
 }
 
@@ -54,19 +54,16 @@ void PluribusServer::dispatch_commands() {
   }
 }
 
-void PluribusServer::receive_commands() {
-
-}
-
 void PluribusServer::configure_server() {
   _server.Post("/new_game", [&](auto& req, auto& res){
     // ReSharper disable once CppDeprecatedEntity
     auto dat = json::parse(req.body.begin(), req.body.end());
     const auto players = dat.at("players").template get<std::vector<std::string>>();
-    Logger::log("POST: /new_game players=[" + join_strs(players, ", ") + "]");
+    const auto stacks = dat.at("stacks").template get<std::vector<int>>();
+    Logger::log("POST: /new_game players=[" + join_strs(players, ", ") + "], stacks=[" + join_as_strs(stacks, ", ") + "]");
     {
       std::lock_guard lock(_cmd_mtx);
-      _cmd_queue.push_back(Command{CommandType::NewGame, players, {}, Action::UNDEFINED, -1});
+      _cmd_queue.push_back(Command::make_new_game(players, stacks));
     }
     _cmd_cv.notify_one();
     res.set_content(R"({"status":"ok"})", "application/json");
@@ -77,10 +74,10 @@ void PluribusServer::configure_server() {
     auto dat = json::parse(req.body.begin(), req.body.end());
     const auto action = Action{dat.at("action").template get<float>()};
     const auto pos = dat.at("pos").template get<int>();
-    Logger::log("POST: /update_state action=" + action.to_string() + ", pos=" + pos);
+    Logger::log("POST: /update_state action=" + action.to_string() + ", pos=" + std::to_string(pos));
     {
       std::lock_guard lock(_cmd_mtx);
-      _cmd_queue.push_back(Command{CommandType::UpdateState, {}, {}, action, pos});
+      _cmd_queue.push_back(Command::make_update_state(action, pos));
     }
     _cmd_cv.notify_one();
     res.set_content(R"({"status":"ok"})", "application/json");
@@ -89,27 +86,27 @@ void PluribusServer::configure_server() {
   _server.Post("/update_board", [&](auto& req, auto& res){
     // ReSharper disable once CppDeprecatedEntity
     auto dat = json::parse(req.body.begin(), req.body.end());
-    auto board_str = j.at("board").get<std::string>();
+    auto board_str = dat.at("board").template get<std::string>();
     Logger::log("POST: /update_board board=" + board_str);
     {
       std::lock_guard lock(_cmd_mtx);
-      _cmd_queue.push_back(Command{CommandType::UpdateBoard, {}, str_to_cards(board_str), Action::UNDEFINED, -1});
+      _cmd_queue.push_back(Command::make_update_board(str_to_cards(board_str)));
     }
     _cmd_cv.notify_one();
     res.set_content(R"({"status":"ok"})", "application/json");
   });
 
-  _server.Get("/solution", [&](auto&, auto& res){
+  _server.Post("/solution", [&](auto& req, auto& res){
     // ReSharper disable once CppDeprecatedEntity
     auto dat = json::parse(req.body.begin(), req.body.end());
-    if (!sol_ptr) {
-      res.status = 503;
-      res.set_content(R"({"error":"not ready"})", "application/json");
-      return;
-    }
+    const auto hand = Hand{dat.at("hand").template get<std::string>()};
+    auto [actions, freq] = _engine->solution(hand);
+    std::vector<std::string> str_actions;
+    std::ranges::transform(actions.begin(), actions.end(), std::back_inserter(str_actions), [](const Action a) { return a.to_string(); });
     json j;
-    j["actions"] = sol_ptr->actions;  // you'll need to implement to_json(Action)
-    j["freq"]    = sol_ptr->freq;
+    j["actions"] = str_actions;
+    j["freq"]    = freq;
+    j["status"]  = "ok";
     res.set_content(j.dump(), "application/json");
   });
 

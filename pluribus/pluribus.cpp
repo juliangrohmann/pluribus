@@ -79,12 +79,13 @@ void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
   _board = updated_board;
 }
 
-Solution Pluribus::solution(const PokerState& state, const Hand& hand) const {
+Solution Pluribus::solution(const Hand& hand) const {
+  const PokerState mapped_state = _root_state.apply(_mapped_actions);
   Solution solution;
-  solution.actions = valid_actions(state, _live_profile);
+  solution.actions = valid_actions(mapped_state, _live_profile);
   const RealTimeDecision decision{*_preflop_bp, _solver};
   for(const Action a : solution.actions) {
-    solution.freq.push_back(decision.frequency(a, state, Board{_board}, hand));
+    solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
   }
   return solution;
 }
@@ -103,7 +104,7 @@ void Pluribus::_init_solver() {
   RealTimeSolverConfig rt_config;
   rt_config.terminal_round = terminal_round(_root_state);
   rt_config.terminal_bet_level = 999;
-  // _solver = std::unique_ptr<Solver>{new TreeRealTimeSolver{_sampled_bp, rt_config}}; TODO
+  // _solver = std::unique_ptr<Solver>{new TreeRealTimeSolver{_sampled_bp, rt_config}};
 }
 
 bool can_solve(const PokerState& root) {

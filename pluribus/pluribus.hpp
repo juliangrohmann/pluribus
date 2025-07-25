@@ -18,7 +18,7 @@ public:
   void new_game(const std::vector<std::string>& players);
   void update_state(Action action, int pos);
   void update_board(const std::vector<uint8_t> &updated_board);
-  Solution solution(const PokerState& state, const Hand& hand) const;
+  Solution solution(const Hand& hand) const;
 
 private:
   void _init_solver();
