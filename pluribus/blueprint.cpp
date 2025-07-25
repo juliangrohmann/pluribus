@@ -28,10 +28,6 @@ struct BlueprintBuffer {
   void serialize(Archive& ar) {
     ar(entries);
   }
-
-  void reset() {
-    std::vector<std::pair<ActionHistory, std::vector<T>>>().swap(entries);
-  }
 };
 
 bool validate_preflop_fn(const std::string& preflop_fn, const std::vector<std::string>& all_fns) {
@@ -71,7 +67,7 @@ void serialize_buffer(const std::string& buffer_prefix, BlueprintBuffer<T>& buff
   buffer_fns.push_back(fn);
   cereal_save(buffer, fn);
   Logger::log("Saved buffer " + std::to_string(buf_idx - 1) + " successfully.");
-  buffer.reset();
+  buffer = BlueprintBuffer<T>{};
 }
 
 void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const double free_gb, const double max_gb, const std::filesystem::path& buffer_dir,
