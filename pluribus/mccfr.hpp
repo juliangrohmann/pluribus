@@ -155,13 +155,18 @@ public:
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_regrets_root, _regrets_tree_config);
+    // ar(_regrets_root, _regrets_tree_config); // TODO: compatibility
+    ar(_regrets_root);
     if(Archive::is_loading::value) {
       if(_regrets_root) _regrets_root->set_config(_regrets_tree_config);
     }
   }
 
 protected:
+  void set_regret_tree_config() { // TODO: remove, compatibility
+    _regrets_tree_config = make_tree_config();
+    if(_regrets_root) _regrets_root->set_config(_regrets_tree_config);
+  }
   void on_start() override;
 
   std::atomic<int>* get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) override;
@@ -269,10 +274,14 @@ public:
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_phi_root, _phi_tree_config, cereal::base_class<TreeSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this),
+    // ar(_phi_root, _phi_tree_config, cereal::base_class<TreeSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this),
+    //     cereal::base_class<Solver>(this)); TODO: compatibility
+    ar(_phi_root, cereal::base_class<TreeSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this),
         cereal::base_class<Solver>(this));
     if(Archive::is_loading::value) {
+      _phi_tree_config = make_tree_config();
       if(_phi_root) _phi_root->set_config(_phi_tree_config);
+      set_regret_tree_config();
     }
   }
 
