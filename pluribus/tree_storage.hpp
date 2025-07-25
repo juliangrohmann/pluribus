@@ -119,19 +119,8 @@ inline int node_value_index(const int n_actions, const int cluster, const int ac
 template <class T>
 class TreeStorageNode {
 public:
-  TreeStorageNode(const PokerState& state, const std::shared_ptr<const TreeStorageConfig>& config)
-      : _branching_actions{config->action_mode.branching_actions(state)},
-        _value_actions{config->action_mode.value_actions(state)},
-        _n_clusters{config->cluster_spec.n_clusters(state.get_round())},
-        _config{config},
-        _values{std::make_unique<std::atomic<T>[]>(get_n_values())},
-        _nodes{std::make_unique<std::atomic<TreeStorageNode*>[]>(_branching_actions.size())},
-        _locks{std::make_unique<SpinLock[]>(_branching_actions.size())} {
-    for(int i = 0; i < get_n_values(); ++i) _values[i].store(T{0}, std::memory_order_relaxed);
-    for(int i = 0; i < _branching_actions.size(); ++i) _nodes[i].store(nullptr, std::memory_order_relaxed);
-  }
-
-  TreeStorageNode(): _n_clusters(0) {}
+  TreeStorageNode(const PokerState& state, const std::shared_ptr<const TreeStorageConfig>& config) : TreeStorageNode{state, config, true} {}
+  TreeStorageNode(): _n_clusters(0), _is_root{true} {}
 
   ~TreeStorageNode() {
     free_memory();
@@ -144,7 +133,7 @@ public:
       std::lock_guard lock(_locks[action_idx]);
       next = node_atom.load(std::memory_order_acquire);
       if(!next) {
-        next = new TreeStorageNode(next_state, _config);
+        next = new TreeStorageNode(next_state, _config, false);
         node_atom.store(next, std::memory_order_release);
       }
     }
@@ -232,7 +221,8 @@ public:
 
   template <class Archive>
   void save(Archive& ar) const {
-    ar(_branching_actions, _value_actions, _n_clusters);
+    ar(_branching_actions, _value_actions, _n_clusters, _is_root);
+    if(_is_root) ar(_config);
     for(int c = 0; c < _n_clusters; ++c) {
       for(int a = 0; a < _value_actions.size(); ++a) {
         ar(_values[node_value_index(_value_actions.size(), c, a)]);
@@ -249,7 +239,8 @@ public:
   template <class Archive>
   void load(Archive& ar) {
     free_memory();
-    ar(_branching_actions, _value_actions, _n_clusters);
+    ar(_branching_actions, _value_actions, _n_clusters, _is_root);
+    if(_is_root) ar(_config);
     _values = std::make_unique<std::atomic<T>[]>(get_n_values());
     _nodes = std::make_unique<std::atomic<TreeStorageNode*>[]>(_branching_actions.size());
     _locks = std::make_unique<SpinLock[]>(_branching_actions.size());
@@ -274,9 +265,24 @@ public:
         _nodes[a].store(nullptr);
       }
     }
+
+    if(_is_root) set_config(_config);
   }
 
 private:
+  TreeStorageNode(const PokerState& state, const std::shared_ptr<const TreeStorageConfig>& config, const bool is_root)
+      : _branching_actions{config->action_mode.branching_actions(state)},
+        _value_actions{config->action_mode.value_actions(state)},
+        _n_clusters{config->cluster_spec.n_clusters(state.get_round())},
+        _config{config},
+        _values{std::make_unique<std::atomic<T>[]>(get_n_values())},
+        _nodes{std::make_unique<std::atomic<TreeStorageNode*>[]>(_branching_actions.size())},
+        _locks{std::make_unique<SpinLock[]>(_branching_actions.size())},
+        _is_root{is_root} {
+    for(int i = 0; i < get_n_values(); ++i) _values[i].store(T{0}, std::memory_order_relaxed);
+    for(int i = 0; i < _branching_actions.size(); ++i) _nodes[i].store(nullptr, std::memory_order_relaxed);
+  }
+
   void free_memory() {
     if(!_nodes) return;
     for(int a_idx = 0; a_idx < _branching_actions.size(); ++a_idx) {
@@ -297,6 +303,7 @@ private:
   std::unique_ptr<std::atomic<T>[]> _values;
   std::unique_ptr<std::atomic<TreeStorageNode*>[]> _nodes;
   std::unique_ptr<SpinLock[]> _locks;
+  bool _is_root;
 };
 
 template<class T>
