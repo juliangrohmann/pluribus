@@ -56,16 +56,6 @@ std::vector<size_t> _collect_base_indexes(const TreeStorageNode<T>& strategy) {
   return base_idxs;
 }
 
-bool is_out_of_memory(const double free_gb, const double max_gb) {
-  const auto free_ram = get_free_ram();
-  const auto limit = static_cast<long long>(std::max(4.0, free_gb - max_gb) * pow(1024LL, 3LL));
-  const bool ret = free_ram < limit;
-  if(ret) {
-    std::cout << std::fixed << std::setprecision(2) << "OOM: free_gb=" << free_gb << ", max_gb=" << max_gb << ", free_ram=" << free_ram << ", limit=" << limit << "\n";
-  }
-  return ret;
-}
-
 template<class T>
 void serialize_buffer(const std::string& buffer_prefix, BlueprintBuffer<T>& buffer, int& buf_idx, std::vector<std::string>& buffer_fns) {
   Logger::log("Saving buffer " + std::to_string(buf_idx) + "...");
@@ -78,8 +68,8 @@ void serialize_buffer(const std::string& buffer_prefix, BlueprintBuffer<T>& buff
   std::cout << "after dealloc: free_ram=" << get_free_ram() << "\n";
 }
 
-void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const double free_gb, const double max_gb, const std::filesystem::path& buffer_dir,
-    const ActionHistory& history, BlueprintBuffer<float>& buffer, int& buf_idx, std::vector<std::string>& buffer_fns) {
+void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const ActionHistory& history, const std::filesystem::path& buffer_dir,
+    const long long max_bytes, long long& curr_bytes, BlueprintBuffer<float>& buffer, int& buf_idx, std::vector<std::string>& buffer_fns) {
   std::vector<float> values(node->get_n_values(), 0.0);
   for(int c = 0; c < node->get_n_clusters(); ++c) {
     const std::atomic<int>* base_ptr = node->get(c, 0);
@@ -89,20 +79,31 @@ void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const double fre
     }
   }
   buffer.entries.push_back({history, values});
-  if(is_out_of_memory(free_gb, max_gb)) {
+  curr_bytes += history.size() * sizeof(Action) + values.size() * sizeof(float);
+  if(curr_bytes > max_bytes) {
     serialize_buffer((buffer_dir / "lossless_buf_").string(), buffer, buf_idx, buffer_fns);
+    curr_bytes = 0LL;
   }
 
   for(int a_idx = 0; a_idx < node->get_branching_actions().size(); ++a_idx) {
     if(node->is_allocated(a_idx)) {
       ActionHistory next_history = history;
       next_history.push_back(node->get_branching_actions()[a_idx]);
-      tree_to_lossless_buffers(node->apply_index(a_idx), free_gb, max_gb, buffer_dir, next_history, buffer, buf_idx, buffer_fns);
+      tree_to_lossless_buffers(node->apply_index(a_idx), next_history, buffer_dir, max_bytes, curr_bytes, buffer, buf_idx, buffer_fns);
     }
   }
 }
 
-LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, const double max_gb) {
+long long compute_max_bytes(const double max_gb) {
+  const double free_gb = static_cast<double>(get_free_ram()) / pow(1024.0, 3.0);
+  if(std::min(free_gb, max_gb) < 8) {
+    Logger::error("At least 8G free RAM required to build blueprint. Available (G): " + std::to_string(free_gb));
+  }
+  return std::min(free_gb - 4.0, max_gb) * pow(1024LL, 3LL);
+}
+
+LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir,
+    const double max_gb) {
   Logger::log("Building lossless buffers...");
   Logger::log("Preflop filename: " + preflop_fn);
   if(!validate_preflop_fn(preflop_fn, all_fns)) Logger::error("Preflop filename not found in all filenames.");
@@ -127,13 +128,11 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
       cereal_save(*bp.get_phi(), meta.preflop_buf_fn);
     }
 
-    const double free_gb = static_cast<double>(get_free_ram()) / pow(1024.0, 3.0);
-    if(std::min(free_gb, max_gb) < 8) {
-      Logger::error("At least 8G free RAM required to build blueprint. Available (G): " + std::to_string(free_gb));
-    }
-    BlueprintBuffer<float> buffer;
     Logger::log("Storing tree as buffers...");
-    tree_to_lossless_buffers(tree_root, free_gb, max_gb, buffer_dir, meta.config.init_state.get_action_history(), buffer, buf_idx, meta.buffer_fns);
+    long long curr_bytes = 0LL;
+    BlueprintBuffer<float> buffer;
+    tree_to_lossless_buffers(tree_root, meta.config.init_state.get_action_history(), buffer_dir, compute_max_bytes(max_gb), curr_bytes, buffer, buf_idx,
+      meta.buffer_fns);
     if(!buffer.entries.empty()) {
       serialize_buffer((buffer_dir / "lossless_buf_").string(), buffer, buf_idx, meta.buffer_fns);
     }
@@ -304,9 +303,9 @@ Action sample_biased(const std::vector<Action>& actions, const std::vector<float
   return actions[dist(GlobalRNG::instance())];
 }
 
-void tree_to_sampled_buffers(const TreeStorageNode<float>* node, const double free_gb, const double max_gb, const std::filesystem::path& buffer_dir,
-    const std::unordered_map<Action, uint8_t>& action_to_idx, const std::vector<Action>& biases, const float factor, const ActionHistory& history,
-    BlueprintBuffer<uint8_t>& buffer, int& buf_idx, std::vector<std::string>& buffer_fns) {
+void tree_to_sampled_buffers(const TreeStorageNode<float>* node, const ActionHistory& history, const std::filesystem::path& buffer_dir,
+    const std::unordered_map<Action, uint8_t>& action_to_idx, const std::vector<Action>& biases, const float factor, const long long max_bytes,
+    long long& curr_bytes, BlueprintBuffer<uint8_t>& buffer, int& buf_idx, std::vector<std::string>& buffer_fns) {
   std::vector<uint8_t> sampled(node->get_n_clusters() * biases.size(), 0);
   for(int c = 0; c < node->get_n_clusters(); ++c) {
     const std::atomic<float>* base_ptr = node->get(c, 0);
@@ -316,15 +315,18 @@ void tree_to_sampled_buffers(const TreeStorageNode<float>* node, const double fr
     }
   }
   buffer.entries.push_back({history, sampled});
-  if(is_out_of_memory(free_gb, max_gb)) {
+  curr_bytes += history.size() * sizeof(Action) + sampled.size() * sizeof(uint8_t);
+  if(curr_bytes > max_bytes) {
     serialize_buffer((buffer_dir / "sampled_buf_").string(), buffer, buf_idx, buffer_fns);
+    curr_bytes = 0LL;
   }
 
   for(int a_idx = 0; a_idx < node->get_branching_actions().size(); ++a_idx) {
     if(node->is_allocated(a_idx)) {
       ActionHistory next_history = history;
       next_history.push_back(node->get_branching_actions()[a_idx]);
-      tree_to_sampled_buffers(node->apply_index(a_idx), free_gb, max_gb, buffer_dir, action_to_idx, biases, factor, next_history, buffer, buf_idx, buffer_fns);
+      tree_to_sampled_buffers(node->apply_index(a_idx), next_history, buffer_dir, action_to_idx, biases, factor, max_bytes, curr_bytes, buffer, buf_idx,
+        buffer_fns);
     }
   }
 }
@@ -343,14 +345,12 @@ SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossl
   const auto action_to_idx = build_compression_map(bp.get_config().action_profile);
   _idx_to_action = build_decompression_map(action_to_idx);
 
-  const double free_gb = static_cast<double>(get_free_ram()) / pow(1024.0, 3.0);
-  if(std::min(free_gb, max_gb) < 8) {
-    Logger::error("At least 8G free RAM required to build blueprint. Available (G): " + std::to_string(free_gb));
-  }
-  BlueprintBuffer<uint8_t> buffer;
-  int buf_idx = 0;
   Logger::log("Storing tree as sampled buffers...");
-  tree_to_sampled_buffers(bp.get_strategy(), free_gb, max_gb, buffer_dir, action_to_idx, meta.biases, factor, meta.config.init_state.get_action_history(), buffer, buf_idx, meta.buffer_fns);
+  long long curr_bytes = 0LL;
+  int buf_idx = 0;
+  BlueprintBuffer<uint8_t> buffer;
+  tree_to_sampled_buffers(bp.get_strategy(), meta.config.init_state.get_action_history(), buffer_dir, action_to_idx, meta.biases, factor,
+    compute_max_bytes(max_gb), curr_bytes, buffer, buf_idx, meta.buffer_fns);
   if(!buffer.entries.empty()) {
     serialize_buffer((buffer_dir / "sampled_buf_").string(), buffer, buf_idx, meta.buffer_fns);
   }
