@@ -63,9 +63,7 @@ void serialize_buffer(const std::string& buffer_prefix, BlueprintBuffer<T>& buff
   buffer_fns.push_back(fn);
   cereal_save(buffer, fn);
   Logger::log("Saved buffer " + std::to_string(buf_idx - 1) + " successfully.");
-  std::cout << "before dealloc: free_ram=" << get_free_ram() << "\n";
   buffer = BlueprintBuffer<T>{};
-  std::cout << "after dealloc: free_ram=" << get_free_ram() << "\n";
 }
 
 void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const ActionHistory& history, const std::filesystem::path& buffer_dir,
@@ -410,7 +408,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
       }
     }
   }
-  std::cout << "Sampled blueprint built.\n";
+  Logger::log("Sampled blueprint built.");
   _bias_to_offset = build_bias_offset_map(meta.config.init_state, bias_profile);
 }
 
