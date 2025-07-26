@@ -72,6 +72,11 @@ public:
   Action decompress_action(const uint8_t action_idx) const { return _idx_to_action[action_idx]; }
   int bias_offset(const Action bias) const { return _bias_to_offset.at(bias); }
 
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(cereal::base_class<Blueprint>(this), _idx_to_action, _bias_to_offset);
+  }
+
 private:
   SampledMetadata build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, double max_gb, const ActionProfile& bias_profile,
     float factor);

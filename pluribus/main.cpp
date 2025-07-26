@@ -86,7 +86,6 @@ int main(int argc, char* argv[]) {
       SampledBlueprint sampled_bp;
       sampled_bp.build(lossless_fn, argv[3], argv[4]);
       cereal_save(sampled_bp, "sampled_" + std::string{argv[5]});
-
     }
   }
   else if(command == "sampled-blueprint") {
