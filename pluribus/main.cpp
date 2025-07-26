@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
   }
   else if(command == "sampled-blueprint") {
     // ./Pluribus sampled-blueprint lossless_bp_fn buf_dir out_fn
-    if(argc < 6) {
+    if(argc < 5) {
       std::cout << "Missing arguments to build blueprint.\n";
     }
     else {
