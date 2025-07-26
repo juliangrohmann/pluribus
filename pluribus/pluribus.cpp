@@ -37,7 +37,7 @@ void Pluribus::new_game(const std::vector<std::string>& players) {
   }
   Logger::log("Real state/Root state:\n" + _root_state.to_string());
   if(const int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;
-      _root_state.get_bet_level() > 0 || _root_state.get_round() != 0 || _root_state.get_active() != init_pos) {
+      _root_state.get_bet_level() > 1 || _root_state.get_round() != 0 || _root_state.get_active() != init_pos) {
     Logger::error("Invalid initial state.");
   }
 
