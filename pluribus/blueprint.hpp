@@ -4,6 +4,7 @@
 #include <vector>
 #include <cereal/cereal.hpp>
 #include <cereal/types/memory.hpp>
+#include <cereal/types/unordered_map.hpp>
 #include <pluribus/debug.hpp>
 #include <pluribus/rng.hpp>
 #include <pluribus/sampling.hpp>
