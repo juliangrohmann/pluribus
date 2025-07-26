@@ -378,6 +378,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   Logger::log("Building sampled blueprint...");
   const BiasActionProfile bias_profile;
   const SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, max_gb, bias_profile, bias_factor);
+  set_config(meta.config);
 
   Logger::log("Initializing sampled blueprint...");
   assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta)));
