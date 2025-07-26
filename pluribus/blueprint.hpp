@@ -68,7 +68,7 @@ struct SampledMetadata {
 
 class SampledBlueprint : public Blueprint<uint8_t> {
 public:
-  void build(const std::string& lossless_bp_fn, const std::string& final_snapshot_fn, const std::string& buf_dir, int max_gb = 50, float bias_factor = 5.0f);
+  void build(const std::string& lossless_bp_fn, const std::string& buf_dir, int max_gb = 50, float bias_factor = 5.0f);
   Action decompress_action(const uint8_t action_idx) const { return _idx_to_action[action_idx]; }
   int bias_offset(const Action bias) const { return _bias_to_offset.at(bias); }
 

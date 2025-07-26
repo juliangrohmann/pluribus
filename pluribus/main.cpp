@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
       std::string lossless_fn = "lossless_" + std::string{argv[5]};
       cereal_save(lossless_bp, lossless_fn);
       SampledBlueprint sampled_bp;
-      sampled_bp.build(lossless_fn, argv[2], argv[4]);
+      sampled_bp.build(lossless_fn, argv[4]);
       cereal_save(sampled_bp, "sampled_" + std::string{argv[5]});
 
     }
@@ -84,19 +84,19 @@ int main(int argc, char* argv[]) {
       std::string lossless_fn = "lossless_" + std::string{argv[5]};
       cereal_save(lossless_bp, lossless_fn);
       SampledBlueprint sampled_bp;
-      sampled_bp.build(lossless_fn, argv[3], argv[4]);
+      sampled_bp.build(lossless_fn, argv[4]);
       cereal_save(sampled_bp, "sampled_" + std::string{argv[5]});
     }
   }
   else if(command == "sampled-blueprint") {
-    // ./Pluribus sampled-blueprint lossless_bp_fn final_snapshot_fn buf_dir out_fn
+    // ./Pluribus sampled-blueprint lossless_bp_fn buf_dir out_fn
     if(argc < 6) {
       std::cout << "Missing arguments to build blueprint.\n";
     }
     else {
       SampledBlueprint sampled_bp;
-      sampled_bp.build(argv[2], argv[3], argv[4]);
-      cereal_save(sampled_bp, "sampled_" + std::string{argv[5]});
+      sampled_bp.build(argv[2], argv[3]);
+      cereal_save(sampled_bp, "sampled_" + std::string{argv[4]});
 
     }
   }

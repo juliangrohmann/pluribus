@@ -337,6 +337,7 @@ SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossl
   cereal_load(bp, lossless_bp_fn);
   SampledMetadata meta;
   meta.config = bp.get_config();
+  meta.tree_config = bp.get_strategy()->make_config_ptr();
   meta.biases = bias_profile.get_actions(meta.config.init_state);
   Logger::log("Biases=" + std::to_string(meta.biases.size()));
 
@@ -373,17 +374,10 @@ std::shared_ptr<const TreeStorageConfig> make_sampled_tree_config(const SampledM
   });
 }
 
-void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::string& final_snapshot_fn, const std::string& buf_dir, const int max_gb,
-    const float bias_factor) {
+void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::string& buf_dir, const int max_gb, const float bias_factor) {
   Logger::log("Building sampled blueprint...");
   const BiasActionProfile bias_profile;
-  SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, max_gb, bias_profile, bias_factor);
-  {
-    Logger::log("Loading tree config from final snapshot...");
-    TreeBlueprintSolver final_snapshot;
-    cereal_load(final_snapshot, final_snapshot_fn);
-    meta.tree_config = final_snapshot.get_strategy()->make_config_ptr();
-  }
+  const SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, max_gb, bias_profile, bias_factor);
 
   Logger::log("Initializing sampled blueprint...");
   assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta)));
