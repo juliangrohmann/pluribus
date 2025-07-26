@@ -149,24 +149,15 @@ public:
   float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const override;
   const TreeStorageNode<int>* get_strategy() const override { return _regrets_root.get(); }
   const SolverConfig& get_config() const override { return Solver::get_config(); }
-  std::shared_ptr<const TreeStorageConfig> get_regrets_tree_config() { return _regrets_tree_config; }
 
   bool operator==(const TreeSolver& other) const { return MCCFRSolver::operator==(other) && *_regrets_root == *other._regrets_root; }
   
   template <class Archive>
   void serialize(Archive& ar) {
-    // ar(_regrets_root, _regrets_tree_config); // TODO: compatibility
     ar(_regrets_root);
-    if(Archive::is_loading::value) {
-      if(_regrets_root) _regrets_root->set_config(_regrets_tree_config);
-    }
   }
 
 protected:
-  void set_regret_tree_config() { // TODO: remove, compatibility
-    _regrets_tree_config = make_tree_config();
-    if(_regrets_root) _regrets_root->set_config(_regrets_tree_config);
-  }
   void on_start() override;
 
   std::atomic<int>* get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) override;
@@ -182,7 +173,6 @@ protected:
   virtual const std::shared_ptr<const TreeStorageConfig> make_tree_config() const = 0;
 
 private:
-  std::shared_ptr<const TreeStorageConfig> _regrets_tree_config = nullptr;
   std::unique_ptr<TreeStorageNode<int>> _regrets_root = nullptr;
 };
 
@@ -274,15 +264,8 @@ public:
   
   template <class Archive>
   void serialize(Archive& ar) {
-    // ar(_phi_root, _phi_tree_config, cereal::base_class<TreeSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this),
-    //     cereal::base_class<Solver>(this)); TODO: compatibility
     ar(_phi_root, cereal::base_class<TreeSolver>(this), cereal::base_class<BlueprintSolver>(this), cereal::base_class<MCCFRSolver>(this),
         cereal::base_class<Solver>(this));
-    if(Archive::is_loading::value) {
-      _phi_tree_config = make_tree_config();
-      if(_phi_root) _phi_root->set_config(_phi_tree_config);
-      set_regret_tree_config();
-    }
   }
 
 protected:
@@ -299,10 +282,8 @@ protected:
   const std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;
   
   const TreeStorageNode<float>* get_phi_root() const { return _phi_root.get(); }
-  std::shared_ptr<const TreeStorageConfig> get_phi_tree_config() { return _phi_tree_config; }
 
 private:
-  std::shared_ptr<const TreeStorageConfig> _phi_tree_config = nullptr;
   std::unique_ptr<TreeStorageNode<float>> _phi_root = nullptr;
 };
 

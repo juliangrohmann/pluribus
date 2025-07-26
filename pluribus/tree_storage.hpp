@@ -221,9 +221,8 @@ public:
 
   template <class Archive>
   void save(Archive& ar) const {
-    // ar(_branching_actions, _value_actions, _n_clusters, _is_root); TODO: compatibility
-    // if(_is_root) ar(_config); TODO: compatibility
-    ar(_branching_actions, _n_clusters);
+    ar(_branching_actions, _value_actions, _n_clusters, _is_root);
+    if(_is_root) ar(_config);
     for(int c = 0; c < _n_clusters; ++c) {
       for(int a = 0; a < _value_actions.size(); ++a) {
         ar(_values[node_value_index(_value_actions.size(), c, a)]);
@@ -240,11 +239,9 @@ public:
   template <class Archive>
   void load(Archive& ar) {
     free_memory();
-    // ar(_branching_actions, _value_actions, _n_clusters, _is_root); TODO: compatibility
-    // if(_is_root) ar(_config); TODO: compatibility
-    ar(_branching_actions, _n_clusters);
-    _value_actions = _branching_actions;
-    _is_root = false;
+    ar(_branching_actions, _value_actions, _n_clusters, _is_root);
+    if(_is_root) ar(_config);
+
     _values = std::make_unique<std::atomic<T>[]>(get_n_values());
     _nodes = std::make_unique<std::atomic<TreeStorageNode*>[]>(_branching_actions.size());
     _locks = std::make_unique<SpinLock[]>(_branching_actions.size());
@@ -270,7 +267,7 @@ public:
       }
     }
 
-    // if(_is_root) set_config(_config); TODO: compatibility
+    if(_is_root) set_config(_config);
   }
 
 private:

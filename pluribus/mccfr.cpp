@@ -225,7 +225,7 @@ void log_external_sampling(const Action sampled, const std::vector<Action>& acti
   debug << "\tSampled: " << sampled.to_string() << "\n";
 }
 
-bool should_restrict(const std::vector<Action>& actions, int restrict_players) {
+bool should_restrict(const std::vector<Action>& actions, const int restrict_players) {
   if(actions.size() < restrict_players) return false;
   for(int i = 0; i < restrict_players; ++i) {
     if(actions[i] != Action::FOLD) return false;
@@ -422,8 +422,7 @@ float TreeSolver::frequency(const Action action, const PokerState& state, const 
 void TreeSolver::on_start() {
   if(!_regrets_root) {
     Logger::log("Initializing regret storage tree ...");
-    _regrets_tree_config = make_tree_config();
-    _regrets_root = std::make_unique<TreeStorageNode<int>>(get_config().init_state, _regrets_tree_config);
+    _regrets_root = std::make_unique<TreeStorageNode<int>>(get_config().init_state, make_tree_config());
   }
 }
 
@@ -572,8 +571,7 @@ void TreeBlueprintSolver::on_start() {
   BlueprintSolver::on_start();
   if(!_phi_root) {
     Logger::log("Initializing avg storage tree ...");
-    _phi_tree_config = make_tree_config();
-    _phi_root = std::make_unique<TreeStorageNode<float>>(get_config().init_state, _phi_tree_config);
+    _phi_root = std::make_unique<TreeStorageNode<float>>(get_config().init_state, make_tree_config());
   }
 }
 
