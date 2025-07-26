@@ -38,6 +38,9 @@ add_subdirectory(benchmark/)
 add_executable(Pluribus pluribus/main.cpp)
 target_link_libraries(Pluribus PRIVATE PluribusLib)
 
+add_executable(UpdateLossless update_lossless/update_lossless.cpp)
+target_link_libraries(Pluribus PRIVATE PluribusLib)
+
 add_executable(Temp temp/temp.cpp)
 target_link_libraries(Temp PRIVATE PluribusLib)
 

@@ -26,6 +26,11 @@ class Blueprint : public Strategy<T> {
 public:
   Blueprint() : _freq{nullptr} {}
 
+  TreeStorageNode<T>* get_mutable_strategy() {
+    if(_freq) return _freq.get();
+    throw std::runtime_error("Blueprint strategy is null.");
+  }
+
   const TreeStorageNode<T>* get_strategy() const override {
     if(_freq) return _freq.get();
     throw std::runtime_error("Blueprint strategy is null.");

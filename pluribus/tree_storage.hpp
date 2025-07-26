@@ -126,6 +126,10 @@ public:
     free_memory();
   }
 
+  void make_root() {
+    _is_root = true;
+  }
+
   TreeStorageNode* apply_index(int action_idx, const PokerState& next_state) {
     auto& node_atom = _nodes[action_idx];
     TreeStorageNode* next = node_atom.load(std::memory_order_acquire);
@@ -221,9 +225,8 @@ public:
 
   template <class Archive>
   void save(Archive& ar) const {
-    // ar(_branching_actions, _value_actions, _n_clusters, _is_root); TODO: compatibility
-    // if(_is_root) ar(_config); TODO: compatibility
-    ar(_branching_actions, _n_clusters);
+    ar(_branching_actions, _value_actions, _n_clusters, _is_root);
+    if(_is_root) ar(_config);
     for(int c = 0; c < _n_clusters; ++c) {
       for(int a = 0; a < _value_actions.size(); ++a) {
         ar(_values[node_value_index(_value_actions.size(), c, a)]);
