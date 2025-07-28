@@ -94,6 +94,7 @@ protected:
   virtual bool should_log(long t) const = 0;
   virtual long next_step(long t, long T) const = 0;
 
+  virtual int get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) = 0;
   virtual std::atomic<int>* get_base_regret_ptr(StorageT<int>* storage, const PokerState& state, int cluster) = 0;
   virtual std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, const PokerState& state, int cluster) = 0;
   virtual StorageT<int>* init_regret_storage() = 0;
@@ -207,7 +208,8 @@ protected:
   bool should_snapshot(const long t, const long T) const override { return _bp_config.is_snapshot_step(t, T); }
   bool should_log(const long t) const override { return t > 0 && t % _bp_config.log_interval == 0; }
   long next_step(long t, long T) const override;
-  
+
+  int get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
   double get_discount_factor(const long t) const override { return _bp_config.get_discount_factor(t); }
 
   MetricsConfig get_avg_metrics_config() const { return _avg_metrics_config; }
@@ -230,6 +232,8 @@ class RealTimeSolver : virtual public MCCFRSolver<StorageT> {
 public:
   RealTimeSolver(const std::shared_ptr<const SampledBlueprint>& bp, const RealTimeSolverConfig& rt_config);
 
+  const RealTimeSolverConfig& get_real_time_config() const { return _rt_config; }
+
 protected:
   int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const override;
@@ -241,7 +245,8 @@ protected:
   bool should_snapshot(long t, long T) const override { return false; }
   bool should_log(const long t) const override { return t % _rt_config.log_interval == 0; }
   long next_step(const long t, const long T) const override { return _rt_config.next_discount_step(t, T); }
-  
+
+  int get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
   double get_discount_factor(const long t) const override { return _rt_config.get_discount_factor(t); }
 
   std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, const PokerState& state, int cluster) override { return nullptr; }
@@ -285,6 +290,29 @@ protected:
 
 private:
   std::unique_ptr<TreeStorageNode<float>> _phi_root = nullptr;
+};
+
+class TreeRealTimeSolver : virtual public TreeSolver, virtual public RealTimeSolver<TreeStorageNode> {
+public:
+  explicit TreeRealTimeSolver(const SolverConfig& config = SolverConfig{}, const RealTimeSolverConfig& rt_config = RealTimeSolverConfig{},
+    const std::shared_ptr<const SampledBlueprint>& bp = nullptr);
+
+  bool operator==(const TreeRealTimeSolver& other) const;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(cereal::base_class<TreeSolver>(this), cereal::base_class<RealTimeSolver>(this), cereal::base_class<MCCFRSolver>(this), cereal::base_class<Solver>(this));
+  }
+
+protected:
+  void on_start() override;
+
+  void save_snapshot(const std::string& fn) const override { cereal_save(*this, fn); }
+
+  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override {}
+  void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override {}
+
+  const std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;
 };
 
 }

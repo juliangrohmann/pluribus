@@ -32,6 +32,7 @@ public:
     throw std::runtime_error("Blueprint strategy is null.");
   }
   const SolverConfig& get_config() const override { return _config; }
+  SolverConfig& get_mutable_config() { return _config; }
 
   template <class Archive>
   void serialize(Archive& ar) {

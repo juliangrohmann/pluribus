@@ -205,7 +205,7 @@ int PokerState::vpip_players() const {
 
 PokerState PokerState::apply(const Action action) const {
   PokerState state = next_state(action);
-  state._actions.push_back(action);
+  if(!is_bias(action)) state._actions.push_back(action);
   return state;
 }
 
@@ -335,6 +335,9 @@ PokerState PokerState::bias(const Action bias) const {
     state._first_bias = state._active;
     state._biases.resize(state._players.size(), Action::BIAS_DUMMY);
   }
+  if(state._biases[state.get_active()] != Action::BIAS_DUMMY) { // TODO: remove
+    throw std::runtime_error("Player " + std::to_string(_active) + " already has a bias! Bias=" + state._biases[state.get_active()].to_string());
+  }
   state._biases[state.get_active()] = bias;
   state.next_bias();
   return state;
@@ -346,7 +349,7 @@ uint8_t increment(uint8_t i, const uint8_t max_val) {
 
 void PokerState::next_round() {
   ++_round;
-  if(verbose) if(verbose) std::cout << std::fixed << std::setprecision(2) << round_to_str(_round) << " (" << (_pot / 100.0) << " bb):\n";
+  if(verbose) std::cout << std::fixed << std::setprecision(2) << round_to_str(_round) << " (" << (_pot / 100.0) << " bb):\n";
   for(Player& p : _players) {
     p.next_round();
   }
@@ -380,7 +383,7 @@ void PokerState::next_bias() {
   const uint8_t init_player_idx = _active;
   do {
     _active = increment(_active, _players.size() - 1);
-  } while(_active != init_player_idx && (_players[_active].has_folded() || _biases[_active] != Action::BIAS_DUMMY));
+  } while(_active != init_player_idx && _players[_active].has_folded());
 }
 
 int total_bet_size(const PokerState& state, const Action action) {

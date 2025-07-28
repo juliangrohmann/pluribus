@@ -120,10 +120,6 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         if(_log_level == SolverLogLevel::DEBUG) debug << "============== i = " << i << " ==============\n";
         std::vector<CachedIndexer> indexers(get_config().poker.n_players);
         RoundSample sample = sampler.sample();
-        // for(const auto& hand : sample.hands) {
-        //   std::cout << hand.to_string() << "  ";
-        // }
-        // std::cout << "\n";
         board = sample_board(get_config().init_board, sample.mask);
         for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
           indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes
@@ -246,6 +242,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
   }
   if(state.get_active() == i) {
     auto value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
+    auto branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
     const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     if(_log_level == SolverLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
     std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
@@ -257,7 +254,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
       Action a = value_actions[a_idx];
       if(base_ptr[a_idx].load() > PRUNE_CUTOFF) {
         PokerState next_state = state.apply(a);
-        int v_a = traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
+        const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
+        int v_a = traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, branching_idx, next_state, i), debug);
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
         if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
@@ -281,10 +279,12 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
     }
     return v;
   }
+  auto value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
   auto branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
-  int a_idx = external_sampling(branching_actions, state, board, hands, indexers, regret_storage, debug);
-  const PokerState next_state = state.apply(branching_actions[a_idx]);
-  return traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
+  const int a_idx = external_sampling(value_actions, state, board, hands, indexers, regret_storage, debug);
+  const PokerState next_state = state.apply(value_actions[a_idx]);
+  const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
+  return traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, branching_idx, next_state, i), debug);
 }
 
 template <template<typename> class StorageT>
@@ -300,6 +300,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t,
   }
   if(state.get_active() == i) {
     auto value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
+    auto branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
     const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     if(_log_level == SolverLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
     std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
@@ -308,8 +309,9 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t,
     float v_exact = 0;
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
+      const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
       PokerState next_state = state.apply(a);
-      int v_a = traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
+      int v_a = traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, branching_idx, next_state, i), debug);
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
       if(_log_level == SolverLogLevel::DEBUG) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
@@ -329,16 +331,17 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t,
     }
     return v;
   }
+  auto value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
   auto branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
-  int a_idx = external_sampling(branching_actions, state, board, hands, indexers, regret_storage, debug);
-  const PokerState next_state = state.apply(branching_actions[a_idx]);
-  return traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, a_idx, next_state, i), debug);
+  const int a_idx = external_sampling(value_actions, state, board, hands, indexers, regret_storage, debug);
+  const PokerState next_state = state.apply(value_actions[a_idx]);
+  const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
+  return traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, branching_idx, next_state, i), debug);
 }
 
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const PokerState& state, const Board& board,
     const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, StorageT<int>* regret_storage, std::ostringstream& debug) {
-  if(actions.size() == 1) return 0;
   const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()],
       state.get_round()));
   const std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
@@ -530,6 +533,11 @@ long BlueprintSolver<StorageT>::next_step(const long t, const long T) const {
   return std::min(std::min(_bp_config.next_discount_step(t, T), _bp_config.next_snapshot_step(t, T)), T);
 }
 
+template<template<typename> class StorageT>
+int BlueprintSolver<StorageT>::get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
+  return FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round()));
+}
+
 // ==========================================================================================
 // || RealTimeSolver
 // ==========================================================================================
@@ -542,14 +550,23 @@ template <template<typename> class StorageT>
 int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
   if(state.has_biases() && state.get_active() != state._first_bias) {
-    Logger::error("Active player changed after biasing. Active=" + std::to_string(state.get_active()) +
-        ", First bias=" + std::to_string(state._first_bias));
+    std::ostringstream oss;
+    oss << "Active player changed after biasing. Active=" << static_cast<int>(state.get_active()) << ", First bias=" << static_cast<int>(state._first_bias)
+        << ", Biases=";
+    for(Action a : state.get_biases()) oss << a.to_string() << "  ";
+    Logger::error(oss.str());
   }
   PokerState curr_state = state;
-  while(!state.is_terminal() && !state.get_players()[i].has_folded()) {
-    curr_state = curr_state.apply(_rollout_action_provider.next_action(indexers[state.get_active()], state, hands, board, _bp.get()));
+  while(!curr_state.is_terminal() && !curr_state.get_players()[i].has_folded()) {
+    curr_state = curr_state.apply(_rollout_action_provider.next_action(indexers[curr_state.get_active()], curr_state, hands, board, _bp.get()));
   }
   return utility(curr_state, i, board, hands, stack_size, this->get_config().rake, eval);
+}
+
+template<template <typename> class StorageT>
+int RealTimeSolver<StorageT>::get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
+  if(state.get_round() == this->get_config().init_state.get_round()) return HoleCardIndexer::get_instance()->index(hands[state.get_active()]);
+  Logger::error("Real time clusters on future rounds are not implemented.");
 }
 
 // ==========================================================================================
@@ -649,8 +666,31 @@ bool TreeBlueprintSolver::operator==(const TreeBlueprintSolver& other) const {
   return TreeSolver::operator==(other) && BlueprintSolver::operator==(other) && *_phi_root == *other._phi_root;
 }
 
+// ==========================================================================================
+// || TreeRealTimeSolver
+// ==========================================================================================
+
+TreeRealTimeSolver::TreeRealTimeSolver(const SolverConfig& config, const RealTimeSolverConfig& rt_config, const std::shared_ptr<const SampledBlueprint>& bp)
+    : TreeSolver{config}, MCCFRSolver{config}, RealTimeSolver{bp, rt_config} {}
+
+bool TreeRealTimeSolver::operator==(const TreeRealTimeSolver& other) const {
+  return TreeSolver::operator==(other) && RealTimeSolver::operator==(other);
 }
-// Histories: 207'676'198
-// Regrets: 89'388'760'400
-// Actionsets: 940'68'252'553
-// Infosets: 470'785'886
+
+void TreeRealTimeSolver::on_start() {
+  TreeSolver::on_start();
+  RealTimeSolver::on_start();
+}
+
+const std::shared_ptr<const TreeStorageConfig> TreeRealTimeSolver::make_tree_config() const {
+  std::vector<int> clusters;
+  for(int round = 1; round < 4; ++round) {
+    clusters.push_back(round == get_config().init_state.get_round() ? MAX_COMBOS : 500);
+  }
+  return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
+    ClusterSpec{169, clusters[0], clusters[1], clusters[2]},
+    ActionMode::make_real_time_mode(get_config().action_profile, get_real_time_config())
+  });
+}
+
+}
