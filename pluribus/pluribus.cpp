@@ -23,18 +23,20 @@ private:
 Pluribus::Pluribus(const std::shared_ptr<const LosslessBlueprint>& preflop_bp, const std::shared_ptr<const SampledBlueprint>& sampled_bp)
     : _preflop_bp{preflop_bp}, _sampled_bp{sampled_bp} {}
 
-void Pluribus::new_game(const std::vector<std::string>& players) {
+void Pluribus::new_game(const std::vector<std::string>& players, const std::vector<int>& stacks) {
   Logger::log("================================ New Game ================================");
   std::ostringstream oss;
   Logger::log("Players: " + join_strs(players, ", "));
+  Logger::log("Stacks: " + join_as_strs(stacks, ", "));
+  const auto& poker_config = _sampled_bp->get_config().poker;
+  if(players.size() != stacks.size() || players.size() != poker_config.n_players) {
+    Logger::error("Player number mismatch. Expected " + std::to_string(poker_config.n_players) + " players.");
+  }
 
-  _real_state = _sampled_bp->get_config().init_state; // TODO: supply state with real stack sizes
+  _real_state = PokerState{poker_config.n_players, stacks, poker_config.ante, poker_config.straddle};
   _root_state = _real_state;
   _mapped_actions = _real_state.get_action_history();
 
-  if(players.size() != _real_state.get_players().size()) {
-    Logger::error("Player number mismatch. Expected " + std::to_string(_real_state.get_players().size()) + " players.");
-  }
   Logger::log("Real state/Root state:\n" + _root_state.to_string());
   if(const int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;
       _root_state.get_bet_level() > 1 || _root_state.get_round() != 0 || _root_state.get_active() != init_pos) {

@@ -40,7 +40,7 @@ void PluribusServer::dispatch_commands() {
 
     switch (cmd.type) {
       case CommandType::NewGame:
-        _engine->new_game(cmd.players);
+        _engine->new_game(cmd.players, cmd.stacks);
         break;
       case CommandType::UpdateState:
         _engine->update_state(cmd.action, cmd.pos);

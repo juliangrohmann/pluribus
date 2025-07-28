@@ -194,6 +194,7 @@ struct PokerConfig {
 
 class PokerState {
 public:
+  explicit PokerState(int n_players, const std::vector<int>& chips, int ante = 0, bool straddle = false);
   explicit PokerState(int n_players = 2, int chips = 10'000, int ante = 0, bool straddle = false);
   explicit PokerState(const PokerConfig& config);
   PokerState(const PokerState&) = default;

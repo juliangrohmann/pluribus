@@ -116,11 +116,15 @@ void Player::reset(const int chips) {
   _betsize = 0;
 }
 
-PokerState::PokerState(const int n_players, const int chips, const int ante, const bool straddle)
+PokerState::PokerState(const int n_players, const std::vector<int>& chips, const int ante, const bool straddle)
     : _pot{150}, _max_bet{100}, _round{0}, _bet_level{1}, _winner{-1}, _straddle{straddle} {
+  if(n_players != chips.size()) {
+    throw std::runtime_error("Player amount mismatch: n_players=" + std::to_string(n_players) + ", chip stacks=" + std::to_string(chips.size()));
+  }
+
   _players.reserve(n_players);
   for(int i = 0; i < n_players; ++i) {
-    _players.push_back(Player{chips});
+    _players.push_back(Player{chips[i]});
   }
   
   if(_players.size() > 2) {
@@ -149,6 +153,9 @@ PokerState::PokerState(const int n_players, const int chips, const int ante, con
     _pot += _players.size() * ante;
   }
 }
+
+PokerState::PokerState(const int n_players, const int chips, const int ante, const bool straddle)
+    : PokerState{n_players, std::vector(n_players, chips), ante, straddle} {}
 
 PokerState::PokerState(const PokerConfig& config) : PokerState{config.n_players, config.n_chips, config.ante, config.straddle} {}
 
