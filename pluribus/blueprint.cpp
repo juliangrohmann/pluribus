@@ -7,7 +7,6 @@
 #include <sys/sysinfo.h>
 #include <cereal/cereal.hpp>
 #include <cereal/types/vector.hpp>
-#include <cereal/types/unordered_map.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/util.hpp>
 #include <pluribus/logging.hpp>
