@@ -182,8 +182,13 @@ struct PokerConfig {
   bool operator==(const PokerConfig&) const = default;
 
   template <class Archive>
-  void serialize(Archive& ar) {
+  void load(Archive& ar) {
     ar(n_players, n_chips, ante);
+  }
+
+  template <class Archive>
+  void save(Archive& ar) {
+    ar(n_players, n_chips, ante, straddle);
   }
 
   int n_players = 2;
@@ -225,8 +230,13 @@ public:
   std::string to_string() const;
   
   template <class Archive>
-  void serialize(Archive& ar) {
+  void load(Archive& ar) {
     ar(_players, _biases, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner);
+  }
+
+  template <class Archive>
+  void save(Archive& ar) {
+    ar(_players, _biases, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner, _straddle);
   }
 
   uint8_t _first_bias = 10; // TODO: remove, just for asserts

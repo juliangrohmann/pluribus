@@ -31,11 +31,12 @@ public:
     if(_freq) return _freq.get();
     throw std::runtime_error("Blueprint strategy is null.");
   }
-
   const TreeStorageNode<T>* get_strategy() const override {
     if(_freq) return _freq.get();
     throw std::runtime_error("Blueprint strategy is null.");
   }
+
+  SolverConfig& get_mutable_config() { return _config; }
   const SolverConfig& get_config() const override { return _config; }
 
   template <class Archive>
