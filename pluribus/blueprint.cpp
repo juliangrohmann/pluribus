@@ -154,12 +154,18 @@ LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std:
 
 void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, const int max_gb) {
   Logger::log("Building lossless blueprint...");
-  build_from_meta_data(build_lossless_buffers(preflop_fn, all_fns, buf_dir, max_gb));
+  auto meta = build_lossless_buffers(preflop_fn, all_fns, buf_dir, max_gb);
+  meta.config.poker.straddle = true;
+  meta.config.init_state = PokerState{meta.config.poker};
+  build_from_meta_data(meta);
 }
 
 void LosslessBlueprint::build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns) {
   Logger::log("Building lossless blueprint from cached buffers...");
-  build_from_meta_data(collect_meta_data(preflop_buf_fn, final_bp_fn, buffer_fns));
+  auto meta = collect_meta_data(preflop_buf_fn, final_bp_fn, buffer_fns);
+  meta.config.poker.straddle = true;
+  meta.config.init_state = PokerState{meta.config.poker};
+  build_from_meta_data(meta);
 }
 
 void LosslessBlueprint::build_meta(const std::string& meta_fn) {
