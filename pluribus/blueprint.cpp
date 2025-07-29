@@ -221,16 +221,11 @@ void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
     BlueprintBuffer<float> buf;
     cereal_load(buf, buf_fn);
     Logger::log("Accumulating " + buf_fn + ": " + std::to_string(buf.entries.size()) + " nodes");
-    // #pragma omp parallel for schedule(static)
+    #pragma omp parallel for schedule(static)
     for(size_t idx = 0; idx < buf.entries.size(); ++idx) {
-      std::cout << "idx=" << idx << "\n";
       TreeStorageNode<float>* node = get_freq().get();
       PokerState state = meta.config.init_state;
       for(const Action a : buf.entries[idx].first.get_history()) {
-        std::cout << "Applying " << a.to_string() << "\n";
-        std::cout << "Branching actions: " << std::flush;
-        for(Action b_a : node->get_branching_actions()) std::cout << b_a.to_string() << "  ";
-        std::cout << "\n";
         state = state.apply(a);
         node = node->apply(a, state);
       }
