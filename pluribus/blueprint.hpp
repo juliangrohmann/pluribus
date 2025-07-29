@@ -20,6 +20,11 @@ struct LosslessMetadata {
   std::vector<std::string> buffer_fns;
   std::string preflop_buf_fn;
   int n_clusters = -1;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(config, tree_config, buffer_fns, preflop_buf_fn, n_clusters);
+  }
 };
 
 template <class T>
