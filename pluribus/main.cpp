@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
     }
   }
   else if(command == "blueprint-cached") {
-    // ./Pluribus blueprint preflop_buf_fn final_snapshot_fn buf_dir out_fn
+    // ./Pluribus blueprint-cached preflop_buf_fn final_snapshot_fn buf_dir out_fn
     if(argc < 6) {
       std::cout << "Missing arguments to build blueprint from cache.\n";
     }
@@ -86,6 +86,18 @@ int main(int argc, char* argv[]) {
       SampledBlueprint sampled_bp;
       sampled_bp.build(lossless_fn, argv[3], argv[4]);
       cereal_save(sampled_bp, "sampled_" + std::string{argv[5]});
+    }
+  }
+  else if(command == "blueprint-meta") { // TODO: remove
+    // ./Pluribus blueprint-meta meta_fn out_fn
+    if(argc < 6) {
+      std::cout << "Missing arguments to build blueprint from cache.\n";
+    }
+    else {
+      LosslessBlueprint lossless_bp;
+      lossless_bp.build_meta(argv[2]);
+      std::string lossless_fn = "lossless_" + std::string{argv[3]};
+      cereal_save(lossless_bp, lossless_fn);
     }
   }
   else if(command == "sampled-blueprint") {

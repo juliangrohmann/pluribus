@@ -183,6 +183,7 @@ struct PokerConfig {
 
   template <class Archive>
   void serialize(Archive& ar) {
+    // ar(n_players, n_chips, ante, straddle); // TODO: compatibility
     ar(n_players, n_chips, ante);
   }
 
@@ -226,6 +227,7 @@ public:
   
   template <class Archive>
   void serialize(Archive& ar) {
+    // ar(_players, _biases, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner, _straddle); // TODO: compatibility
     ar(_players, _biases, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner);
   }
 
