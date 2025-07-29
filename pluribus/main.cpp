@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
   }
   else if(command == "blueprint-meta") { // TODO: remove
     // ./Pluribus blueprint-meta meta_fn out_fn
-    if(argc < 6) {
+    if(argc < 4) {
       std::cout << "Missing arguments to build blueprint from cache.\n";
     }
     else {
