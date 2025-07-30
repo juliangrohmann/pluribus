@@ -143,7 +143,12 @@ LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std:
   Logger::log("Final blueprint file: " + final_bp_fn);
   LosslessMetadata meta;
   meta.preflop_buf_fn = preflop_buf_fn;
-  meta.buffer_fns = buffer_fns;
+  for(const auto& fn : buffer_fns) {
+    if(fn != preflop_buf_fn) {
+      meta.buffer_fns.push_back(fn);
+    }
+  }
+  Logger::log("Buffer filenames: " + std::to_string(meta.buffer_fns.size()));
   TreeBlueprintSolver final_bp;
   cereal_load(final_bp, final_bp_fn);
   set_meta_config(meta, final_bp);
