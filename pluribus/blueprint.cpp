@@ -147,6 +147,9 @@ LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std:
     if(fn != preflop_buf_fn) {
       meta.buffer_fns.push_back(fn);
     }
+    else {
+      Logger::log("Excluded " + fn + " from buffers.");
+    }
   }
   Logger::log("Buffer filenames: " + std::to_string(meta.buffer_fns.size()));
   TreeBlueprintSolver final_bp;
