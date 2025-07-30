@@ -50,11 +50,11 @@ private:
 
 class LosslessBlueprint : public Blueprint<float> {
 public:
-  void build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir = "", int max_gb = 50);
-  void build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns);
+  void build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, bool preflop, int max_gb = 50);
+  void build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns, bool preflop);
 
 private:
-  void build_from_meta_data(const LosslessMetadata& meta);
+  void build_from_meta_data(const LosslessMetadata& meta, bool preflop);
 };
 
 std::vector<float> biased_freq(const std::vector<Action>& actions, const std::vector<float>& freq, Action bias, float factor);

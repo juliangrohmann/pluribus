@@ -58,13 +58,14 @@ int main(int argc, char* argv[]) {
     
   }
   else if(command == "blueprint") {
-    // ./Pluribus blueprint final_snapshot_fn snapshot_dir buf_dir out_fn
+    // ./Pluribus blueprint final_snapshot_fn snapshot_dir buf_dir out_fn [--no-preflop]
     if(argc < 6) {
       std::cout << "Missing arguments to build blueprint.\n";
     }
     else {
+      bool no_preflop = argc >= 7 && strcmp(argv[6], "--no-preflop");
       LosslessBlueprint lossless_bp;
-      lossless_bp.build(argv[2], get_filepaths(argv[3]), argv[4]);
+      lossless_bp.build(argv[2], get_filepaths(argv[3]), argv[4], !no_preflop);
       std::string lossless_fn = "lossless_" + std::string{argv[5]};
       cereal_save(lossless_bp, lossless_fn);
       SampledBlueprint sampled_bp;
@@ -74,13 +75,14 @@ int main(int argc, char* argv[]) {
     }
   }
   else if(command == "blueprint-cached") {
-    // ./Pluribus blueprint-cached preflop_buf_fn final_snapshot_fn buf_dir out_fn
+    // ./Pluribus blueprint-cached preflop_buf_fn final_snapshot_fn buf_dir out_fn [--no-preflop]
     if(argc < 6) {
       std::cout << "Missing arguments to build blueprint from cache.\n";
     }
     else {
+      bool no_preflop = argc >= 7 && strcmp(argv[6], "--no-preflop");
       LosslessBlueprint lossless_bp;
-      lossless_bp.build_cached(argv[2], argv[3], get_filepaths(argv[4]));
+      lossless_bp.build_cached(argv[2], argv[3], get_filepaths(argv[4]), !no_preflop);
       std::string lossless_fn = "lossless_" + std::string{argv[5]};
       cereal_save(lossless_bp, lossless_fn);
       SampledBlueprint sampled_bp;
