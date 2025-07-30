@@ -5,11 +5,11 @@
 #include <cereal/cereal.hpp>
 #include <cereal/types/memory.hpp>
 #include <cereal/types/unordered_map.hpp>
+#include <pluribus/cereal_ext.hpp>
+#include <pluribus/config.hpp>
 #include <pluribus/debug.hpp>
 #include <pluribus/rng.hpp>
 #include <pluribus/sampling.hpp>
-#include <pluribus/cereal_ext.hpp>
-#include <pluribus/config.hpp>
 #include <pluribus/tree_storage.hpp>
 
 namespace pluribus {
@@ -19,7 +19,6 @@ struct LosslessMetadata {
   std::shared_ptr<const TreeStorageConfig> tree_config;
   std::vector<std::string> buffer_fns;
   std::string preflop_buf_fn;
-  int n_clusters = -1;
 };
 
 template <class T>

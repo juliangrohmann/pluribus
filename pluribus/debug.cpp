@@ -1,12 +1,12 @@
-#include <iostream>
+#include <cnpy.h>
 #include <iomanip>
+#include <iostream>
 #include <string>
 #include <vector>
-#include <cnpy.h>
 #include <hand_isomorphism/hand_index.h>
-#include <pluribus/util.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/debug.hpp>
+#include <pluribus/util.hpp>
 
 namespace pluribus {
 
@@ -22,7 +22,7 @@ std::string round_to_str(const int round) {
 }
 
 const std::vector<std::string> positions{"BTN", "CO", "HJ", "LJ", "UTG+2", "UTG+1", "UTG"};
-std::string pos_to_str(const int idx, const int n_players) {
+std::string pos_to_str(const size_t idx, const size_t n_players) {
   if(idx == 0) return n_players == 2 ? "BB" : "SB";
   if(idx == 1) return n_players == 2 ? "SB" : "BB";
   return positions[n_players - idx - 1];

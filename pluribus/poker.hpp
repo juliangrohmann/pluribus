@@ -17,8 +17,8 @@ namespace pluribus {
 
 class Deck {
 public:
-  explicit Deck(const std::unordered_set<uint8_t>& dead_cards = {}) : _dead_cards{dead_cards} { reset(); }
-  explicit Deck(const std::vector<uint8_t>& dead_cards) {
+  explicit Deck(const std::unordered_set<uint8_t>& dead_cards = {}) : _cards{}, _dead_cards{dead_cards} { reset(); }
+  explicit Deck(const std::vector<uint8_t>& dead_cards) : _cards{} {
     std::ranges::copy(dead_cards, std::inserter(_dead_cards, _dead_cards.end()));
     reset();
   }
@@ -45,26 +45,26 @@ uint64_t card_mask(const std::vector<uint8_t>& cards);
 template<int N>
 class CardSet {
 public:
-  CardSet() { 
+  CardSet() : _mask{0} {
     _cards.fill(0); 
     update_mask();
   }
-  explicit CardSet(const std::array<uint8_t, N>& cards) : _cards{cards} {
-    update_mask(); 
+  CardSet(const std::initializer_list<uint8_t>& cards) : _mask{0} {
+    std::copy(cards.begin(), cards.end(), _cards.begin());
+    update_mask(0, cards.size());
   }
-  explicit CardSet(const std::vector<uint8_t>& cards) {
+  explicit CardSet(const std::array<uint8_t, N>& cards) : _cards{cards}, _mask{0}  {
+    update_mask();
+  }
+  explicit CardSet(const std::vector<uint8_t>& cards) : _mask{0} {
     std::copy(cards.begin(), cards.end(), _cards.begin()); 
     update_mask(0, cards.size());
   }
-  explicit CardSet(const std::initializer_list<uint8_t>& cards) {
-    std::copy(cards.begin(), cards.end(), _cards.begin()); 
-    update_mask(0, cards.size());
-  }
-  explicit CardSet(const std::string& card_str) {
+  explicit CardSet(const std::string& card_str) : _mask{0} {
     str_to_cards(card_str, _cards.data()); 
     update_mask(0, card_str.size() / 2);
   }
-   explicit CardSet(Deck& deck, const std::vector<uint8_t>& init_cards = {}) {
+   explicit CardSet(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : _mask{0} {
     deal(deck, init_cards); 
   }
 
@@ -79,7 +79,7 @@ public:
 
   void deal(Deck& deck, std::vector<uint8_t> init_cards = {}) { 
     for(int i = 0; i < init_cards.size(); ++i) _cards[i] = init_cards[i];
-    for(int i = init_cards.size(); i < N; ++i) _cards[i] = deck.draw(); 
+    for(int i = static_cast<int>(init_cards.size()); i < N; ++i) _cards[i] = deck.draw();
     update_mask();
   }
 
@@ -104,10 +104,10 @@ protected:
 
 class Board : public CardSet<5> {
 public:
-  Board() {}
+  Board() = default;
+  Board(const std::initializer_list<uint8_t>& cards) : CardSet{cards} {}
   explicit Board(const std::array<uint8_t, 5>& cards) : CardSet{cards} {}
   explicit Board(const std::vector<uint8_t>& cards) : CardSet{cards} {}
-  explicit Board(const std::initializer_list<uint8_t>& cards) : CardSet{cards} {}
   explicit Board(const std::string& card_str) : CardSet{card_str} {}
   explicit Board(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : CardSet{deck, init_cards} {}
   bool operator==(const Board&) const = default;
@@ -115,10 +115,10 @@ public:
 
 class Hand : public CardSet<2> {
 public:
-  Hand() {}
+  Hand() = default;
+  Hand(const std::initializer_list<uint8_t>& cards) : CardSet{cards} {}
   explicit Hand(const std::array<uint8_t, 2>& cards) : CardSet{cards} {}
   explicit Hand(const std::vector<uint8_t>& cards) : CardSet{cards} {}
-  explicit Hand(const std::initializer_list<uint8_t>& cards) : CardSet{cards} {}
   explicit Hand(const std::string& card_str) : CardSet{card_str} {}
   explicit Hand(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : CardSet{deck, init_cards} {}
   bool operator==(const Hand&) const = default;
@@ -260,7 +260,7 @@ public:
   RakeStructure(const double percent, const double cap) : _percent{percent}, _cap{cap} {}
 
   int payoff(const PokerState& state) const {
-    return state.get_round() == 0 ? state.get_pot() : round(std::max(state.get_pot() * (1.0 - _percent), state.get_pot() - _cap));
+    return state.get_round() == 0 ? state.get_pot() : static_cast<int>(round(std::max(state.get_pot() * (1.0 - _percent), state.get_pot() - _cap)));
   }
 
   bool operator==(const RakeStructure& other) const = default;

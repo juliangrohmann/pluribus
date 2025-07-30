@@ -1,14 +1,14 @@
-#include <iostream>
 #include <iomanip>
-#include <vector>
-#include <sstream>
+#include <iostream>
 #include <limits>
+#include <sstream>
+#include <vector>
 #include <cereal/cereal.hpp>
-#include <pluribus/util.hpp>
-#include <pluribus/debug.hpp>
-#include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/debug.hpp>
 #include <pluribus/logging.hpp>
+#include <pluribus/poker.hpp>
+#include <pluribus/util.hpp>
 #include <sys/stat.h>
 
 namespace pluribus {
@@ -169,7 +169,7 @@ std::string actions_to_str(const std::vector<Action>& actions) {
 
 std::string ActionProfile::to_string() const {
   std::ostringstream oss;
-  if(_iso_actions.size() == 0) {
+  if(_iso_actions.empty()) {
 
   }
   else {

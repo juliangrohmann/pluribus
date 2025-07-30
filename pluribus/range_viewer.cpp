@@ -1,12 +1,12 @@
-#include <iostream>
-#include <iomanip>
-#include <stdexcept>
 #include <algorithm>
+#include <iomanip>
+#include <iostream>
+#include <stdexcept>
 #include <utility>
-#include <SDL2/SDL_image.h>
-#include <pluribus/util.hpp>
 #include <pluribus/actions.hpp>
 #include <pluribus/range_viewer.hpp>
+#include <pluribus/util.hpp>
+#include <SDL2/SDL_image.h>
 
 namespace pluribus {
 
@@ -192,10 +192,10 @@ void RangeViewer::render_legend(const std::vector<RenderableRange>& ranges) {
   if(n_rel_ranges == 0) return;
   
   const int w = _window_width / n_rel_ranges;
-  constexpr int h = 100;
   int x = 0;
   for(const auto& range : ranges) {
     if(range.is_relative()) {
+      constexpr int h = 100;
       SDL_Rect rect = {x, _window_height - h, w, h};
       set_color(get_renderer(), range.get_color());
       SDL_RenderFillRect(get_renderer(), &rect);
@@ -252,7 +252,7 @@ void WindowRangeViewer::render(const std::vector<RenderableRange>& ranges) {
 }
 
 PngRangeViewer::PngRangeViewer(const std::string& fn, const int width, const int height) : RangeViewer(fn, width, height), _fn{fn} {
-  if(const int imgFlags = IMG_INIT_PNG; !(IMG_Init(imgFlags) & imgFlags)) {
+  if(constexpr int imgFlags = IMG_INIT_PNG; !(IMG_Init(imgFlags) & imgFlags)) {
     SDL_Log("IMG_Init failed: %s", IMG_GetError());
     return;
   }

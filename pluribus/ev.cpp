@@ -1,9 +1,9 @@
 #include <cmath>
-#include <pluribus/indexing.hpp>
-#include <pluribus/cluster.hpp>
 #include <pluribus/blueprint.hpp>
-#include <pluribus/mccfr.hpp>
+#include <pluribus/cluster.hpp>
 #include <pluribus/ev.hpp>
+#include <pluribus/indexing.hpp>
+#include <pluribus/mccfr.hpp>
 
 namespace pluribus {
 
@@ -36,7 +36,7 @@ ResultEV MonteCarloEV::sampled(const std::vector<Action>& biases, const SampledB
 
 bool MonteCarloEV::_should_terminate(const long t, const double std_err, const Duration dt) const {
   return t >= _min_it && 
-      (t >= _max_it || std_err < _std_err_target || std::chrono::duration_cast<std::chrono::milliseconds>(dt).count() > _max_ms);
+      (t >= _max_it || std_err < _std_err_target || static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(dt).count()) > _max_ms);
 }
 
 bool any_collision(const uint8_t card, const std::vector<Hand>& hands, const std::vector<uint8_t>& board) {
@@ -98,11 +98,11 @@ double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, const 
       if(collides(c, init_board)) continue;
       auto next_board = init_board;
       next_board.push_back(c);
-      boards.push_back(Board{next_board});
+      boards.emplace_back(next_board);
     }
   }
   else if(init_board.size() == 5) {
-    boards.push_back(Board{init_board});
+    boards.emplace_back(init_board);
   }
   else {
     throw std::runtime_error("Enumerate EV only supported for Turn/River.");
@@ -113,7 +113,7 @@ double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, const 
   std::vector<Hand> hands(ranges.size());
   double ev = 0.0;
   double total = 0.0;
-  double max_combos = boards.size();
+  auto max_combos = static_cast<double>(boards.size());
   for(const auto& r : ranges) max_combos *= r.n_combos();
   for(const auto& board : boards) {
     std::cout << "Enumerate EV: " << std::fixed << std::setprecision(1) << total / max_combos * 100 << "%\n";
@@ -124,7 +124,7 @@ double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, const 
         hands[i] = hh;
         hands[pos_v] = vh;
         std::vector<CachedIndexer> indexers;
-        for(int _ = 0; i < hands.size(); ++_) indexers.push_back(CachedIndexer{});
+        for(int _ = 0; i < hands.size(); ++_) indexers.emplace_back();
         const double freq = ranges[i].frequency(hh) * ranges[pos_v].frequency(vh);
         ev += freq * node_ev(bp.get_strategy(), bp.get_config(), state, i, hands, board, indexers, eval);
         total += freq;

@@ -3,9 +3,9 @@
 #include <atomic>
 #include <cereal/cereal.hpp>
 #include <cereal/archives/binary.hpp>
-#include <tbb/concurrent_vector.h>
-#include <tbb/concurrent_unordered_map.h>
 #include <pluribus/logging.hpp>
+#include <tbb/concurrent_unordered_map.h>
+#include <tbb/concurrent_vector.h>
 
 namespace pluribus {
   

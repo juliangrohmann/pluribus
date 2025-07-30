@@ -1,24 +1,24 @@
-#include <iostream>
-#include <iomanip>
-#include <fstream>
-#include <sstream>
-#include <string>
 #include <algorithm>
 #include <atomic>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <limits>
 #include <omp.h>
-#include <tqdm/tqdm.hpp>
+#include <sstream>
+#include <string>
 #include <json/json.hpp>
-#include <pluribus/util.hpp>
-#include <pluribus/rng.hpp>
-#include <pluribus/debug.hpp>
-#include <pluribus/poker.hpp>
-#include <pluribus/cluster.hpp>
 #include <pluribus/actions.hpp>
-#include <pluribus/traverse.hpp>
+#include <pluribus/cluster.hpp>
+#include <pluribus/debug.hpp>
 #include <pluribus/decision.hpp>
 #include <pluribus/logging.hpp>
 #include <pluribus/mccfr.hpp>
+#include <pluribus/poker.hpp>
+#include <pluribus/rng.hpp>
+#include <pluribus/traverse.hpp>
+#include <pluribus/util.hpp>
+#include <tqdm/tqdm.hpp>
 
 namespace pluribus {
 
@@ -66,14 +66,6 @@ std::string action_str(const std::vector<Action>& actions) {
   return str;
 }
 
-bool are_full_ranges(const std::vector<PokerRange>& ranges) {
-  const PokerRange full_range = PokerRange::full();
-  for(const auto& r : ranges) {
-    if(r != full_range) return false;
-  }
-  return true;
-}
-
 template <class T>
 std::vector<float> state_to_freq(std::atomic<T>* base_ptr, int n_actions) {
   return calculate_strategy(base_ptr, n_actions);
@@ -93,8 +85,6 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
   Logger::log("Solver config:\n" + get_config().to_string());
   on_start();
 
-  bool full_ranges = are_full_ranges(get_config().init_ranges);
-  Logger::log("Full ranges: " + std::string{full_ranges ? "true" : "false"});
   Logger::log("Training blueprint from " + std::to_string(_t) + " to " + std::to_string(T));
   std::ostringstream buf;
   while(_t < T) {
@@ -149,8 +139,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       buf << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
       Logger::dump(buf);
       init_regret_storage()->lcfr_discount(d);
-      StorageT<float>* init_avg = init_avg_storage();
-      if(init_avg) init_avg->lcfr_discount(d);
+      if(StorageT<float>* init_avg = init_avg_storage()) init_avg->lcfr_discount(d);
     }
     if(should_snapshot(_t, T)) {
       std::ostringstream fn_stream;
@@ -573,7 +562,7 @@ int RealTimeSolver<StorageT>::get_cluster(const PokerState& state, const Board& 
 // || TreeBlueprintSolver
 // ==========================================================================================
 
-const std::shared_ptr<const TreeStorageConfig> TreeBlueprintSolver::make_tree_config() const {
+std::shared_ptr<const TreeStorageConfig> TreeBlueprintSolver::make_tree_config() const {
   return std::make_shared<TreeStorageConfig>(TreeStorageConfig{
     ClusterSpec{169, 200, 200, 200},
     ActionMode::make_blueprint_mode(get_config().action_profile)
@@ -682,7 +671,7 @@ void TreeRealTimeSolver::on_start() {
   RealTimeSolver::on_start();
 }
 
-const std::shared_ptr<const TreeStorageConfig> TreeRealTimeSolver::make_tree_config() const {
+std::shared_ptr<const TreeStorageConfig> TreeRealTimeSolver::make_tree_config() const {
   std::vector<int> clusters;
   for(int round = 1; round < 4; ++round) {
     clusters.push_back(round == get_config().init_state.get_round() ? MAX_COMBOS : 500);

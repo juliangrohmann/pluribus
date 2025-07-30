@@ -1,12 +1,12 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
-#include <pluribus/range.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/poker.hpp>
+#include <pluribus/range.hpp>
 #include <pluribus/range_viewer.hpp>
-#include <pluribus/util.hpp>
 #include <pluribus/traverse.hpp>
+#include <pluribus/util.hpp>
 
 namespace pluribus {
 

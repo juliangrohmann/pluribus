@@ -1,9 +1,9 @@
 #include <iostream>
-#include <pluribus/poker.hpp>
+#include <pluribus/blueprint.hpp>
 #include <pluribus/cluster.hpp>
+#include <pluribus/poker.hpp>
 #include <pluribus/range_viewer.hpp>
 #include <pluribus/traverse.hpp>
-#include <pluribus/blueprint.hpp>
 
 #include "server.hpp"
 
@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
     }
   }
   else if(command == "blueprint-cached") {
-    // ./Pluribus blueprint preflop_buf_fn final_snapshot_fn buf_dir out_fn
+    // ./Pluribus blueprint-cached preflop_buf_fn final_snapshot_fn buf_dir out_fn
     if(argc < 6) {
       std::cout << "Missing arguments to build blueprint from cache.\n";
     }

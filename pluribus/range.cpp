@@ -1,11 +1,11 @@
 #include <numeric>
 #include <omp/Hand.h>
 #include <pluribus/constants.hpp>
-#include <pluribus/rng.hpp>
-#include <pluribus/poker.hpp>
-#include <pluribus/mccfr.hpp>
 #include <pluribus/logging.hpp>
+#include <pluribus/mccfr.hpp>
+#include <pluribus/poker.hpp>
 #include <pluribus/range.hpp>
+#include <pluribus/rng.hpp>
 
 namespace pluribus {
 

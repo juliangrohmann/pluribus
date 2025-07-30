@@ -1,15 +1,15 @@
-#include <iostream>
-#include <iomanip>
 #include <cassert>
+#include <ctime>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <ctime>
-#include <sstream>
-#include <fstream>
-#include <filesystem>
-#include <sys/sysinfo.h>
-#include <omp/Hand.h>
 #include <hand_isomorphism/hand_index.h>
+#include <omp/Hand.h>
+#include <sys/sysinfo.h>
 
 namespace pluribus {
 
@@ -68,7 +68,7 @@ void write_to_file(const std::filesystem::path& file_path, const std::string& co
 
 std::string date_time_str(const std::string& format) {
     std::time_t t = std::time(nullptr);
-    std::tm tm;
+    std::tm tm{};
 #ifdef _WIN32
     localtime_s(&tm, &t);
 #else
@@ -101,14 +101,14 @@ std::vector<uint8_t> str_to_cards(const std::string& card_str) {
 }
 
 std::string cards_to_str(const uint8_t* begin, const uint8_t* end) {
-  std::string str = "";
+  std::string str;
   for(; begin != end; ++begin) {
     str += idx_to_card(*begin);
   }
   return str;
 }
 
-std::string cards_to_str(const uint8_t cards[], const int n) {
+std::string cards_to_str(const uint8_t cards[], const size_t n) {
   return cards_to_str(cards, cards + n);
 }
 
@@ -122,9 +122,9 @@ int n_board_cards(const int round) {
 
 int init_indexer(hand_indexer_t& indexer, const int round) {
   uint8_t n_cards[round + 1];
-  constexpr uint8_t all_rounds[] = {2, 3, 1, 1};
   int card_sum = 0;
   for(int i = 0; i < round + 1; ++i) {
+    constexpr uint8_t all_rounds[] = {2, 3, 1, 1};
     n_cards[i] = all_rounds[i];
     card_sum += all_rounds[i];
   }

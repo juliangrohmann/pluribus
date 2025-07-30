@@ -20,7 +20,7 @@ constexpr bool verbose = is_debug &
 #endif
 
 std::string round_to_str(int round);
-std::string pos_to_str(int idx, int n_players);
+std::string pos_to_str(size_t idx, size_t n_players);
 void print_cluster(int cluster, int round, int n_clusters);
 void print_similar_boards(const std::string &board, int n_clusters=200);
 

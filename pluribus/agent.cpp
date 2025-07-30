@@ -1,11 +1,11 @@
 #include <vector>
-#include <pluribus/rng.hpp>
-#include <pluribus/poker.hpp>
+#include <pluribus/agent.hpp>
+#include <pluribus/cluster.hpp>
 #include <pluribus/indexing.hpp>
 #include <pluribus/mccfr.hpp>
-#include <pluribus/cluster.hpp>
+#include <pluribus/poker.hpp>
+#include <pluribus/rng.hpp>
 #include <pluribus/simulate.hpp>
-#include <pluribus/agent.hpp>
 
 namespace pluribus {
 

@@ -1,19 +1,19 @@
-#include <iostream>
-#include <string>
-#include <fstream>
-#include <vector>
 #include <chrono>
+#include <cnpy.h>
+#include <fstream>
+#include <iostream>
 #include <memory>
 #include <omp.h>
-#include <cnpy.h>
-#include <tqdm/tqdm.hpp>
+#include <string>
+#include <vector>
 #include <cereal/types/array.hpp>
 #include <hand_isomorphism/hand_index.h>
-#include <omp/EquityCalculator.h>
 #include <omp/CardRange.h>
+#include <omp/EquityCalculator.h>
+#include <pluribus/cluster.hpp>
 #include <pluribus/constants.hpp>
 #include <pluribus/util.hpp>
-#include <pluribus/cluster.hpp>
+#include <tqdm/tqdm.hpp>
 
 namespace pluribus {
 

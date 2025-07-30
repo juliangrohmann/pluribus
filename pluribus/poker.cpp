@@ -1,17 +1,17 @@
-#include <iostream>
-#include <iomanip>
-#include <cassert>
-#include <vector>
 #include <array>
-#include <string>
+#include <cassert>
+#include <iomanip>
+#include <iostream>
 #include <sstream>
+#include <string>
+#include <vector>
+#include <boost/functional/hash.hpp>
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
-#include <boost/functional/hash.hpp>
-#include <pluribus/rng.hpp>
 #include <pluribus/debug.hpp>
-#include <pluribus/util.hpp>
 #include <pluribus/poker.hpp>
+#include <pluribus/rng.hpp>
+#include <pluribus/util.hpp>
 
 namespace pluribus {
 

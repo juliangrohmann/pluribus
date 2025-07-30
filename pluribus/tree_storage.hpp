@@ -1,14 +1,14 @@
 #pragma once
 
 #include <atomic>
-#include <mutex>
 #include <functional>
-#include <pluribus/poker.hpp>
+#include <mutex>
 #include <pluribus/actions.hpp>
-#include <pluribus/config.hpp>
 #include <pluribus/concurrency.hpp>
-#include <pluribus/util.hpp>
+#include <pluribus/config.hpp>
 #include <pluribus/logging.hpp>
+#include <pluribus/poker.hpp>
+#include <pluribus/util.hpp>
 
 namespace pluribus {
 
@@ -288,8 +288,7 @@ private:
     if(!_nodes) return;
     for(int a_idx = 0; a_idx < _branching_actions.size(); ++a_idx) {
       auto& node_atom = _nodes[a_idx];
-      const TreeStorageNode* node = node_atom.load();
-      if(node) {
+      if(const TreeStorageNode* node = node_atom.load()) {
         delete node;
         node_atom.store(nullptr);
       }

@@ -1,11 +1,11 @@
 #pragma once
 
-#include <pluribus/poker.hpp>
-#include <pluribus/cluster.hpp>
-#include <pluribus/tree_storage.hpp>
-#include <pluribus/blueprint.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/blueprint.hpp>
 #include <pluribus/calc.hpp>
+#include <pluribus/cluster.hpp>
+#include <pluribus/poker.hpp>
+#include <pluribus/tree_storage.hpp>
 
 namespace pluribus {
 

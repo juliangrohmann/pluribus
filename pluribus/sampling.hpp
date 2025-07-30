@@ -3,8 +3,8 @@
 #include <omp/Random.h>
 #include <pluribus/constants.hpp>
 #include <pluribus/poker.hpp>
-#include <pluribus/rng.hpp>
 #include <pluribus/range.hpp>
+#include <pluribus/rng.hpp>
 
 namespace pluribus {
 

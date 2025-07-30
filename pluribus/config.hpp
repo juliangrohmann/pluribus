@@ -1,7 +1,7 @@
 #pragma once
 
-#include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/poker.hpp>
 #include <pluribus/profiles.hpp>
 #include <pluribus/range.hpp>
 
@@ -74,11 +74,11 @@ struct BlueprintSolverConfig : DiscountConfig {
   }
 
   long strategy_interval = 10'000;
-  long preflop_threshold;
-  long snapshot_threshold;
-  long snapshot_interval;
-  long prune_thresh;
-  long log_interval;
+  long preflop_threshold = -1;
+  long snapshot_threshold = -1;
+  long snapshot_interval = -1;
+  long prune_thresh = -1;
+  long log_interval = -1;
 };
 
 struct RealTimeTimingConfig {
@@ -91,7 +91,7 @@ struct RealTimeSolverConfig : DiscountConfig {
   explicit RealTimeSolverConfig(const RealTimeTimingConfig& timings = RealTimeTimingConfig{}, long it_per_sec = 100'000);
 
   std::string to_string() const;
-  void set_iterations(const RealTimeTimingConfig& timings, long it_per_min);
+  void set_iterations(const RealTimeTimingConfig& timings, long it_per_sec);
 
   bool operator==(const RealTimeSolverConfig& other) const = default;
 
@@ -101,7 +101,7 @@ struct RealTimeSolverConfig : DiscountConfig {
   }
 
   ActionProfile bias_profile = BiasActionProfile{};
-  long log_interval;
+  long log_interval = -1;
   int terminal_round = -1;
   int terminal_bet_level = -1;
 };

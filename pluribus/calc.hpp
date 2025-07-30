@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vector>
 #include <atomic>
+#include <vector>
 
 namespace pluribus {
 
@@ -24,7 +24,7 @@ std::vector<float> calculate_strategy(const std::atomic<T>* base_ptr, const int 
     }
   }
   else {
-    const float uni = 1.0f / n_actions;
+    const float uni = 1.0f / static_cast<float>(n_actions);
     for(auto& f : freq) {
       f = uni;
     }

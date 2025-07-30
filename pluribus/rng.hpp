@@ -1,11 +1,11 @@
 #pragma once
 
 #include <iostream>
+#include <memory>
 #include <random>
 #include <thread>
-#include <memory>
-#include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
+#include <gsl/gsl_rng.h>
 
 namespace pluribus {
 

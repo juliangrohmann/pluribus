@@ -1,13 +1,13 @@
 #pragma once
 
-#include <string>
 #include <array>
-#include <vector>
 #include <memory>
+#include <string>
+#include <vector>
 #include <omp/EquityCalculator.h>
 #include <omp/Hand.h>
-#include <pluribus/poker.hpp>
 #include <pluribus/indexing.hpp>
+#include <pluribus/poker.hpp>
 
 namespace pluribus {
 

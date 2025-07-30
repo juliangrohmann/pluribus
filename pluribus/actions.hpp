@@ -1,13 +1,13 @@
 #pragma once
 
-#include <string>
 #include <initializer_list>
 #include <memory>
+#include <string>
+#include <boost/dynamic_bitset.hpp>
 #include <cereal/cereal.hpp>
 #include <cereal/types/array.hpp>
 #include <cereal/types/string.hpp>
 #include <cereal/types/vector.hpp>
-#include <boost/dynamic_bitset.hpp>
 #include <hand_isomorphism/hand_index.h>
 
 namespace pluribus {
@@ -129,8 +129,8 @@ template <>
 struct hash<pluribus::ActionHistory> {
   std::size_t operator()(const pluribus::ActionHistory& ah) const noexcept {
     size_t seed = 0;
-    constexpr std::hash<pluribus::Action> action_hasher;
     for(const pluribus::Action& a : ah.get_history()) {
+      constexpr std::hash<pluribus::Action> action_hasher;
       boost::hash_combine(seed, action_hasher(a));
     }
     return seed;

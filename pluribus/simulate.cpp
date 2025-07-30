@@ -1,12 +1,12 @@
-#include <iostream>
-#include <iomanip>
 #include <cassert>
+#include <iomanip>
+#include <iostream>
 #include <omp.h>
 #include <omp/HandEvaluator.h>
-#include <pluribus/util.hpp>
-#include <pluribus/poker.hpp>
 #include <pluribus/debug.hpp>
+#include <pluribus/poker.hpp>
 #include <pluribus/simulate.hpp>
+#include <pluribus/util.hpp>
 
 namespace pluribus {
 
@@ -25,7 +25,7 @@ std::vector<long> get_payoffs(const Board& board, const std::vector<Hand>& hands
     for(int i = 0; i < hands.size(); ++i) {
       const bool is_winner = std::ranges::find(win_idxs, i) != win_idxs.end();
       payoffs[i] = is_winner ? state.get_pot() / win_idxs.size(): 0;
-      if(verbose && is_winner) std::cout << i << (i == win_idxs[win_idxs.size() - 1] ? " " : ", ");
+      if constexpr(verbose && is_winner) std::cout << i << (i == win_idxs[win_idxs.size() - 1] ? " " : ", ");
     }
     if(verbose) std::cout << "win" << (win_idxs.size() > 1 ? " " : "s ") << "at showdown.\n";
     payoffs[win_idxs[0]] += state.get_pot() % win_idxs.size();

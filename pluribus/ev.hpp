@@ -1,5 +1,7 @@
 #pragma once
+
 #include <limits>
+#include <pluribus/decision.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/range.hpp>
 
@@ -7,7 +9,6 @@ namespace pluribus {
 
 using Duration = std::chrono::high_resolution_clock::duration;
 
-void _validate_ev_inputs(const PokerState& state, int i, const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board);
 inline double standard_deviation(const double S, const double w_sum) { return pow(S / w_sum, 0.5); }
 void update_stats(int x, double w, double& mean, double& w_sum, double& w_sum2, double& S); 
 double enumerate_ev(const LosslessBlueprint& bp, const PokerState& state, int i, const std::vector<PokerRange>& ranges, 
@@ -63,11 +64,11 @@ private:
       if(_verbose && t > 0 && t % 100'000 == 0) {
         auto t_i = std::chrono::high_resolution_clock::now();
         const auto dt = std::chrono::duration_cast<std::chrono::microseconds>(t_i - t_0).count();
-        std::cout << std::fixed << std::setprecision(1) << "t=" << t / 1'000'000.0 << "M, " 
+        std::cout << std::fixed << std::setprecision(1) << "t=" << static_cast<double>(t) / 1'000'000.0 << "M, "
                   << std::setprecision(2) << "EV=" << mean << ", "
                   << "stdDev=" << standard_deviation(S, w_sum) << ", "
                   << "stdErr=" << std_err << " ("
-                  << std::setprecision(1) << static_cast<double>(t + 1) / (dt / 1'000.0) << "k it/sec)\n";
+                  << std::setprecision(1) << static_cast<double>(t + 1) / (static_cast<double>(dt) / 1'000.0) << "k it/sec)\n";
       }
       ++t;
     }

@@ -1,11 +1,11 @@
 #include <cnpy.h>
-#include <string>
-#include <numeric>
 #include <memory>
-#include <pluribus/util.hpp>
-#include <pluribus/poker.hpp>
+#include <numeric>
+#include <string>
 #include <pluribus/cluster.hpp>
 #include <pluribus/indexing.hpp>
+#include <pluribus/poker.hpp>
+#include <pluribus/util.hpp>
 
 namespace pluribus {
 
@@ -17,11 +17,9 @@ std::array<hand_indexer_t, 4> init_indexer_vec() {
 
 std::unique_ptr<HandIndexer> HandIndexer::_instance = nullptr;
 
-HandIndexer::HandIndexer() {
-  _indexers = init_indexer_vec();
-}
+HandIndexer::HandIndexer() : _indexers{init_indexer_vec()} {}
 
-uint64_t HandIndexer::index(const Board& board, const Hand& hand, const int round) {
+uint64_t HandIndexer::index(const Board& board, const Hand& hand, const int round) const {
   return index(collect_cards(board, hand, round).data(), round);
 }
 
@@ -30,8 +28,8 @@ CachedIndexer::CachedIndexer(const int max_round) : _max_round{max_round} {
 }
 
 uint64_t CachedIndexer::index(const uint8_t cards[], const int round) {
-  while(_indices.size() <= round) {
-    const int curr_round = _indices.size();
+  while(static_cast<int>(_indices.size()) <= round) {
+    const int curr_round = static_cast<int>(_indices.size());
     const int offset = curr_round == 0 ? 0 : n_board_cards(curr_round - 1) + 2;
     _indices.push_back(hand_index_next_round(HandIndexer::get_instance()->get_indexer(_max_round), cards + offset, &_state));
   }

@@ -1,6 +1,6 @@
 #include <pluribus/logging.hpp>
-#include <pluribus/traverse.hpp>
 #include <pluribus/pluribus.hpp>
+#include <pluribus/traverse.hpp>
 
 namespace pluribus {
 

@@ -40,10 +40,10 @@ bool DiscountConfig::is_discount_step(const long t) const {
 }
 
 double DiscountConfig::get_discount_factor(const long t) const {
-  return static_cast<double>(t / discount_interval) / (t / discount_interval + 1);
+  return static_cast<double>(t / discount_interval) / static_cast<double>(t / discount_interval + 1);
 }
 
-BlueprintSolverConfig::BlueprintSolverConfig(const BlueprintTimingConfig& timings, const long it_per_min) {
+BlueprintSolverConfig::BlueprintSolverConfig(const BlueprintTimingConfig& timings, const long it_per_min) : DiscountConfig{} {
   set_iterations(timings, it_per_min);
 }
 
@@ -82,7 +82,7 @@ bool BlueprintSolverConfig::is_snapshot_step(const long t, const long T) const {
   return t == T || (t >= snapshot_threshold && (t - snapshot_threshold) % snapshot_interval == 0);
 }
 
-RealTimeSolverConfig::RealTimeSolverConfig(const RealTimeTimingConfig& timings, const long it_per_sec) {
+RealTimeSolverConfig::RealTimeSolverConfig(const RealTimeTimingConfig& timings, const long it_per_sec) : DiscountConfig{} {
   set_iterations(timings, it_per_sec);
 }
 
@@ -91,9 +91,9 @@ std::string RealTimeSolverConfig::to_string() const {
 }
 
 void RealTimeSolverConfig::set_iterations(const RealTimeTimingConfig& timings, const long it_per_sec) {
-  discount_interval = timings.discount_interval_s * it_per_sec;
-  lcfr_thresh = timings.lcfr_thresh_s * it_per_sec;
-  log_interval = timings.log_interval_s * it_per_sec;
+  discount_interval = static_cast<long>(timings.discount_interval_s * static_cast<double>(it_per_sec));
+  lcfr_thresh = static_cast<long>(timings.lcfr_thresh_s * static_cast<double>(it_per_sec));
+  log_interval = static_cast<long>(timings.log_interval_s * static_cast<double>(it_per_sec));
 }
 
 }

@@ -1,19 +1,19 @@
 #pragma once
 
-#include <vector>
 #include <atomic>
-#include <memory>
-#include <filesystem>
 #include <fcntl.h>
-#include <cereal/cereal.hpp>
+#include <filesystem>
 #include <libwandb_cpp.h>
+#include <memory>
+#include <vector>
+#include <cereal/cereal.hpp>
 #include <cereal/types/polymorphic.hpp>
-#include <pluribus/range.hpp>
 #include <pluribus/cereal_ext.hpp>
-#include <pluribus/poker.hpp>
-#include <pluribus/indexing.hpp>
-#include <pluribus/decision.hpp>
 #include <pluribus/config.hpp>
+#include <pluribus/decision.hpp>
+#include <pluribus/indexing.hpp>
+#include <pluribus/poker.hpp>
+#include <pluribus/range.hpp>
 #include <pluribus/tree_storage.hpp>
 
 namespace pluribus {
@@ -171,7 +171,7 @@ protected:
 
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
-  virtual const std::shared_ptr<const TreeStorageConfig> make_tree_config() const = 0;
+  virtual std::shared_ptr<const TreeStorageConfig> make_tree_config() const = 0;
 
 private:
   std::unique_ptr<TreeStorageNode<int>> _regrets_root = nullptr;
@@ -284,7 +284,7 @@ protected:
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override;
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
-  const std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;
+  std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;
   
   const TreeStorageNode<float>* get_phi_root() const { return _phi_root.get(); }
 
@@ -312,7 +312,7 @@ protected:
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override {}
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override {}
 
-  const std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;
+  std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;
 };
 
 }

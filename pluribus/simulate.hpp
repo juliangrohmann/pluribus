@@ -1,8 +1,8 @@
 #pragma once
 
 #include <vector>
-#include <pluribus/poker.hpp>
 #include <pluribus/agent.hpp>
+#include <pluribus/poker.hpp>
 
 namespace pluribus {
 

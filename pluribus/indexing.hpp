@@ -1,15 +1,15 @@
 #pragma once
 
 #include <hand_isomorphism/hand_index.h>
-#include <pluribus/poker.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/poker.hpp>
 
 namespace pluribus {
 
 class HandIndexer {
 public:
   hand_index_t index(const uint8_t cards[], const int round) const { return hand_index_last(&_indexers[round], cards); }
-  hand_index_t index(const Board& board, const Hand& hand, int round);
+  hand_index_t index(const Board& board, const Hand& hand, int round) const;
 
   hand_indexer_t* get_indexer(const int round) { return &_indexers[round]; }
 
@@ -38,7 +38,7 @@ public:
   hand_index_t index(const uint8_t cards[], int round);
   hand_index_t index(const Board& board, const Hand& hand, int round);
 private:
-  hand_indexer_state_t _state;
+  hand_indexer_state_t _state{};
   std::vector<hand_index_t> _indices;
   int _max_round;
 };

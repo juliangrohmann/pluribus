@@ -1,11 +1,11 @@
 #pragma once
 
-#include <vector>
-#include <mutex>
+#include <atomic>
 #include <condition_variable>
 #include <deque>
-#include <atomic>
 #include <memory>
+#include <mutex>
+#include <vector>
 #include <httplib/httplib.h>
 #include <pluribus/pluribus.hpp>
 #include <pluribus/poker.hpp>

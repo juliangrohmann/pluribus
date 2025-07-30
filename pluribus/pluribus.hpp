@@ -1,9 +1,9 @@
 #pragma once
 
 #include <memory>
-#include <pluribus/poker.hpp>
-#include <pluribus/mccfr.hpp>
 #include <pluribus/blueprint.hpp>
+#include <pluribus/mccfr.hpp>
+#include <pluribus/poker.hpp>
 
 namespace pluribus {
  

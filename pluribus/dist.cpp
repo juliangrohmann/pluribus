@@ -1,6 +1,6 @@
 #include <pluribus/constants.hpp>
-#include <pluribus/range.hpp>
 #include <pluribus/dist.hpp>
+#include <pluribus/range.hpp>
 
 #include "range_viewer.hpp"
 
