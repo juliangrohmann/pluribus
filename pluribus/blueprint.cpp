@@ -152,29 +152,34 @@ LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std:
   return meta;
 }
 
-void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, const int max_gb) {
+void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, const bool preflop,
+    const int max_gb) {
   Logger::log("Building lossless blueprint...");
+  Logger::log("Preflop=" + std::to_string(preflop));
   auto meta = build_lossless_buffers(preflop_fn, all_fns, buf_dir, max_gb);
   meta.config.poker.straddle = true;
   meta.config.init_state = PokerState{meta.config.poker};
-  build_from_meta_data(meta);
+  build_from_meta_data(meta, preflop);
 }
 
-void LosslessBlueprint::build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns) {
+void LosslessBlueprint::build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns,
+    const bool preflop) {
   Logger::log("Building lossless blueprint from cached buffers...");
+  Logger::log("Preflop=" + std::to_string(preflop));
   auto meta = collect_meta_data(preflop_buf_fn, final_bp_fn, buffer_fns);
   meta.config.poker.straddle = true;
   meta.config.init_state = PokerState{meta.config.poker};
-  build_from_meta_data(meta);
+  build_from_meta_data(meta, preflop);
 }
 
-void LosslessBlueprint::build_meta(const std::string& meta_fn) {
+void LosslessBlueprint::build_meta(const std::string& meta_fn, const bool preflop) {
   Logger::log("Building lossless blueprint from cached metadata...");
+  Logger::log("Preflop=" + std::to_string(preflop));
   LosslessMetadata meta;
   cereal_load(meta, meta_fn);
   meta.config.poker.straddle = true;
   meta.config.init_state = PokerState{meta.config.poker};
-  build_from_meta_data(meta);
+  build_from_meta_data(meta, preflop);
 }
 
 void set_preflop_strategy(TreeStorageNode<float>* node, const TreeStorageNode<float>* preflop_node, const PokerState& state) {
@@ -219,7 +224,7 @@ void normalize_tree(TreeStorageNode<float>* node, const PokerState& state) {
   }
 }
 
-void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
+void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta, const bool preflop) {
   Logger::log("Building lossless blueprint from meta data...");
   set_config(meta.config);
   assign_freq(new TreeStorageNode<float>{meta.config.init_state, meta.tree_config});
@@ -245,10 +250,15 @@ void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta) {
     }
   }
 
-  Logger::log("Setting preflop strategy to phi...");
-  TreeStorageNode<float> phi;
-  cereal_load(phi, meta.preflop_buf_fn);
-  set_preflop_strategy(get_freq().get(), &phi, meta.config.init_state);
+  if(preflop) {
+    Logger::log("Setting preflop strategy to phi...");
+    TreeStorageNode<float> phi;
+    cereal_load(phi, meta.preflop_buf_fn);
+    set_preflop_strategy(get_freq().get(), &phi, meta.config.init_state);
+  }
+  else {
+    Logger::log("Not setting preflop strategy.");
+  }
 
   Logger::log("Normalizing frequencies...");
   normalize_tree(get_freq().get(), meta.config.init_state);
