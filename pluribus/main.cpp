@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
       std::cout << "Missing arguments to build blueprint.\n";
     }
     else {
-      bool no_preflop = argc >= 7 && strcmp(argv[6], "--no-preflop");
+      bool no_preflop = argc >= 7 && strcmp(argv[6], "--no-preflop") == 0;
       LosslessBlueprint lossless_bp;
       lossless_bp.build(argv[2], get_filepaths(argv[3]), argv[4], !no_preflop);
       std::string lossless_fn = "lossless_" + std::string{argv[5]};
@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
       std::cout << "Missing arguments to build blueprint from cache.\n";
     }
     else {
-      bool no_preflop = argc >= 7 && strcmp(argv[6], "--no-preflop");
+      bool no_preflop = argc >= 7 && strcmp(argv[6], "--no-preflop") == 0;
       LosslessBlueprint lossless_bp;
       lossless_bp.build_cached(argv[2], argv[3], get_filepaths(argv[4]), !no_preflop);
       std::string lossless_fn = "lossless_" + std::string{argv[5]};
