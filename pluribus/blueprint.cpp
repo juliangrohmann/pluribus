@@ -216,10 +216,11 @@ void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta, const
   Logger::log("Building lossless blueprint from meta data...");
   set_config(meta.config);
   assign_freq(new TreeStorageNode<float>{meta.config.init_state, meta.tree_config});
-  for(const std::string& buf_fn : meta.buffer_fns) {
+  for(int buf_idx = 0; buf_idx < meta.buffer_fns.size(); ++buf_idx) {
     BlueprintBuffer<float> buf;
-    cereal_load(buf, buf_fn);
-    Logger::log("Accumulating " + buf_fn + ": " + std::to_string(buf.entries.size()) + " nodes");
+    cereal_load(buf, meta.buffer_fns[buf_idx]);
+    Logger::log("(" + std::to_string(buf_idx + 1) + "/" + std::to_string(meta.buffer_fns.size()) +
+      ") Accumulating " + meta.buffer_fns[buf_idx] + ": " + std::to_string(buf.entries.size()) + " nodes");
     #pragma omp parallel for schedule(static)
     for(const auto& [history, values] : buf.entries) {
       TreeStorageNode<float>* node = get_freq().get();
