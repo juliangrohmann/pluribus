@@ -259,7 +259,10 @@ protected:
   StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const PokerState& next_state, int i) override { return nullptr; }
 
 private:
+  Action next_rollout_action(CachedIndexer& indexer, const PokerState& state, const Hand& hand, const Board& board) const;
+
   const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
+  const TreeStorageNode<uint8_t>* _root_node = nullptr;
   const RealTimeSolverConfig _rt_config;
   const SampledActionProvider _rollout_action_provider;
 };

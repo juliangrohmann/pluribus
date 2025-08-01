@@ -533,7 +533,17 @@ int BlueprintSolver<StorageT>::get_cluster(const PokerState& state, const Board&
 
 template <template<typename> class StorageT>
 RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlueprint>& bp, const RealTimeSolverConfig& rt_config)
-    : _bp{bp}, _rt_config{rt_config} {}
+    : _bp{bp}, _rt_config{rt_config}, _root_node{bp->get_strategy()->apply(rt_config.init_actions)} {}
+
+template <template<typename> class StorageT>
+Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, const PokerState& state, const Hand& hand, const Board& board) const {
+  const hand_index_t hand_idx = indexer.index(board, hand, state.get_round());
+  const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
+  const std::vector<Action> history = state.get_action_history().slice(_rt_config.init_actions.size()).get_history();
+  const TreeStorageNode<uint8_t>* node = _root_node->apply(history);
+  const uint8_t bias_offset = _bp->bias_offset(state.get_biases()[state.get_active()]);
+  return _bp->decompress_action(node->get(cluster, bias_offset)->load());
+}
 
 template <template<typename> class StorageT>
 int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size,
@@ -547,7 +557,7 @@ int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const in
   }
   PokerState curr_state = state;
   while(!curr_state.is_terminal() && !curr_state.get_players()[i].has_folded()) {
-    curr_state = curr_state.apply(_rollout_action_provider.next_action(indexers[curr_state.get_active()], curr_state, hands, board, _bp.get()));
+    curr_state = curr_state.apply(next_rollout_action(indexers[curr_state.get_active()], curr_state, hands[curr_state.get_active()], board));
   }
   return utility(curr_state, i, board, hands, stack_size, this->get_config().rake, eval);
 }
@@ -660,7 +670,12 @@ bool TreeBlueprintSolver::operator==(const TreeBlueprintSolver& other) const {
 // ==========================================================================================
 
 TreeRealTimeSolver::TreeRealTimeSolver(const SolverConfig& config, const RealTimeSolverConfig& rt_config, const std::shared_ptr<const SampledBlueprint>& bp)
-    : TreeSolver{config}, MCCFRSolver{config}, RealTimeSolver{bp, rt_config} {}
+    : TreeSolver{config}, MCCFRSolver{config}, RealTimeSolver{bp, rt_config} {
+  if(config.init_state.get_action_history().size() != rt_config.init_actions.size()) {
+    Logger::error("Init state action count does not match mapped action count.\nInit state actions: "
+      + action_str(config.init_state.get_action_history().get_history()) + "\nMapped actions: " + action_str(rt_config.init_actions));
+  }
+}
 
 bool TreeRealTimeSolver::operator==(const TreeRealTimeSolver& other) const {
   return TreeSolver::operator==(other) && RealTimeSolver::operator==(other);

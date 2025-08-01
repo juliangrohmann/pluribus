@@ -101,6 +101,7 @@ struct RealTimeSolverConfig : DiscountConfig {
   }
 
   ActionProfile bias_profile = BiasActionProfile{};
+  std::vector<Action> init_actions;
   long log_interval = -1;
   int terminal_round = -1;
   int terminal_bet_level = -1;
