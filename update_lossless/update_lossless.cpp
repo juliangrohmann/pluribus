@@ -4,8 +4,8 @@
 using namespace pluribus;
 
 int main(int argc, char* argv[]) {
-  if(argc < 3) throw std::runtime_error("straddle arg required");
-  const bool straddle = strcmp(argv[2], "true") == 0;
+  if(argc < 4) throw std::runtime_error("straddle arg required");
+  const bool straddle = strcmp(argv[3], "true") == 0;
   std::cout << "straddle=" << (straddle ? "true" : "false");
   LosslessBlueprint bp;
   cereal_load(bp, argv[1]);
@@ -15,5 +15,5 @@ int main(int argc, char* argv[]) {
   bp.get_mutable_strategy()->make_root();
   bp.get_mutable_config().poker.straddle = straddle;
   bp.get_mutable_config().init_state = PokerState{bp.get_mutable_config().poker};
-  cereal_save(bp, std::string{"updated_"} + argv[1]);
+  cereal_save(bp, argv[2]);
 }
