@@ -401,7 +401,7 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
     cereal_load(buf, buf_fn);
     Logger::log("Setting sampled actions from buffer " + buf_fn + ": " + std::to_string(buf.entries.size()) + " nodes");
     #pragma omp parallel for schedule(static)
-    for(auto & [history, values] : buf.entries) {
+    for(auto& [history, values] : buf.entries) {
       TreeStorageNode<uint8_t>* node = get_freq().get();
       PokerState state = meta.config.init_state;
       for(const Action a : history.get_history()) {
