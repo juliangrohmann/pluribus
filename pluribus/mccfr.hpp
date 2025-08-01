@@ -234,6 +234,11 @@ public:
 
   const RealTimeSolverConfig& get_real_time_config() const { return _rt_config; }
 
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_rt_config);
+  }
+
 protected:
   int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const override;
