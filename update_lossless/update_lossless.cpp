@@ -4,8 +4,8 @@
 using namespace pluribus;
 
 int main(int argc, char* argv[]) {
-  if(argc < 2) throw std::runtime_error("straddle arg required");
-  const bool straddle = strcmp(argv[1], "true");
+  if(argc < 3) throw std::runtime_error("straddle arg required");
+  const bool straddle = strcmp(argv[2], "true");
   std::cout << "straddle=" << (straddle ? "true" : "false");
   LosslessBlueprint bp;
   cereal_load(bp, argv[1]);
