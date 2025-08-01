@@ -187,7 +187,7 @@ struct PokerConfig {
   }
 
   template <class Archive>
-  void save(Archive& ar) {
+  void save(Archive& ar) const {
     ar(n_players, n_chips, ante, straddle);
   }
 
@@ -235,7 +235,7 @@ public:
   }
 
   template <class Archive>
-  void save(Archive& ar) {
+  void save(Archive& ar) const {
     ar(_players, _biases, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner, _straddle);
   }
 
