@@ -24,6 +24,11 @@ public:
   explicit RingBlueprintProfile(int n_players, int stack_size);
 };
 
+class RingSimpleProfile : public ActionProfile {
+public:
+  explicit RingSimpleProfile(int n_players, int stack_size);
+};
+
 class WPTGoldRingBlueprintProfile : public ActionProfile {
 public:
   explicit WPTGoldRingBlueprintProfile(int n_players);

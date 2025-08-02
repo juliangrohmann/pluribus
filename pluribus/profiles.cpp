@@ -80,13 +80,46 @@ RingBlueprintProfile::RingBlueprintProfile(const int n_players, const int stack_
   set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.85f}, Action::ALL_IN}, 0);
 
   // preflop 3-bet
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.10f}, Action{1.40f}, Action{1.70f}}, 0, 2, 0);
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.30f}, Action{1.60f}}, 0, 2, 1);
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{1.20f}}, 0, 2, 2);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.10f}, Action{1.40f}, Action{1.70f}, Action::ALL_IN}, 0, 2, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.30f}, Action{1.60f}, Action::ALL_IN}, 0, 2, 1);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{1.20f}, Action::ALL_IN}, 0, 2, 2);
 
   // preflop 4-bet+
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.70f}, Action{0.80f}, Action{0.90f}, Action{1.00f}, Action::ALL_IN}, 0, 3, 0);
   if(stack_size < 10'000) add_action(Action{0.50f}, 0, 3, 0);
+
+  // flop
+  set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 1, 0);
+
+  // turn
+  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 2, 0, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 2, 1, 0);
+
+  // river
+  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 3, 0, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 3, 1, 0);
+}
+
+RingSimpleProfile::RingSimpleProfile(const int n_players, const int stack_size) : ActionProfile{n_players} {
+  // preflop RFI & isos
+  for(int pos = 2; pos < n_players - 2; ++pos) {
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, pos);
+  }
+  if(n_players > 3) set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, n_players - 2);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, n_players - 1);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action::ALL_IN}, 0, 1, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action::ALL_IN}, 0, 1, 1);
+  set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.85f}, Action::ALL_IN}, 0);
+
+  // preflop 3-bet
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.40f}, Action::ALL_IN}, 0, 2, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.30f}, Action::ALL_IN}, 0, 2, 1);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action::ALL_IN}, 0, 2, 2);
+
+  // preflop 4-bet+
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.70f}, Action::ALL_IN}, 0, 3, 0, false);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 3, 0, true);
 
   // flop
   set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
