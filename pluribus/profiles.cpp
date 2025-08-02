@@ -80,7 +80,9 @@ RingBlueprintProfile::RingBlueprintProfile(const int n_players, const int stack_
   set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.85f}, Action::ALL_IN}, 0);
 
   // preflop 3-bet
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{1.20f}}, 0, 2, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.10f}, Action{1.40f}, Action{1.70f}}, 0, 2, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.30f}, Action{1.60f}}, 0, 2, 1);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{1.20f}}, 0, 2, 2);
 
   // preflop 4-bet+
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.70f}, Action{0.80f}, Action{0.90f}, Action{1.00f}, Action::ALL_IN}, 0, 3, 0);
