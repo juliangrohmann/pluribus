@@ -71,20 +71,16 @@ HeadsUpSimpleProfile::HeadsUpSimpleProfile(const int stack_size) : ActionProfile
 RingBlueprintProfile::RingBlueprintProfile(const int n_players, const int stack_size) : ActionProfile{n_players} {
   // preflop RFI & isos
   for(int pos = 2; pos < n_players - 2; ++pos) {
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.40f}, Action::ALL_IN}, 0, 1, pos);
+    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, pos);
   }
-  if(n_players > 3) set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.52f}, Action::ALL_IN}, 0, 1, n_players - 2);
+  if(n_players > 3) set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, n_players - 2);
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action::ALL_IN}, 0, 1, n_players - 1);
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action::ALL_IN}, 0, 1, 0);
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action::ALL_IN}, 0, 1, 1);
-  set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{2.00f}, Action::ALL_IN}, 0);
+  set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.85f}, Action::ALL_IN}, 0);
 
   // preflop 3-bet
-  for(int pos = 2; pos < n_players; ++pos) {
-    set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{1.20f}}, 0, 2, pos);
-  }
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.20f}, Action{1.40f}}, 0, 2, 0);
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.20f}, Action{1.40f}}, 0, 2, 1);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.80f}, Action{1.00f}, Action{1.20f}}, 0, 2, 0);
 
   // preflop 4-bet+
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.70f}, Action{0.80f}, Action{0.90f}, Action{1.00f}, Action::ALL_IN}, 0, 3, 0);
