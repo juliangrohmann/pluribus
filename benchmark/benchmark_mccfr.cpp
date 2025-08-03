@@ -19,7 +19,7 @@ int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state,
 int main(int argc, char* argv[]) {
   long n = argc > 1 ? atoi(argv[1]) : 1'000'000'000L;
 
-  SolverConfig config{PokerConfig{2, 10'000, 0, false}, HeadsUpBlueprintProfile{10'000}};
+  SolverConfig config{PokerConfig{2, 0, false}, HeadsUpBlueprintProfile{10'000}};
   omp::HandEvaluator eval;
   TreeBlueprintSolver trainer{config, BlueprintSolverConfig{}};
   trainer.set_log_level(SolverLogLevel::NONE);

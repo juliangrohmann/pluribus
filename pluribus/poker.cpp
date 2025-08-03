@@ -157,7 +157,7 @@ PokerState::PokerState(const int n_players, const std::vector<int>& chips, const
 PokerState::PokerState(const int n_players, const int chips, const int ante, const bool straddle)
     : PokerState{n_players, std::vector(n_players, chips), ante, straddle} {}
 
-PokerState::PokerState(const PokerConfig& config) : PokerState{config.n_players, config.n_chips, config.ante, config.straddle} {}
+PokerState::PokerState(const PokerConfig& config, int n_chips) : PokerState{config.n_players, n_chips, config.ante, config.straddle} {}
 
 PokerState PokerState::next_state(const Action action) const {
   const Player& player = get_players()[get_active()];
@@ -260,7 +260,7 @@ int big_blind_size(const PokerState& state) {
 
 std::string PokerConfig::to_string() const {
   std::ostringstream oss;
-  oss << "PokerConfig{n_players=" << n_players << ", n_chips=" << n_chips << ", ante=" << ante;
+  oss << "PokerConfig{n_players=" << n_players << ", ante=" << ante << ", straddle=" << (straddle ? "true" : "false");
   return oss.str();
 }
 

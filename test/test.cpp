@@ -208,7 +208,7 @@ TEST_CASE("Simulate hands", "[poker][slow]") {
   for(int i = 0; i < n_players; ++i) rng_agents.push_back(RandomAgent{RingBlueprintProfile{n_players, stack_size}});
   std::vector<Agent*> agents;
   for(int i = 0; i < n_players; ++i) agents.push_back(&rng_agents[i]);
-  auto results = simulate(agents, PokerConfig{n_players, stack_size, 0}, 100'000);
+  auto results = simulate(agents, PokerConfig{n_players, 0, false}, stack_size, 100'000);
   long net = 0l;
   for(long result : results) {
     net += result;
@@ -237,7 +237,7 @@ TEST_CASE("Split pot", "[poker]") {
     Action::CHECK_CALL, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL
   };
-  auto result = simulate_round(board, hands, actions, PokerConfig{static_cast<int>(hands.size()), 10'000, 0});
+  auto result = simulate_round(board, hands, actions, PokerConfig{static_cast<int>(hands.size()), 0, false}, 10'000);
   REQUIRE(result[0] == -50);
   REQUIRE(result[1] == 25);
   REQUIRE(result[2] == 25);
@@ -458,7 +458,7 @@ TEST_CASE("Lossless monte carlo EV", "[ev][slow][dependency]") {
   LosslessBlueprint bp;
   cereal_load(bp, "lossless_bp_2p_100bb_0ante");
   std::vector<uint8_t> board = str_to_cards("AcTd3c2s");
-  PokerState state{bp.get_config().poker};
+  PokerState state{bp.get_config().poker, 10'000};
   std::vector<Action> actions = {Action{0.75f}, Action::CHECK_CALL, Action::CHECK_CALL, Action{0.50f}, Action::CHECK_CALL, Action::CHECK_CALL, Action::CHECK_CALL};
   state = state.apply(ActionHistory{actions});
   auto ranges = build_ranges(state.get_action_history().get_history(), Board{board}, bp);
@@ -501,7 +501,7 @@ TEST_CASE("Serialize ActionHistory", "[serialize]") {
 }
 
 TEST_CASE("Serialize TreeBlueprintSolver", "[serialize][blueprint][slow]") {
-  TreeBlueprintSolver trainer{SolverConfig{PokerConfig{2, 10'000, 0, false}, HeadsUpBlueprintProfile{10'000}}};
+  TreeBlueprintSolver trainer{SolverConfig{PokerConfig{2, 0, false}, HeadsUpBlueprintProfile{10'000}}};
   trainer.solve(1'000'000);
   
   REQUIRE(test_serialization(trainer));

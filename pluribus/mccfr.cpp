@@ -214,7 +214,7 @@ template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long t, const int i, const Board& board, const std::vector<Hand>& hands,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug) {
   if(is_terminal(state, i)) {
-    const int u = terminal_utility(state, i, board, hands, get_config().poker.n_chips, indexers, eval);
+    const int u = terminal_utility(state, i, board, hands, get_config().stack_size(i), indexers, eval);
     if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, get_config().init_state, hands, debug);
     return u;
   }
@@ -272,7 +272,7 @@ template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t, const int i, const Board& board, const std::vector<Hand>& hands,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug) {
   if(is_terminal(state, i)) {
-    const int u = terminal_utility(state, i, board, hands, get_config().poker.n_chips, indexers, eval);
+    const int u = terminal_utility(state, i, board, hands, get_config().stack_size(i), indexers, eval);
     if(_log_level == SolverLogLevel::DEBUG) log_utility(u, state, get_config().init_state, hands, debug);
     return u;
   }

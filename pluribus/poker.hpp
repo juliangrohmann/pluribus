@@ -183,11 +183,11 @@ struct PokerConfig {
 
   template <class Archive>
   void serialize(Archive& ar) {
+    int n_chips; // buffer for compatibility
     ar(n_players, n_chips, ante, straddle);
   }
 
   int n_players = 2;
-  int n_chips = 10'000;
   int ante = 0;
   bool straddle = false;
 };
@@ -196,7 +196,7 @@ class PokerState {
 public:
   explicit PokerState(int n_players, const std::vector<int>& chips, int ante = 0, bool straddle = false);
   explicit PokerState(int n_players = 2, int chips = 10'000, int ante = 0, bool straddle = false);
-  explicit PokerState(const PokerConfig& config);
+  explicit PokerState(const PokerConfig& config, int n_chips);
   PokerState(const PokerState&) = default;
   PokerState(PokerState&&) = default;
 

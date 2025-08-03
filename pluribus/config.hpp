@@ -8,8 +8,10 @@
 namespace pluribus {
 
 struct SolverConfig {
-  explicit SolverConfig(const PokerConfig& poker_ = PokerConfig{}, const ActionProfile& action_profile = ActionProfile{});
+  explicit SolverConfig(const PokerConfig& poker_ = PokerConfig{}, const ActionProfile& action_profile = ActionProfile{},
+    const std::vector<int>& stacks = std::vector<int>{});
 
+  int stack_size(const int i) const { return init_state.get_players()[i].get_chips() + init_state.get_players()[i].get_betsize(); }
   std::string to_string() const;
 
   bool operator==(const SolverConfig& other) const = default;
