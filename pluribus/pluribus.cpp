@@ -35,7 +35,8 @@ void Pluribus::new_game(const std::vector<std::string>& players, const std::vect
 
   _real_state = PokerState{poker_config.n_players, stacks, poker_config.ante, poker_config.straddle};
   _root_state = _real_state;
-  _mapped_actions = _real_state.get_action_history();
+  _mapped_bp_actions = ActionHistory{};
+  _mapped_live_actions = ActionHistory{};
 
   Logger::log("Real state/Root state:\n" + _root_state.to_string());
   if(const int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;
@@ -82,7 +83,7 @@ void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
 }
 
 Solution Pluribus::solution(const Hand& hand) const {
-  const PokerState mapped_state = _root_state.apply(_mapped_actions);
+  const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
   Solution solution;
   solution.actions = valid_actions(mapped_state, _live_profile);
   const RealTimeDecision decision{*_preflop_bp, _solver};
@@ -98,15 +99,19 @@ int terminal_round(const PokerState& root) {
 
 void Pluribus::_init_solver() {
   Logger::log("Initializing solver: MappedRealTimeSolver");
-  SolverConfig config{_sampled_bp->get_config().poker};
+  SolverConfig config{_sampled_bp->get_config().poker, _live_profile};
+  config.rake = _sampled_bp->get_config().rake;
   config.init_state = _root_state;
   config.init_board = _board;
   config.init_ranges = _ranges;
   config.action_profile = _live_profile;
   RealTimeSolverConfig rt_config;
-  rt_config.terminal_round = terminal_round(_root_state);
+  rt_config.bias_profile = BiasActionProfile{};
+  rt_config.init_actions = _mapped_bp_actions.get_history();
+  // rt_config.terminal_round = terminal_round(_root_state); // TODO: solve multiple rounds
+  rt_config.terminal_bet_level = _root_state.get_round() + 1;
   rt_config.terminal_bet_level = 999;
-  // _solver = std::unique_ptr<Solver>{new TreeRealTimeSolver{_sampled_bp, rt_config}};
+  _solver = std::unique_ptr<Solver>{new TreeRealTimeSolver{config, rt_config, _sampled_bp}};
 }
 
 bool can_solve(const PokerState& root) {
@@ -124,6 +129,7 @@ bool is_off_tree(Action a, const PokerState& state, const ActionProfile& profile
 
 void Pluribus::_apply_action(const Action a) {
   Logger::log("Applying action: " + a.to_string());
+  _mapped_live_actions.push_back(translate_pseudo_harmonic(a, valid_actions(_real_state, _live_profile), _real_state));
   _real_state = _real_state.apply(a);
   if(!can_solve(_root_state) && can_solve(_real_state)) {
     _update_root();
@@ -133,7 +139,7 @@ void Pluribus::_apply_action(const Action a) {
   }
   else {
     Action mapped = a; // TODO: map preflop actions
-    _mapped_actions.push_back(a);
+    // _mapped_actions.push_back(a);
   }
 }
 

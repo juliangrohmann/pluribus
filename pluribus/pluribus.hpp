@@ -30,7 +30,8 @@ private:
   std::shared_ptr<Solver> _solver = nullptr;
   PokerState _root_state;
   PokerState _real_state;
-  ActionHistory _mapped_actions;
+  ActionHistory _mapped_bp_actions;
+  ActionHistory _mapped_live_actions;
   ActionProfile _live_profile;
   std::vector<PokerRange> _ranges;
   std::vector<uint8_t> _board;

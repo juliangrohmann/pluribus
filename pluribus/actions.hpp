@@ -40,6 +40,7 @@ private:
   float _bet_type;
 };
 
+std::string actions_to_str(const std::vector<Action>& actions);
 bool is_bias(Action a);
 
 class ActionHistory {
@@ -53,7 +54,7 @@ public:
   const std::vector<Action>& get_history() const { return _history; }
   const Action& get(const int i) const { return _history[i]; }
   size_t size() const { return _history.size(); }
-  std::string to_string() const;
+  std::string to_string() const { return actions_to_str(_history); };
   ActionHistory slice(int start, int end = -1) const;
   bool is_consistent(const ActionHistory& other) const;
 

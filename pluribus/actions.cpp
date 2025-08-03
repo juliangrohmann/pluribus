@@ -38,6 +38,14 @@ std::string Action::to_string() const {
   return oss.str();
 }
 
+std::string actions_to_str(const std::vector<Action>& actions) {
+  std::string str;
+  for(int i = 0; i < actions.size(); ++i) {
+    str += actions[i].to_string() + (i == actions.size() - 1 ? "" : ", ");
+  }
+  return str;
+}
+
 bool is_bias(const Action a) {
   return a == Action::BIAS_FOLD || a == Action::BIAS_CALL ||
       a == Action::BIAS_RAISE || a == Action::BIAS_NONE;
@@ -52,14 +60,6 @@ bool ActionHistory::is_consistent(const ActionHistory& other) const {
     if(get(i) != other.get(i)) return false;
   }
   return true;
-}
-
-std::string ActionHistory::to_string() const {
-  std::string str;
-  for(int i = 0; i < _history.size(); ++i) {
-    str += _history[i].to_string() + (i == _history.size() - 1 ? "" : ", ");
-  }
-  return str;
 }
 
 template <class T>
@@ -157,14 +157,6 @@ int ActionProfile::max_bet_level() const {
     max_val = std::max(static_cast<int>(round.size()) - 1, max_val);
   }
   return max_val;
-}
-
-std::string actions_to_str(const std::vector<Action>& actions) {
-  std::ostringstream oss;
-  for(Action a : actions) {
-    oss << a.to_string() << "  ";
-  }
-  return oss.str();
 }
 
 std::string ActionProfile::to_string() const {

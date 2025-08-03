@@ -58,14 +58,6 @@ void Solver::solve(const long t_plus) {
 // || MCCFRSolver
 // ==========================================================================================
 
-std::string action_str(const std::vector<Action>& actions) {
-  std::string str;
-  for(Action a : actions) {
-    str += a.to_string() + ", ";
-  }
-  return str;
-}
-
 template <class T>
 std::vector<float> state_to_freq(std::atomic<T>* base_ptr, int n_actions) {
   return calculate_strategy(base_ptr, n_actions);
@@ -512,9 +504,7 @@ void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::ve
 
 template <template<typename> class StorageT>
 bool BlueprintSolver<StorageT>::should_prune(const long t) const {
-  if(t < _bp_config.prune_thresh) return false;
-  std::uniform_real_distribution dist(0.0f, 1.0f);
-  return dist(GlobalRNG::instance()) > 0.95;
+  return t >= _bp_config.prune_thresh && GlobalRNG::uniform() > 0.95;
 }
 
 template <template<typename> class StorageT>
@@ -673,7 +663,7 @@ TreeRealTimeSolver::TreeRealTimeSolver(const SolverConfig& config, const RealTim
     : TreeSolver{config}, MCCFRSolver{config}, RealTimeSolver{bp, rt_config} {
   if(config.init_state.get_action_history().size() != rt_config.init_actions.size()) {
     Logger::error("Init state action count does not match mapped action count.\nInit state actions: "
-      + action_str(config.init_state.get_action_history().get_history()) + "\nMapped actions: " + action_str(rt_config.init_actions));
+      + actions_to_str(config.init_state.get_action_history().get_history()) + "\nMapped actions: " + actions_to_str(rt_config.init_actions));
   }
 }
 

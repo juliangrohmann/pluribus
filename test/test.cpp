@@ -150,7 +150,35 @@ TEST_CASE("Evaluate hand", "[eval]") {
     omp::Hand villain = omp::Hand::empty() + omp::Hand(line.substr(10, 10));
     REQUIRE((evaluator.evaluate(hero) > evaluator.evaluate(villain)) == (line[line.length() - 1] == '1'));
   }
-};
+}
+
+TEST_CASE("All-in sizing", "[actions]") {
+  PokerState state{3, {2'000, 3'000, 1'000}, 0, false};
+  state = state.apply({Action{0.60}, Action::CHECK_CALL, Action::CHECK_CALL, Action{0.50}});
+  const int all_in_size = total_bet_size(state, Action::ALL_IN);
+  REQUIRE(all_in_size == 1'750);
+  REQUIRE(fractional_bet_size(state, total_bet_size(state, Action::ALL_IN)) == (all_in_size - 375.0) / 1500.0);
+}
+
+TEST_CASE("Pseudo harmonic action translation", "[actions]") {
+  std::vector actions = {Action::CHECK_CALL, Action{0.33}, Action{0.50}, Action{0.75}, Action::ALL_IN};
+  std::vector simple_actions = {Action{0.50}, Action{0.75}};
+  PokerState state{3, {3'000, 3'000, 3'000}, 0, false};
+  state = state.apply({Action{0.60}, Action::CHECK_CALL, Action::CHECK_CALL});
+  REQUIRE(translate_pseudo_harmonic(Action{0.50}, actions, state) == Action{0.50});
+  REQUIRE(translate_pseudo_harmonic(Action::ALL_IN, actions, state) == Action::ALL_IN);
+  REQUIRE(translate_pseudo_harmonic(Action{1.00}, simple_actions, state) == Action{0.75});
+  REQUIRE(translate_pseudo_harmonic(Action{0.25}, simple_actions, state) == Action{0.50});
+  int N = 100'000;
+  int n_A = 0;
+  float A = 0.50f, B = 0.80f, x = 0.60f;
+  for(int i = 0; i < N; ++i) {
+    Action a = translate_pseudo_harmonic(Action{x}, {Action{A}, Action{B}}, state);
+    if(a == Action{A}) ++n_A;
+  }
+  double p_A = (B - x) * (1 + A) / ((B - A) * (1 + x));
+  REQUIRE(abs(static_cast<double>(n_A) / static_cast<double>(N) - p_A) < 0.01);
+}
 
 TEST_CASE("Simple equity solver", "[equity]") {
   auto sample = board_str_sample(1, 10);

@@ -389,7 +389,13 @@ void PokerState::next_bias() {
 int total_bet_size(const PokerState& state, const Action action) {
   const Player& active_player = state.get_players()[state.get_active()];
   if(action == Action::ALL_IN) {
-    return active_player.get_chips() + active_player.get_betsize();
+    int max_total = 0;
+    for(int i = 0; i < state.get_players().size(); ++i) {
+      if(i != state.get_active() && !state.get_players()[i].has_folded()) {
+        max_total = std::max(state.get_players()[i].get_betsize() + state.get_players()[i].get_chips(), max_total);
+      }
+    }
+    return std::min(active_player.get_chips() + active_player.get_betsize(), max_total);
   }
   if(action.get_bet_type() > 0.0f) {
     const int missing = state.get_max_bet() - active_player.get_betsize();
@@ -397,6 +403,12 @@ int total_bet_size(const PokerState& state, const Action action) {
     return real_pot * action.get_bet_type() + missing + active_player.get_betsize();
   }
   throw std::runtime_error("Invalid action bet size: " + std::to_string(action.get_bet_type()));
+}
+
+double fractional_bet_size(const PokerState& state, const int total_size) {
+  const double raise_size = total_size - state.get_max_bet();
+  const double pot_size = state.get_pot() + state.get_max_bet() - state.get_players()[state.get_active()].get_betsize();
+  return raise_size / pot_size;
 }
 
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile) {
@@ -410,7 +422,13 @@ std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& 
       continue;
     }
     if(a == Action::FOLD) {
-      if(player.get_betsize() < state.get_max_bet()) {
+      if(player.get_betsize() < state.get_max_bet() && player.get_chips() > 0) {
+        valid.push_back(a);
+      }
+      continue;
+    }
+    if(a == Action::ALL_IN) { // faster than calling total_bet_size
+      if(player.get_chips() > state.get_max_bet() - player.get_betsize()) {
         valid.push_back(a);
       }
       continue;

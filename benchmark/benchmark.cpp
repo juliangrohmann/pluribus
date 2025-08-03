@@ -1,3 +1,4 @@
+// ReSharper disable CppExpressionWithoutSideEffects
 #ifdef UNIT_TEST
 
 #include <iostream>

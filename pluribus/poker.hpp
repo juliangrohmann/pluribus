@@ -276,6 +276,7 @@ private:
 };
 
 int total_bet_size(const PokerState& state, Action action);
+double fractional_bet_size(const PokerState& state, int total_size);
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile);
 int round_of_last_action(const PokerState& state);
 std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval);

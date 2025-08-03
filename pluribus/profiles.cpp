@@ -1,4 +1,9 @@
+#include <random>
+#include <pluribus/logging.hpp>
 #include <pluribus/profiles.hpp>
+#include <pluribus/rng.hpp>
+
+#include "poker.hpp"
 
 namespace pluribus {
 
