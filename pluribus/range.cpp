@@ -119,7 +119,7 @@ PokerRange PokerRange::random() {
   PokerRange range{0.0};
   for(uint8_t i = 0; i < MAX_CARDS; ++i) {
     for(uint8_t j = i + 1; j < MAX_CARDS; ++j) {
-      range.add_hand(Hand{j, i}, GlobalRNG::uniform());
+      range.add_hand(Hand{j, i}, GSLGlobalRNG::uniform());
     }
   }
   return range;

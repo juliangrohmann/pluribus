@@ -30,6 +30,7 @@
 #include <pluribus/util.hpp>
 #include <pluribus/debug.hpp>
 #include <pluribus/rng.hpp>
+#include <pluribus/translate.hpp>
 
 using namespace pluribus;
 using std::string;

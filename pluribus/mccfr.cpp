@@ -504,7 +504,7 @@ void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::ve
 
 template <template<typename> class StorageT>
 bool BlueprintSolver<StorageT>::should_prune(const long t) const {
-  return t >= _bp_config.prune_thresh && GlobalRNG::uniform() > 0.95;
+  return t >= _bp_config.prune_thresh && GSLGlobalRNG::uniform() > 0.95;
 }
 
 template <template<typename> class StorageT>
@@ -530,6 +530,7 @@ Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, con
   const hand_index_t hand_idx = indexer.index(board, hand, state.get_round());
   const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
   const std::vector<Action> history = state.get_action_history().slice(_rt_config.init_actions.size()).get_history();
+  // TODO: action translation
   const TreeStorageNode<uint8_t>* node = _root_node->apply(history);
   const uint8_t bias_offset = _bp->bias_offset(state.get_biases()[state.get_active()]);
   return _bp->decompress_action(node->get(cluster, bias_offset)->load());

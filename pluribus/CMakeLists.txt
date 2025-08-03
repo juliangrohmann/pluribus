@@ -14,6 +14,7 @@ add_library(
   agent.cpp
   simulate.cpp
   actions.cpp
+  translate.cpp
   indexing.cpp
   mccfr.cpp
   pluribus.cpp

@@ -1,5 +1,6 @@
 #include <pluribus/logging.hpp>
 #include <pluribus/pluribus.hpp>
+#include <pluribus/translate.hpp>
 #include <pluribus/traverse.hpp>
 
 namespace pluribus {
@@ -33,6 +34,7 @@ void Pluribus::new_game(const std::vector<std::string>& players, const std::vect
     Logger::error("Player number mismatch. Expected " + std::to_string(poker_config.n_players) + " players.");
   }
 
+  _solver = nullptr;
   _real_state = PokerState{poker_config.n_players, stacks, poker_config.ante, poker_config.straddle};
   _root_state = _real_state;
   _mapped_bp_actions = ActionHistory{};
@@ -129,17 +131,23 @@ bool is_off_tree(Action a, const PokerState& state, const ActionProfile& profile
 
 void Pluribus::_apply_action(const Action a) {
   Logger::log("Applying action: " + a.to_string());
-  _mapped_live_actions.push_back(translate_pseudo_harmonic(a, valid_actions(_real_state, _live_profile), _real_state));
+  const PokerState prev_real_state = _real_state;
   _real_state = _real_state.apply(a);
-  if(!can_solve(_root_state) && can_solve(_real_state)) {
+  Logger::log("New state:\n" + _real_state.to_string());
+  const Action translated = translate_pseudo_harmonic(a, valid_actions(prev_real_state, _live_profile), prev_real_state);
+  _mapped_live_actions.push_back(translated);
+  Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
+  if(_real_state.get_round() > _root_state.get_round()) {
+    Logger::log("Round advanced. Updating root...");
     _update_root();
   }
-  if(can_solve(_root_state) && is_off_tree(a, _real_state, _live_profile)) {
+  else if(can_solve(_root_state) && is_off_tree(a, prev_real_state, _live_profile)) {
+    Logger::log("Action is off-tree. Adding to live actions...");
     // TODO: interrupt if solving, add action, re-solve
   }
-  else {
-    Action mapped = a; // TODO: map preflop actions
-    // _mapped_actions.push_back(a);
+  else if(!can_solve(_root_state) && can_solve(_real_state)) {
+    Logger::log("First solvable state. Updating root...");
+    _update_root();
   }
 }
 
@@ -148,7 +156,10 @@ void Pluribus::_update_root() {
   const RealTimeDecision decision{*_preflop_bp, _solver};
   std::ostringstream oss;
   for(Action a : _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history()) {
-    oss << pos_to_str(curr_state.get_active(), _ranges.size()) << " action applied to root: " + a.to_string() << ", combos: "
+    const Action translated = translate_pseudo_harmonic(a, valid_actions(curr_state, _sampled_bp->get_config().action_profile), curr_state);
+    _mapped_bp_actions.push_back(translated);
+    Logger::log("Blueprint action translation: " + a.to_string() + " -> " + translated.to_string());
+    oss << pos_to_str(curr_state.get_active(), _ranges.size()) << " action applied to root: " + translated.to_string() << ", combos: "
         << std::fixed << std::setprecision(2) << _ranges[curr_state.get_active()].n_combos();
     update_ranges(_ranges, a, curr_state, Board{_board}, decision);
     oss << " -> " << _ranges[curr_state.get_active()].n_combos();
@@ -161,13 +172,12 @@ void Pluribus::_update_root() {
     oss << " -> " << _ranges[i].n_combos();
     Logger::dump(oss);
   }
-
-  if(curr_state != _real_state) {
-    Logger::error("Updated root state does not match real state.\nUpdated root:\n" + 
-        curr_state.to_string() + "\nReal state:\n" + _real_state.to_string());
-  }
   _root_state = _real_state;
+  _mapped_live_actions = ActionHistory{};
   Logger::log("New root:\n" + _root_state.to_string());
+  if(_root_state.get_action_history().size() != _mapped_bp_actions.size()) {
+    Logger::error("Mapped action length mismatch!\nRoot: " + _root_state.get_action_history().to_string() + "\nMapped: " + _mapped_bp_actions.to_string());
+  }
   if(should_solve(_root_state)) {
     Logger::log("Should solve.");
     // TODO: interrupt if solving
