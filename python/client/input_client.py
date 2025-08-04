@@ -1,29 +1,48 @@
 import requests
 import argparse
 
+def cast(num_str, dt):
+  try:
+    return dt(num_str)
+  except ValueError:
+    print("Input is not a number.")
+    return None
+
 def new_game(url):
   players, stacks = [], []
   while name := input(f"Player {len(players)}: "):
     players.append(name)
-  while stack := input(f"Player {len(stacks)} chips: "):
-    stacks.append(int(stack))
-  assert len(players) == len(stacks), "Player amount mismatch."
+  while stack := input(f"Player {len(stacks)} chips: ") is not None:
+    if v := cast(stack, int):
+      stacks.append(v)
+  if len(players) != len(stacks):
+    print("Player amount mismatch.")
+    return None
   return requests.post(url + "new_game", json={"players": players, "stacks": stacks})
 
 def update_state(url):
-  action = float(input("Betsize: "))
-  pos = int(input("Position: "))
-  assert pos >= 0, "Invalid position."
+  if (action := cast(input("Betsize: "), float)) is None: return None
+  if action < 0:
+    print("Invalid betsize.")
+    return None
+  if (pos := cast(input("Position: "), int)) is None: return None
+  if pos < 0:
+    print("Invalid position")
+    return None
   return requests.post(url + "update_state", json={"action": action, "pos": pos})
 
 def update_board(url):
   board = input("Board: ")
-  assert len(board) % 2 == 0 and len(board) >= 6, "Invalid board."
+  if len(board) % 2 != 0 or len(board) < 6:
+    print("Invalid board.")
+    return None
   return requests.post(url + "update_board", json={"board": board})
 
 def solution(url):
   hand = input("Hand: ")
-  assert len(hand) == 4, "Invalid hand."
+  if len(hand) != 4:
+    print("Invalid hand.")
+    return None
   return requests.post(url + "solution", json={"hand": hand})
 
 endpoints = [
@@ -38,8 +57,8 @@ if __name__ == "__main__":
   parser.add_argument("server", type=str)
   args = parser.parse_args()
   root_url = f"http://{args.server}:8080/"
-  while inp := input("Endpoint: "):
+  while inp := input("\nEndpoint: "):
     if matches := [e[1] for e in endpoints if e[0] == inp]:
-      print(matches[0](root_url))
+      if res := matches[0](root_url): print(f"Response: {res.json()}")
     else:
       print("Invalid endpoint.")
