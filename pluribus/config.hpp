@@ -10,7 +10,7 @@ namespace pluribus {
 struct SolverConfig {
   explicit SolverConfig(const PokerConfig& poker_ = PokerConfig{}, const ActionProfile& action_profile = ActionProfile{},
     const std::vector<int>& stacks = std::vector<int>{});
-  explicit SolverConfig(const PokerConfig& poker_ = PokerConfig{}, const ActionProfile& action_profile = ActionProfile{}, int stacks);
+  explicit SolverConfig(const PokerConfig& poker_, const ActionProfile& action_profile, int stacks);
 
   int stack_size(const int i) const { return init_state.get_players()[i].get_chips() + init_state.get_players()[i].get_betsize(); }
   std::string to_string() const;
