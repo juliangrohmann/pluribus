@@ -523,7 +523,7 @@ int BlueprintSolver<StorageT>::get_cluster(const PokerState& state, const Board&
 
 template <template<typename> class StorageT>
 RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlueprint>& bp, const RealTimeSolverConfig& rt_config)
-    : _bp{bp}, _rt_config{rt_config}, _root_node{bp->get_strategy()->apply(rt_config.init_actions)} {}
+    : _bp{bp}, _root_node{bp->get_strategy()->apply(rt_config.init_actions)}, _rt_config{rt_config} {}
 
 template <template<typename> class StorageT>
 Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, const PokerState& state, const Hand& hand, const Board& board) const {
