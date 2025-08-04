@@ -38,7 +38,7 @@ Action sample(const TranslationResult& result) {
   return GSLGlobalRNG::uniform() < result.p_A ? result.A : result.B;
 }
 
-Action translate_pseudo_harmonic(Action a, const std::vector<Action>& actions, const PokerState& state) {
+Action translate_pseudo_harmonic(const Action a, const std::vector<Action>& actions, const PokerState& state) {
   return sample(pseudo_harmonic_result(a, actions, state));
 }
 

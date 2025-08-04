@@ -51,10 +51,11 @@ public:
   ActionHistory(const std::initializer_list<Action>& actions) : _history{actions} {}
 
   void push_back(const Action& action) { _history.push_back(action); }
-  const std::vector<Action>& get_history() const { return _history; }
-  const Action& get(const int i) const { return _history[i]; }
+  const std::vector<Action>& get_history() const & { return _history; }
+  std::vector<Action> get_history() && { return std::move(_history); }
+  Action get(const int i) const { return _history[i]; }
   size_t size() const { return _history.size(); }
-  std::string to_string() const { return actions_to_str(_history); };
+  std::string to_string() const { return actions_to_str(_history); }
   ActionHistory slice(int start, int end = -1) const;
   bool is_consistent(const ActionHistory& other) const;
 
