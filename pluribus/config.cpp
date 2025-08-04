@@ -10,6 +10,9 @@ SolverConfig::SolverConfig(const PokerConfig& poker_, const ActionProfile& actio
   for(int i = 0; i < poker_.n_players; ++i) init_ranges.push_back(PokerRange::full());
 }
 
+SolverConfig::SolverConfig(const PokerConfig& poker_, const ActionProfile& action_profile, const int stacks)
+    : SolverConfig{poker_, action_profile, std::vector(poker_.n_players, stacks)} {}
+
 std::string ranges_to_config_str(const std::vector<PokerRange>& ranges) {
   std::ostringstream oss;
   for(int i = 0; i < ranges.size(); ++ i) oss << "Player " << i << ": " << ranges[i].n_combos() << " combos\n";
