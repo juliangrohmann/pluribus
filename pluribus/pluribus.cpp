@@ -22,7 +22,9 @@ private:
 };
 
 Pluribus::Pluribus(const std::shared_ptr<const LosslessBlueprint>& preflop_bp, const std::shared_ptr<const SampledBlueprint>& sampled_bp)
-    : _preflop_bp{preflop_bp}, _sampled_bp{sampled_bp} {}
+    : _preflop_bp{preflop_bp}, _sampled_bp{sampled_bp} {
+  Logger::log("Pluribus action profile:\n" + _sampled_bp->get_config().action_profile.to_string());
+}
 
 void Pluribus::new_game(const std::vector<std::string>& players, const std::vector<int>& stacks) {
   Logger::log("================================ New Game ================================");
@@ -39,6 +41,7 @@ void Pluribus::new_game(const std::vector<std::string>& players, const std::vect
   _root_state = _real_state;
   _mapped_bp_actions = ActionHistory{};
   _mapped_live_actions = ActionHistory{};
+  _live_profile = _sampled_bp->get_config().action_profile; // TODO: use more actions in live solver than blueprint?
 
   Logger::log("Real state/Root state:\n" + _root_state.to_string());
   if(const int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;
@@ -52,9 +55,6 @@ void Pluribus::new_game(const std::vector<std::string>& players, const std::vect
     oss << pos_to_str(p, _real_state.get_players().size()) << ": " << _ranges[p].n_combos() << " combos\n";
   }
   Logger::log(oss.str());
-
-  _live_profile = _sampled_bp->get_config().action_profile; // TODO: use more actions in live solver than blueprint?
-  Logger::log("Live profile:\n" + _live_profile.to_string());
 
   _board.clear();
   Logger::log("# Board cards: " + std::to_string(_board.size()));
@@ -131,10 +131,13 @@ bool is_off_tree(Action a, const PokerState& state, const ActionProfile& profile
 
 void Pluribus::_apply_action(const Action a) {
   Logger::log("Applying action: " + a.to_string());
+  const auto actions = valid_actions(_real_state, _live_profile);
+  Logger::log("Valid actions: " + actions_to_str(actions));
   const PokerState prev_real_state = _real_state;
   _real_state = _real_state.apply(a);
   Logger::log("New state:\n" + _real_state.to_string());
-  const Action translated = translate_pseudo_harmonic(a, valid_actions(prev_real_state, _live_profile), prev_real_state);
+
+  const Action translated = translate_pseudo_harmonic(a, actions, prev_real_state);
   _mapped_live_actions.push_back(translated);
   Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
   if(_real_state.get_round() > _root_state.get_round()) {
