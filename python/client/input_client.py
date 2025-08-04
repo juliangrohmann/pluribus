@@ -12,12 +12,13 @@ def new_game(url):
   players, stacks = [], []
   while name := input(f"Player {len(players)}: "):
     players.append(name)
-  while stack := input(f"Player {len(stacks)} chips: ") is not None:
-    if v := cast(stack, int):
+  while stack := input(f"Player {len(stacks)} chips: "):
+    if (v := cast(stack, int)) is not None:
       stacks.append(v)
   if len(players) != len(stacks):
     print("Player amount mismatch.")
     return None
+  print(f"{stacks=}")
   return requests.post(url + "new_game", json={"players": players, "stacks": stacks})
 
 def update_state(url):
