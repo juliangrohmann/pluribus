@@ -104,8 +104,7 @@ PokerRange build_action_range(const PokerRange& base_range, const Action& a, con
 
 void update_ranges(std::vector<PokerRange>& ranges, const Action a, const PokerState& state, const Board& board,
     const DecisionAlgorithm& decision) {
-  const auto action_range = build_action_range(ranges[state.get_active()], a, state, board, decision);
-  ranges[state.get_active()] *= action_range;
+  ranges[state.get_active()] *= build_action_range(ranges[state.get_active()], a, state, board, decision);
 }
 
 std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const Board& board, const Strategy<float>& strat) {

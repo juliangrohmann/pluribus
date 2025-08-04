@@ -23,7 +23,7 @@ public:
 
   float frequency(Action a, const PokerState& state, const Board& board, const Hand& hand) const override {
     if(!state.get_action_history().is_consistent(_init_state.get_action_history())) {
-    Logger::error("Cannot compute TreeSolver frequency for inconsistent histories:\nInitial state: " 
+      Logger::error("Cannot compute TreeSolver frequency for inconsistent histories:\nInitial state: "  
         + _init_state.get_action_history().to_string() + "\nGiven state: " + state.get_action_history().to_string());
     }
     const TreeStorageNode<T>* node = _root;

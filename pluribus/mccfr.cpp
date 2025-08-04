@@ -529,10 +529,14 @@ template <template<typename> class StorageT>
 Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, const PokerState& state, const Hand& hand, const Board& board) const {
   const hand_index_t hand_idx = indexer.index(board, hand, state.get_round());
   const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
+  // std::cout << "Rollout cluster=" << cluster << "\n";
   const std::vector<Action> history = state.get_action_history().slice(_rt_config.init_actions.size()).get_history();
+  // std::cout << "Live history=" << actions_to_str(history) << "\n";
   // TODO: action translation
   const TreeStorageNode<uint8_t>* node = _root_node->apply(history);
+  // std::cout << "Applied!\n";
   const uint8_t bias_offset = _bp->bias_offset(state.get_biases()[state.get_active()]);
+  // std::cout << "Bias offset=" << static_cast<int>(bias_offset) << "\n";
   return _bp->decompress_action(node->get(cluster, bias_offset)->load());
 }
 
