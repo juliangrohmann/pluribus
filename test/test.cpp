@@ -1,36 +1,36 @@
 #ifdef UNIT_TEST
 
-#include <iostream>
-#include <string>
-#include <set>
-#include <array>
-#include <vector>
-#include <fstream>
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <fstream>
+#include <iostream>
+#include <set>
+#include <string>
 #include <unistd.h>
+#include <vector>
+#include <catch2/catch_test_macros.hpp>
 #include <cereal/archives/binary.hpp>
 #include <cereal/types/unordered_map.hpp>
-#include <catch2/catch_test_macros.hpp>
+#include <hand_isomorphism/hand_index.h>
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
-#include <hand_isomorphism/hand_index.h>
-#include <pluribus/poker.hpp>
-#include <pluribus/cluster.hpp>
-#include <pluribus/agent.hpp>
-#include <pluribus/simulate.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/agent.hpp>
 #include <pluribus/blueprint.hpp>
-#include <pluribus/traverse.hpp>
-#include <pluribus/sampling.hpp>
+#include <pluribus/cereal_ext.hpp>
+#include <pluribus/cluster.hpp>
+#include <pluribus/debug.hpp>
 #include <pluribus/dist.hpp>
 #include <pluribus/ev.hpp>
 #include <pluribus/mccfr.hpp>
-#include <pluribus/cereal_ext.hpp>
-#include <pluribus/util.hpp>
-#include <pluribus/debug.hpp>
+#include <pluribus/poker.hpp>
 #include <pluribus/rng.hpp>
+#include <pluribus/sampling.hpp>
+#include <pluribus/simulate.hpp>
 #include <pluribus/translate.hpp>
+#include <pluribus/traverse.hpp>
+#include <pluribus/util.hpp>
 
 using namespace pluribus;
 using std::string;
@@ -41,10 +41,10 @@ omp::Hand init_hand(const std::string& str) {
   return omp::Hand::empty() + omp::Hand(std::string(str));
 }
 
-std::vector<std::vector<int>> board_idx_sample(int round, int amount) {
+std::vector<std::vector<int>> board_idx_sample(const int round, const int amount) {
   hand_indexer_t indexer;
-  int card_sum = init_indexer(indexer, round);
-  int n_idx = hand_indexer_size(&indexer, round);
+  const int card_sum = init_indexer(indexer, round);
+  const int n_idx = hand_indexer_size(&indexer, round);
 
   uint8_t cards[7] = {};
   std::vector<std::vector<int>> hands;
@@ -61,13 +61,12 @@ std::vector<std::vector<int>> board_idx_sample(int round, int amount) {
   return hands;
 }
 
-std::vector<string> board_str_sample(int round, int amount) {
+std::vector<string> board_str_sample(const int round, const int amount) {
   std::vector<string> sample;
   sample.reserve(amount);
-  auto hands = board_idx_sample(round, amount);
-  for(const auto& hand : hands) {
+  for(const auto hands = board_idx_sample(round, amount); const auto& hand : hands) {
     string hand_str = "";
-    for(int idx : hand) {
+    for(const int idx : hand) {
       hand_str += idx_to_card(idx);
     }
     sample.push_back(hand_str);
@@ -75,13 +74,12 @@ std::vector<string> board_str_sample(int round, int amount) {
   return sample;
 }
 
-std::vector<omp::Hand> board_hand_sample(int round, int amount) {
+std::vector<omp::Hand> board_hand_sample(const int round, const int amount) {
   std::vector<omp::Hand> sample;
   sample.reserve(amount);
-  auto hands = board_idx_sample(round, amount);
-  for(const auto& idx_hand : hands) {
+  for(const auto hands = board_idx_sample(round, amount); const auto& idx_hand : hands) {
     omp::Hand hand = omp::Hand::empty();
-    for(int idx : idx_hand) {
+    for(const int idx : idx_hand) {
       hand += omp::Hand(idx);
     }
     sample.push_back(hand);
@@ -95,17 +93,17 @@ bool test_serialization(const T& obj) {
   cereal_save(obj, fn);
   T loaded_obj;
   cereal_load(loaded_obj, fn);
-  bool match = (obj == loaded_obj);
+  const bool match = obj == loaded_obj;
   // unlink(fn.c_str());
   return match;
 }
 
 TEST_CASE("Card encode/decode", "[card]") {
   int idx = 0;
-  for(char rank : omp::RANKS) {
-    for(char suit : omp::SUITS) {
+  for(const char rank : omp::RANKS) {
+    for(const char suit : omp::SUITS) {
       string card = string(1, rank) + suit;
-      int card_idx = card_to_idx(card);
+      const int card_idx = card_to_idx(card);
       REQUIRE(card_idx == idx++);
       REQUIRE(idx_to_card(card_idx) == card);
     }
@@ -113,17 +111,16 @@ TEST_CASE("Card encode/decode", "[card]") {
 }
 
 TEST_CASE("Hand contains", "[hand]") {
-  auto sample = board_idx_sample(1, 10'000);
-  for(const auto& idx_hand : sample) {
+  for(const auto sample = board_idx_sample(1, 10'000); const auto& idx_hand : sample) {
     omp::Hand hand = omp::Hand::empty();
-    for(int idx : idx_hand) {
+    for(const int idx : idx_hand) {
       hand += omp::Hand(idx);
     }
     std::vector<int> matches;
     for(int i = 0; i < MAX_CARDS; ++i) {
-      bool match_proper = hand.contains(omp::Hand::empty() + omp::Hand(i));
-      bool match_improper = hand.contains(omp::Hand(i));
-      bool should_match = (std::find(idx_hand.data(), idx_hand.data() + idx_hand.size(), i) != idx_hand.data() + idx_hand.size());
+      const bool match_proper = hand.contains(omp::Hand::empty() + omp::Hand(i));
+      const bool match_improper = hand.contains(omp::Hand(i));
+      const bool should_match = std::find(idx_hand.data(), idx_hand.data() + idx_hand.size(), i) != idx_hand.data() + idx_hand.size();
       REQUIRE(match_proper == should_match);
       REQUIRE(match_improper == should_match);
       if(match_proper) {
@@ -142,11 +139,11 @@ TEST_CASE("Hand intersection", "[hand]") {
 }
 
 TEST_CASE("Evaluate hand", "[eval]") {
-  omp::HandEvaluator evaluator;
   std::fstream file("../resources/eval_testset.txt");
   string line;
   while(std::getline(file, line)) {
-    line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
+    omp::HandEvaluator evaluator;
+    std::erase(line, ' ');
     omp::Hand hero = omp::Hand::empty() + omp::Hand(line.substr(0, 10));
     omp::Hand villain = omp::Hand::empty() + omp::Hand(line.substr(10, 10));
     REQUIRE((evaluator.evaluate(hero) > evaluator.evaluate(villain)) == (line[line.length() - 1] == '1'));
@@ -174,43 +171,41 @@ TEST_CASE("Pseudo harmonic action translation", "[actions]") {
   int n_A = 0;
   float A = 0.50f, B = 0.80f, x = 0.60f;
   for(int i = 0; i < N; ++i) {
-    Action a = translate_pseudo_harmonic(Action{x}, {Action{A}, Action{B}}, state);
-    if(a == Action{A}) ++n_A;
+    if(Action a = translate_pseudo_harmonic(Action{x}, {Action{A}, Action{B}}, state); a == Action{A}) ++n_A;
   }
   double p_A = (B - x) * (1 + A) / ((B - A) * (1 + x));
   REQUIRE(abs(static_cast<double>(n_A) / static_cast<double>(N) - p_A) < 0.01);
 }
 
 TEST_CASE("Simple equity solver", "[equity]") {
-  auto sample = board_str_sample(1, 10);
-  for(const string& hand : sample) {
+  for(const auto sample = board_str_sample(1, 10); const string& hand : sample) {
     string hero_str = hand.substr(0, 4);
     string board_str = hand.substr(4);
-    omp::Hand hero = omp::Hand(hero_str);
+    auto hero = omp::Hand(hero_str);
     omp::Hand board = omp::Hand::empty() + omp::Hand(board_str);
     for(int i = 0; i < 8; ++i) {
-      omp::CardRange hero_rng = omp::CardRange(hero_str);
-      omp::CardRange villain = omp::CardRange(ochs_categories[i]);
+      auto hero_rng = omp::CardRange(hero_str);
+      auto villain = omp::CardRange(ochs_categories[i]);
       omp::EquityCalculator eq;
       eq.start({hero_rng, villain}, omp::CardRange::getCardMask(board_str), 0, true);
       eq.wait();
-      double calc_eq = eq.getResults().equity[0];
-      double simple_eq = equity(hero, villain, board);
+      const double calc_eq = eq.getResults().equity[0];
+      const double simple_eq = equity(hero, villain, board);
       REQUIRE(abs(calc_eq - simple_eq) < 1e-5);
     }
   }
 }
 
 TEST_CASE("Simulate hands", "[poker][slow]") {
-  int n_players = 9;
-  int stack_size = 10'000;
+  constexpr int n_players = 9;
+  constexpr int stack_size = 10'000;
   std::vector<RandomAgent> rng_agents;
   for(int i = 0; i < n_players; ++i) rng_agents.push_back(RandomAgent{RingBlueprintProfile{n_players, stack_size}});
   std::vector<Agent*> agents;
   for(int i = 0; i < n_players; ++i) agents.push_back(&rng_agents[i]);
-  auto results = simulate(agents, PokerConfig{n_players, 0, false}, stack_size, 100'000);
+  const auto results = simulate(agents, PokerConfig{n_players, 0, false}, stack_size, 100'000);
   long net = 0l;
-  for(long result : results) {
+  for(const long result : results) {
     net += result;
   }
   REQUIRE(net == 0l);
@@ -229,15 +224,15 @@ TEST_CASE("Straddle", "[poker]") {
 
 TEST_CASE("Split pot", "[poker]") {
   Deck deck;
-  std::vector hands{Hand{"KsTc"}, Hand{"As4c"}, Hand{"Ac2h"}};
-  Board board{"AdKh9s9h5c"};
-  ActionHistory actions = {
+  const std::vector hands{Hand{"KsTc"}, Hand{"As4c"}, Hand{"Ac2h"}};
+  const Board board{"AdKh9s9h5c"};
+  const ActionHistory actions = {
     Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
     Action::CHECK_CALL, Action{0.33f}, Action{1.00f}, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL
   };
-  auto result = simulate_round(board, hands, actions, PokerConfig{static_cast<int>(hands.size()), 0, false}, 10'000);
+  const auto result = simulate_round(board, hands, actions, PokerConfig{static_cast<int>(hands.size()), 0, false}, 10'000);
   REQUIRE(result[0] == -50);
   REQUIRE(result[1] == 25);
   REQUIRE(result[2] == 25);
@@ -294,61 +289,26 @@ TEST_CASE("Action profile", "[profile]") {
   REQUIRE(profile.get_actions(bb_ip_state) == bb_ip);
 }
 
-void test_hand_distribution(const PokerRange& range, std::function<Hand()>sampler, long n_samples, double threshold) {
-  double n_combos = range.n_combos();
+void test_hand_distribution(const PokerRange& range, const std::function<Hand()>& sampler, const long n_samples, const double threshold) {
+  const double n_combos = range.n_combos();
   std::unordered_map<Hand, long> sampled;
   for(long i = 0; i < n_samples; ++i) {
     sampled[sampler()] += 1;
   }
-  for(auto& entry : sampled) {
-    std::cout << "n_combos=" << n_combos << ", n_samples=" << n_samples << ", sampled=" << entry.second << "\n";
-    double rel_freq = static_cast<double>(entry.second * n_combos) / n_samples;
-    std::cout << std::fixed << std::setprecision(2) << entry.first.to_string() << ": " << rel_freq << " (" << range.frequency(entry.first) << ")\n";
-    REQUIRE(abs(rel_freq - range.frequency(entry.first)) < threshold);
+  for(auto& [hand, amount] : sampled) {
+    std::cout << "n_combos=" << n_combos << ", n_samples=" << n_samples << ", sampled=" << amount << "\n";
+    const double rel_freq = amount * n_combos / n_samples;
+    std::cout << std::fixed << std::setprecision(2) << hand.to_string() << ": " << rel_freq << " (" << range.frequency(hand) << ")\n";
+    REQUIRE(abs(rel_freq - range.frequency(hand)) < threshold);
   }
 }
 
-// TEST_CASE("Sample PokerRange with dead_cards", "[range]") {
-//   std::uniform_real_distribution<float> dist(0.0f, 1.0f);
-//   PokerRange range;
-//   uint8_t dead_card = card_to_idx("Ad");
-//   range.add_hand(Hand{dead_card, card_to_idx("Jd")});
-//   range.add_hand(Hand{card_to_idx("9h"), dead_card});
-//   range.add_hand(Hand{"AdAh"});
-//   range.add_hand(Hand{"AcAd"});
-//   range.add_hand(Hand{"AcTh"});
-//   range.add_hand(Hand{"8s8h"});
-
-//   std::unordered_map<Hand, float> sampled;
-//   for(int i = 0; i < 10'000; ++i) {
-//     Hand hand = range.sample({dead_card});
-//     REQUIRE(hand.cards()[0] != dead_card);
-//     REQUIRE(hand.cards()[1] != dead_card);
-//   }
-// }
-
-// void test_hand_sampler(const PokerRange& range, bool sparse, long n, double thresh) {
-//   HandSampler sampler{range, sparse};
-//   test_hand_distribution(range, [&]() -> Hand { return sampler.sample(); }, n, thresh);
-// }
-
-// TEST_CASE("Sample hands with HandSampler", "[sampler]") {
-//   auto sparse_range = PokerRange();
-//   sparse_range.add_hand({"AcAh"}, 0.5);
-//   sparse_range.add_hand({"AcKh"}, 1.0);
-//   sparse_range.add_hand({"2c2h"}, 0.25);
-//   test_hand_sampler(sparse_range, false, 1'000'000, 0.01);
-//   test_hand_sampler(sparse_range, true, 1'000'000, 0.01);
-//   test_hand_sampler(PokerRange::random(), false, 10'000'000, 0.04);
-// }
-
-void test_biased_freq(std::vector<Action> actions, std::vector<float> freq, Action bias, float factor, std::vector<int> biased_idxs) {
-  auto b_freq = biased_freq(actions, freq, bias, factor);
+void test_biased_freq(const std::vector<Action>& actions, const std::vector<float>& freq, const Action bias, const float factor, std::vector<int> biased_idxs) {
+  const auto b_freq = biased_freq(actions, freq, bias, factor);
   float b_sum = 0.0f, norm_sum = 0.0f;
   std::vector<float> correct_freq;
   for(int fidx = 0; fidx < b_freq.size(); ++fidx) {
-    correct_freq.push_back(std::find(biased_idxs.begin(), biased_idxs.end(), fidx) != biased_idxs.end() ?
-                                     freq[fidx] * factor : freq[fidx]);
+    correct_freq.push_back(std::ranges::find(biased_idxs, fidx) != biased_idxs.end() ? freq[fidx] * factor : freq[fidx]);
     b_sum += b_freq[fidx];
     norm_sum += correct_freq[fidx];
   }
@@ -360,14 +320,13 @@ void test_biased_freq(std::vector<Action> actions, std::vector<float> freq, Acti
 }
 
 TEST_CASE("Bias action frequencies", "[bias]") {
-  std::vector<Action> no_fold = {Action::CHECK_CALL, Action{0.50f}, Action::ALL_IN};
-  std::vector<Action> no_bet = {Action::FOLD, Action::CHECK_CALL};
-  std::vector<Action> facing_bet = {Action::FOLD, Action::CHECK_CALL, Action{0.30f}, Action{0.80f}, Action::ALL_IN};
-  std::vector<Action> facing_check = {Action::CHECK_CALL, Action{0.30f}, Action{0.50f}, Action{1.50f}, Action::ALL_IN};
-  float factor = 0.5f;
-  std::vector<float> freq_2 = {0.25f, 0.75f};
-  std::vector<float> freq_3 = {0.10f, 0.25f, 0.65f};
-  std::vector<float> freq_5 = {0.10f, 0.25f, 0.15f, 0.30f, 0.20f};
+  const std::vector no_fold = {Action::CHECK_CALL, Action{0.50f}, Action::ALL_IN};
+  const std::vector no_bet = {Action::FOLD, Action::CHECK_CALL};
+  const std::vector facing_bet = {Action::FOLD, Action::CHECK_CALL, Action{0.30f}, Action{0.80f}, Action::ALL_IN};
+  const std::vector facing_check = {Action::CHECK_CALL, Action{0.30f}, Action{0.50f}, Action{1.50f}, Action::ALL_IN};
+  const std::vector freq_2 = {0.25f, 0.75f};
+  const std::vector freq_3 = {0.10f, 0.25f, 0.65f};
+  const std::vector freq_5 = {0.10f, 0.25f, 0.15f, 0.30f, 0.20f};
   test_biased_freq(no_fold, freq_3, Action::BIAS_FOLD, 5.0f, {});
   test_biased_freq(no_fold, freq_3, Action::BIAS_CALL, 5.0f, {0});
   test_biased_freq(no_fold, freq_3, Action::BIAS_RAISE, 5.0f, {1, 2});
@@ -397,7 +356,7 @@ TEST_CASE("Progressive indexing", "[index]") {
     hand_index_t prog_indices[4];
     hand_index_all(HandIndexer::get_instance()->get_indexer(3), cards.data(), prog_indices);
     for(int round = 0; round < 4; ++round) {
-      uint16_t prog_cluster = FlatClusterMap::get_instance()->cluster(round, prog_indices[round]);
+      const uint16_t prog_cluster = FlatClusterMap::get_instance()->cluster(round, prog_indices[round]);
       REQUIRE(prog_cluster == single_clusters[round]);
     }
   }
@@ -414,23 +373,23 @@ TEST_CASE("Cached indexing", "[index]") {
     auto cards = collect_cards(board, hand);
     auto indexer = CachedIndexer(3);
     for(int round = 0; round < 4; ++round) {
-      uint16_t cached_cluster = FlatClusterMap::get_instance()->cluster(round, indexer.index(board, hand, round));
+      const uint16_t cached_cluster = FlatClusterMap::get_instance()->cluster(round, indexer.index(board, hand, round));
       REQUIRE(cached_cluster == single_clusters[round]);
     }
   }
 }
 
-void test_sampler_mask(RoundSampler& sampler, SamplingMode mode, const std::vector<uint8_t> dead_cards) {
+void test_sampler_mask(RoundSampler& sampler, const SamplingMode mode, const std::vector<uint8_t>& dead_cards) {
   sampler.set_mode(mode);
-  auto sample = sampler.sample();
+  const auto sample = sampler.sample();
   auto mask = card_mask(dead_cards);
   for(const auto& hand : sample.hands) mask |= hand.mask();
   REQUIRE(sample.mask == mask);
 }
 
 TEST_CASE("Round sampler", "[sampling][slow]") {
-  int n_samples = 10'000'000;
-  auto dead_cards = str_to_cards("AcTh3d2s");
+  constexpr int n_samples = 10'000'000;
+  const auto dead_cards = str_to_cards("AcTh3d2s");
   std::vector<PokerRange> ranges;
   for(int i = 0; i < 2; ++i) ranges.push_back(PokerRange::random());
   RoundSampler sampler{ranges, dead_cards};
@@ -439,12 +398,12 @@ TEST_CASE("Round sampler", "[sampling][slow]") {
     dist.add_hand(sample.hands[0], sample.weight);
   };
   sampler.set_mode(SamplingMode::MARGINAL_REJECTION);
-  auto marginal_rejection_1 = build_distribution(n_samples, sample_fun, false);
-  auto marginal_rejection_2 = build_distribution(n_samples, sample_fun, false);
+  const auto marginal_rejection_1 = build_distribution(n_samples, sample_fun, false);
+  const auto marginal_rejection_2 = build_distribution(n_samples, sample_fun, false);
   sampler.set_mode(SamplingMode::IMPORTANCE_REJECTION);
-  auto importance_rejection = build_distribution(n_samples, sample_fun, false);
+  const auto importance_rejection = build_distribution(n_samples, sample_fun, false);
   sampler.set_mode(SamplingMode::IMPORTANCE_RANDOM_WALK);
-  auto importance_walk = build_distribution(n_samples, sample_fun, false);
+  const auto importance_walk = build_distribution(n_samples, sample_fun, false);
   REQUIRE(distribution_rmse(marginal_rejection_1, marginal_rejection_2) < 0.0006);
   REQUIRE(distribution_rmse(marginal_rejection_1, importance_rejection) < 0.00075);
   REQUIRE(distribution_rmse(marginal_rejection_1, importance_walk) < 0.00075);
@@ -459,7 +418,7 @@ TEST_CASE("Lossless monte carlo EV", "[ev][slow][dependency]") {
   cereal_load(bp, "lossless_bp_2p_100bb_0ante");
   std::vector<uint8_t> board = str_to_cards("AcTd3c2s");
   PokerState state{bp.get_config().poker, 10'000};
-  std::vector<Action> actions = {Action{0.75f}, Action::CHECK_CALL, Action::CHECK_CALL, Action{0.50f}, Action::CHECK_CALL, Action::CHECK_CALL, Action::CHECK_CALL};
+  std::vector actions = {Action{0.75f}, Action::CHECK_CALL, Action::CHECK_CALL, Action{0.50f}, Action::CHECK_CALL, Action::CHECK_CALL, Action::CHECK_CALL};
   state = state.apply(ActionHistory{actions});
   auto ranges = build_ranges(state.get_action_history().get_history(), Board{board}, bp);
   MonteCarloEV ev_solver{};
@@ -480,7 +439,7 @@ TEST_CASE("Serialize Hand", "[serialize]") {
 }
 
 TEST_CASE("Serialize PokerState", "[serialize]") {
-  ActionHistory actions = {
+  const ActionHistory actions = {
     Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
     Action::CHECK_CALL, Action{0.33f}, Action{1.00f}, Action::CHECK_CALL,
   };
@@ -491,7 +450,7 @@ TEST_CASE("Serialize PokerState", "[serialize]") {
 }
 
 TEST_CASE("Serialize ActionHistory", "[serialize]") {
-  ActionHistory actions = {
+  const ActionHistory actions = {
     Action{0.8f}, Action::FOLD, Action::CHECK_CALL,
     Action::CHECK_CALL, Action{0.33f}, Action{1.00f}, Action::CHECK_CALL,
     Action::CHECK_CALL, Action::CHECK_CALL,
