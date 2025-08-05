@@ -23,7 +23,7 @@ void log_pruned(const PokerState& state, const Board& board, const TreeStorageNo
       Hand hand = HoleCardIndexer::get_instance()->hand(h_idx);
       const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
       if(const int regret = node->get(cluster, a_idx)->load(); regret < -300'000'000) {
-        Logger::log(hand.to_string());
+        Logger::log(hand.to_string() + ": " + std::to_string(regret));
         ++n;
       }
     }
