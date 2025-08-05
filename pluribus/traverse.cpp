@@ -152,9 +152,6 @@ std::unordered_map<Action, RenderableRange> build_renderable_ranges(const Decisi
   const auto actions = valid_actions(state, profile);
   auto color_map = map_colors(actions);
   base_range.remove_cards(board.as_vector(n_board_cards(state.get_round())));
-  std::cout << "Actions: ";
-  for(Action a : actions) std::cout << a.to_string() << "  ";
-  std::cout << "\n";
   for(Action a : actions) {
     PokerRange action_range = build_action_range(base_range, a, state, board, decision);
     ranges.insert({a, RenderableRange{base_range * action_range, a.to_string(), color_map[a], true}});
