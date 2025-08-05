@@ -185,6 +185,7 @@ struct PokerConfig {
   void serialize(Archive& ar) {
     // ar(n_players, n_chips, ante, straddle); // TODO: compatibility
     ar(n_players, n_chips, ante);
+    straddle = true;
   }
 
   int n_players = 2;
@@ -229,6 +230,7 @@ public:
   void serialize(Archive& ar) {
     // ar(_players, _biases, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner, _straddle); // TODO: compatibility
     ar(_players, _biases, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner);
+    _straddle = true;
   }
 
   uint8_t _first_bias = 10; // TODO: remove, just for asserts
