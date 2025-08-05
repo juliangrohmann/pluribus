@@ -10,7 +10,25 @@
 
 namespace pluribus {
 
-void traverse(RangeViewer* viewer_p, const DecisionAlgorithm& decision, const SolverConfig& config) {
+void log_pruned(const PokerState& state, const Board& board, const TreeStorageNode<int>* root) {
+  Logger::log("Logging pruned...");
+  const TreeStorageNode<int>* node = root;
+  for(int i = 0; i < state.get_action_history().size(); ++i) {
+    node = node->apply(state.get_action_history().get(i));
+  }
+  for(int a_idx = 0; a_idx < node->get_value_actions().size(); ++a_idx) {
+    Logger::log("Pruned " + node->get_value_actions()[a_idx].to_string() + ":");
+    for(int h_idx = 0; h_idx < MAX_COMBOS; ++h_idx) {
+      Hand hand = HoleCardIndexer::get_instance()->hand(h_idx);
+      const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
+      if(const int regret = node->get(cluster, a_idx)->load(); regret < -300'000'000) {
+        Logger::log(hand.to_string());
+      }
+    }
+  }
+}
+
+void traverse(RangeViewer* viewer_p, const DecisionAlgorithm& decision, const SolverConfig& config, const TreeStorageNode<int>* root) {
   std::string input;
   std::cout << "Board cards: ";
   auto board_cards = config.init_board;
@@ -56,6 +74,7 @@ void traverse(RangeViewer* viewer_p, const DecisionAlgorithm& decision, const So
       state = config.init_state;
     }
 
+    if(root) log_pruned(state, board, root);
     action_ranges = build_renderable_ranges(decision, config.action_profile, state, board, ranges[state.get_active()]);
     render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
     std::cout << state.to_string();
@@ -68,7 +87,7 @@ void traverse_tree(RangeViewer* viewer_p, const std::string& bp_fn) {
   TreeBlueprintSolver bp;
   cereal_load(bp, bp_fn);
   std::cout << "Success.\n";
-  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_config());
+  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_config(), bp.get_strategy());
 }
 
 void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn) {
@@ -76,7 +95,7 @@ void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn) {
   LosslessBlueprint bp;
   cereal_load(bp, bp_fn);
   std::cout << "Success.\n";
-  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_config());
+  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_config(), nullptr);
 }
 
 Action str_to_action(const std::string& str) {
