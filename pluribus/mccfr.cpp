@@ -210,6 +210,16 @@ bool should_restrict(const std::vector<Action>& actions, const int restrict_play
   return true;
 }
 
+bool is_terminal_call(const Action a, const int i, const PokerState& state) {
+  if(a != Action::CHECK_CALL) return false;
+  for(int p_idx = 0; p_idx < state.get_players().size(); ++p_idx) {
+    if(p_idx != i && !state.get_players()[p_idx].has_folded() && state.get_players()[p_idx].get_chips() > 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long t, const int i, const Board& board, const std::vector<Hand>& hands,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug) {
@@ -233,7 +243,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
     float v_exact = 0;
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
-      if(base_ptr[a_idx].load() > PRUNE_CUTOFF) {
+      if(state.get_round() == 3 || a == Action::FOLD || base_ptr[a_idx].load() > PRUNE_CUTOFF || is_terminal_call(a, i, state)) {
         PokerState next_state = state.apply(a);
         const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
         int v_a = traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, branching_idx, next_state, i), debug);
