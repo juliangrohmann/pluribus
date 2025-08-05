@@ -18,13 +18,16 @@ void log_pruned(const PokerState& state, const Board& board, const TreeStorageNo
   }
   for(int a_idx = 0; a_idx < node->get_value_actions().size(); ++a_idx) {
     Logger::log("Pruned " + node->get_value_actions()[a_idx].to_string() + ":");
+    int n = 0;
     for(int h_idx = 0; h_idx < MAX_COMBOS; ++h_idx) {
       Hand hand = HoleCardIndexer::get_instance()->hand(h_idx);
       const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), board, hand);
       if(const int regret = node->get(cluster, a_idx)->load(); regret < -300'000'000) {
         Logger::log(hand.to_string());
+        ++n;
       }
     }
+    Logger::log(node->get_value_actions()[a_idx].to_string() + ": Pruned " + std::to_string(n) + "/" + std::to_string(MAX_COMBOS));
   }
 }
 
