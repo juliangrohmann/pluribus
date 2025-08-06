@@ -135,27 +135,24 @@ std::string cluster_filename(const int round, const int n_clusters, const int sp
   return base + (round == 3 ? "_p" + std::to_string(split) + ".npy": ".npy");
 }
 
+std::vector<uint16_t> load_clusters(const int round, const int n_clusters, const int split) {
+  return cnpy::npy_load(cluster_filename(round, n_clusters, split)).as_vec<uint16_t>();
+}
+
 std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(const int n_clusters) {
   std::cout << "Initializing flat cluster map (n_clusters=" << n_clusters << ")...\n";
   std::array<std::vector<uint16_t>, 4> cluster_map;
-  for(int i = 0; i < 4; ++i) {
-    std::cout << "(Flat: " << n_clusters << " clusters) Loading round " << i << "... " << std::flush;
-    if(i == 0)  {
-      cluster_map[i].resize(169);
-      std::iota(cluster_map[i].begin(), cluster_map[i].end(), 0);
-    }
-    else if(i == 3) {
-      cluster_map[i] = cnpy::npy_load(cluster_filename(i, n_clusters, 1)).as_vec<uint16_t>();
-      auto s2 = cnpy::npy_load(cluster_filename(i, n_clusters, 2)).as_vec<uint16_t>();
-      const size_t s1_size = cluster_map[i].size();
-      cluster_map[i].resize(cluster_map[i].size() + s2.size());
-      std::ranges::copy(s2, cluster_map[i].data() + s1_size);
-    }
-    else {
-      cluster_map[i] = cnpy::npy_load(cluster_filename(i, n_clusters, 1)).as_vec<uint16_t>();
-    }
-    std::cout << "Success.\n";
+  cluster_map[0].resize(169);
+  std::iota(cluster_map[0].begin(), cluster_map[0].end(), 0);
+  for(int i = 1; i <= 3; ++i) {
+    std::cout << "(Flat: " << n_clusters << " clusters) Loading round " << i << "...\n";
+    cluster_map[i] = load_clusters(i, n_clusters, 1);
   }
+  auto s2 = cnpy::npy_load(cluster_filename(3, n_clusters, 2)).as_vec<uint16_t>();
+  const size_t s1_size = cluster_map[3].size();
+  cluster_map[3].resize(cluster_map[3].size() + s2.size());
+  std::ranges::copy(s2, cluster_map[3].data() + s1_size);
+  std::cout << "Loaded all clusters.\n";
   return cluster_map;
 }
 
