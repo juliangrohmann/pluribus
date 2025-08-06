@@ -1,5 +1,5 @@
 ## Timings
-Timing patterns due to solution needing to converge when there is little time to solve (i.e call OOP, flop)
+Timing patterns due to solution needing to converge when there is little time to solve (i.e. call OOP, flop)
 - If real-time solution is not nearly converged, occasionally act according to blueprint (mostly on early streets)
 
 
@@ -7,7 +7,7 @@ Timing patterns due to solution needing to converge when there is little time to
 Process detection:
 - Give the client-side script an inconspicuous name
 
-Resource usage detection (may be impossible):
+Resource usage detection (maybe impossible):
 - Make sure resources don't spike on OCR usage
 - Worst case, do OCR on a seperate device
 
