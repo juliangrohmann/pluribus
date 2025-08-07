@@ -4,6 +4,7 @@
 #include <string>
 #include <pluribus/cluster.hpp>
 #include <pluribus/indexing.hpp>
+#include <pluribus/logging.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/util.hpp>
 
@@ -21,6 +22,17 @@ HandIndexer::HandIndexer() : _indexers{init_indexer_vec()} {}
 
 uint64_t HandIndexer::index(const Board& board, const Hand& hand, const int round) const {
   return index(collect_cards(board, hand, round).data(), round);
+}
+
+std::unique_ptr<FlopIndexer> FlopIndexer::_instance = nullptr;
+
+FlopIndexer::FlopIndexer() {
+  constexpr uint8_t cards_per_round[1] = {3};
+  hand_indexer_init(1, cards_per_round, &_indexer);
+  const hand_index_t num_flops = hand_indexer_size(&_indexer, 0);
+  if(num_flops != NUM_DISTINCT_FLOPS) {
+    Logger::error("Flop indexer size mismatch: Current=" + std::to_string(num_flops) + ", Expected=" + std::to_string(NUM_DISTINCT_FLOPS));
+  }
 }
 
 CachedIndexer::CachedIndexer(const int max_round) : _max_round{max_round} {

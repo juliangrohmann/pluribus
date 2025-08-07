@@ -35,9 +35,9 @@ void Deck::shuffle() {
   _current = 0;
 }
 
-uint64_t card_mask(const std::vector<uint8_t>& cards) {
+uint64_t card_mask(const uint8_t* cards, const size_t n_cards) {
   uint64_t mask = 0L;
-  for(const uint8_t c : cards) mask |= card_mask(c);
+  for(size_t i = 0; i < n_cards; ++i) mask |= card_mask(cards[i]);
   return mask;
 }
 

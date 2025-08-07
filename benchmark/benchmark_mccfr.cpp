@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 
   // preload cache
   HandIndexer::get_instance();
-  FlatClusterMap::get_instance();
+  BlueprintClusterMap::get_instance();
 
   RoundSampler sampler{config.init_ranges, config.init_board};
   RoundSample sample = sampler.sample();

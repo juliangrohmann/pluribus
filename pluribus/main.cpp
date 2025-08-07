@@ -34,14 +34,24 @@ int main(int argc, char* argv[]) {
     PluribusServer server{argv[2], argv[3]};
     server.start();
   }
-  else if(command == "cluster") {
-    // ./Pluribus cluster round
-    if(int round = atoi(argv[2]); round < 1 || round > 3) {
-      std::cout << "1 <= round <= 3 required. Given: " << round << std::endl;
+  else if(command == "ochs-features") {
+    // ./Pluribus ochs-features [--blueprint, --real-time] round dir
+    if(argc < 5) {
+      std::cout << "Missing arguments to build cluster features.\n";
     }
     else {
-      std::cout << "Clustering round " << round << "..." << std::endl;
-      build_ochs_features(round);
+      std::function<void(int, const std::string&)> fun;
+      if(strcmp(argv[2], "--blueprint") == 0) fun = build_ochs_features;
+      else if(strcmp(argv[2], "--real-time") == 0) fun = build_ochs_features_filtered;
+      else throw std::runtime_error("Invalid OCHS feature mode: " + std::string{argv[2]});
+      if(strcmp(argv[3], "all") == 0) {
+        for(int round = 1; round <= 3; ++round) {
+          fun(round, argv[4]);
+        }
+      }
+      else {
+        fun(atoi(argv[3]), argv[4]);
+      }
     }
   }
   else if(command == "traverse") {

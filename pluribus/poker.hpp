@@ -40,7 +40,8 @@ private:
 };
 
 inline uint64_t card_mask(const uint8_t card) { return 1L << card; }
-uint64_t card_mask(const std::vector<uint8_t>& cards);
+uint64_t card_mask(const uint8_t* cards, size_t n_cards);
+inline uint64_t card_mask(const std::vector<uint8_t>& cards) { return card_mask(cards.data(), cards.size()); }
 
 template<int N>
 class CardSet {
@@ -50,14 +51,14 @@ public:
     update_mask();
   }
   CardSet(const std::initializer_list<uint8_t>& cards) : _mask{0} {
-    std::copy(cards.begin(), cards.end(), _cards.begin());
+    std::copy(cards.begin(), cards.begin() + std::min(static_cast<int>(cards.size()), N), _cards.begin());
     update_mask(0, cards.size());
   }
   explicit CardSet(const std::array<uint8_t, N>& cards) : _cards{cards}, _mask{0}  {
     update_mask();
   }
   explicit CardSet(const std::vector<uint8_t>& cards) : _mask{0} {
-    std::copy(cards.begin(), cards.end(), _cards.begin()); 
+    std::copy(cards.begin(), cards.begin() + std::min(static_cast<int>(cards.size()), N), _cards.begin());
     update_mask(0, cards.size());
   }
   explicit CardSet(const std::string& card_str) : _mask{0} {

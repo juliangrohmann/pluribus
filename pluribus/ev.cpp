@@ -80,7 +80,7 @@ double node_ev(const TreeStorageNode<float>* node, const SolverConfig& config, c
     return hu;
   }
   const hand_index_t cached_idx = indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round());
-  const int cached_cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), cached_idx);
+  const int cached_cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), cached_idx);
   const auto& actions = node->get_value_actions();
   double ev = 0.0;
   for(int aidx = 0; aidx < actions.size(); ++aidx) {

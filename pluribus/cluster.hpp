@@ -25,33 +25,57 @@ const std::array<std::string, 8> ochs_categories = {
 
 void assign_features(const std::string& hand, const std::string& board, float* data);
 double equity(const omp::Hand& hero, const omp::CardRange &villain, const omp::Hand& board);
-void build_ochs_features(int round);
+void build_ochs_features(int round, const std::string& dir);
+void build_ochs_features_filtered(int round, const std::string& dir);
 std::string cluster_filename(int round, int n_clusters, int split);
 std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(int n_clusters);
 
-class FlatClusterMap {
+class BlueprintClusterMap {
 public:
-  uint16_t cluster(const int round, const uint64_t index) const { return _cluster_map[round][index]; }
+  uint16_t cluster(const int round, const hand_index_t index) const { return _cluster_map[round][index]; }
   uint16_t cluster(const int round, const Board& board, const Hand& hand) const {
     return cluster(round, HandIndexer::get_instance()->index(board, hand, round));
   }
 
-  static FlatClusterMap* get_instance() {
+  static BlueprintClusterMap* get_instance() {
     if(!_instance) {
-      _instance = std::unique_ptr<FlatClusterMap>(new FlatClusterMap());
+      _instance = std::unique_ptr<BlueprintClusterMap>(new BlueprintClusterMap());
     }
     return _instance.get();
   }
 
-  FlatClusterMap(const FlatClusterMap&) = delete;
-  FlatClusterMap& operator=(const FlatClusterMap&) = delete;
+  BlueprintClusterMap(const BlueprintClusterMap&) = delete;
+  BlueprintClusterMap& operator=(const BlueprintClusterMap&) = delete;
 
 private:
-  FlatClusterMap();
+  BlueprintClusterMap();
 
   std::array<std::vector<uint16_t>, 4> _cluster_map;
 
-  static std::unique_ptr<FlatClusterMap> _instance;
+  static std::unique_ptr<BlueprintClusterMap> _instance;
+};
+
+class RealTimeClusterMap {
+public:
+  uint16_t cluster(int round, hand_index_t flop_index, hand_index_t hand_index) const;
+  uint16_t cluster(int round, const Board& board, const Hand& hand) const;
+
+  static RealTimeClusterMap* get_instance() {
+    if(!_instance) {
+      _instance = std::unique_ptr<RealTimeClusterMap>(new RealTimeClusterMap());
+    }
+    return _instance.get();
+  }
+
+  RealTimeClusterMap(const RealTimeClusterMap&) = delete;
+  RealTimeClusterMap& operator=(const RealTimeClusterMap&) = delete;
+
+private:
+  RealTimeClusterMap();
+
+  std::array<std::array<std::unordered_map<hand_index_t, uint16_t>, 4>, NUM_DISTINCT_FLOPS> _cluster_map;
+
+  static std::unique_ptr<RealTimeClusterMap> _instance;
 };
 
 }

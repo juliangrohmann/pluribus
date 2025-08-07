@@ -1,7 +1,8 @@
 import numpy as np
+import argparse
+from pathlib import Path
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.cluster import KMeans
-import argparse
 
 
 def cluster(data, n_clusters):
@@ -30,9 +31,12 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("round", type=int)
   parser.add_argument("--clusters", type=int, default=200)
+  parser.add_argument("--flops", action="store_true")
+  parser.add_argument("--dir", type=str, default="")
   args = parser.parse_args()
-  print(f"{args.round=}")
-  print(f"{args.clusters=}")
-  labels = cluster_batched(args.round, args.clusters) if args.round == 3 else cluster(np.load(f"features_{args.round}.npy"), args.clusters)
-  np.save(fn := f"clusters_r{args.round}_c{args.clusters}.npy", labels)
-  print(f"clusters written to {fn}")
+  print(f"{args.round=}, {args.clusters=}, {args.batched}, {args.flops}, {args.dir}")
+  files = [f"features_r{args.round}_f{flop_idx}.npy" for flop_idx in range(1755)] if args.flops else [f"features_{args.round}.npy"]
+  for f in files:
+    labels = cluster_batched(args.round, args.clusters) if args.round == 3 and not args.flops else cluster(np.load(f), args.clusters)
+    np.save(fn := str(Path(args.dir) / f"clusters_r{args.round}_c{args.clusters}.npy"), labels)
+    print(f"clusters written to {fn}")

@@ -5,4 +5,5 @@ namespace pluribus {
   static constexpr int MAX_CARDS = 52;
   static constexpr int MAX_PREFLOP_COMBOS = 169;
   static constexpr int MAX_COMBOS = 1326;
+  static constexpr int NUM_DISTINCT_FLOPS = 1755;
 }

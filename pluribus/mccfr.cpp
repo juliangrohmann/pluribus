@@ -73,7 +73,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
   Logger::log("MCCFRSolver --- Initializing HandIndexer...");
   Logger::log(HandIndexer::get_instance() ? "Success." : "Failure.");
   Logger::log("MCCFRSolver --- Initializing FlatClusterMap...");
-  Logger::log(FlatClusterMap::get_instance() ? "Success." : "Failure.");
+  Logger::log(BlueprintClusterMap::get_instance() ? "Success." : "Failure.");
   Logger::log("Solver config:\n" + get_config().to_string());
   on_start();
 
@@ -234,7 +234,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long 
   if(state.get_active() == i) {
     auto value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
     auto branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
-    const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
+    const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     if(_log_level == SolverLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
     std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
     auto freq = calculate_strategy(base_ptr, value_actions.size());
@@ -292,7 +292,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t,
   if(state.get_active() == i) {
     auto value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
     auto branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
-    const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
+    const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     if(_log_level == SolverLogLevel::DEBUG) debug << "Cluster:" << cluster << "\n";
     std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
     auto freq = calculate_strategy(base_ptr, value_actions.size());
@@ -333,7 +333,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t,
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const PokerState& state, const Board& board,
     const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, StorageT<int>* regret_storage, std::ostringstream& debug) {
-  const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()],
+  const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()],
       state.get_round()));
   const std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
   const std::vector<float> freq = calculate_strategy(base_ptr, actions.size());
@@ -475,7 +475,7 @@ void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, 
   }
   if(state.get_active() == i) {
     auto actions = this->avg_value_actions(avg_storage, state, this->get_config().action_profile);
-    int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
+    int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     const std::atomic<int>* base_ptr = this->get_base_regret_ptr(regret_storage, state, cluster);
     auto freq = calculate_strategy(base_ptr, actions.size());
     int a_idx = sample_action_idx(freq);
@@ -524,7 +524,7 @@ long BlueprintSolver<StorageT>::next_step(const long t, const long T) const {
 
 template<template<typename> class StorageT>
 int BlueprintSolver<StorageT>::get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
-  return FlatClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round()));
+  return BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round()));
 }
 
 // ==========================================================================================
@@ -538,7 +538,7 @@ RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlue
 template <template<typename> class StorageT>
 Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, const PokerState& state, const Hand& hand, const Board& board) const {
   const hand_index_t hand_idx = indexer.index(board, hand, state.get_round());
-  const int cluster = FlatClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
+  const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
   // std::cout << "Rollout cluster=" << cluster << "\n";
   const std::vector<Action> history = state.get_action_history().slice(_rt_config.init_actions.size()).get_history();
   // std::cout << "Live history=" << actions_to_str(history) << "\n";

@@ -23,6 +23,7 @@
 #include <pluribus/debug.hpp>
 #include <pluribus/dist.hpp>
 #include <pluribus/ev.hpp>
+#include <pluribus/indexing.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/rng.hpp>
@@ -339,7 +340,7 @@ TEST_CASE("Bias action frequencies", "[bias]") {
 std::array<uint16_t, 4> independent_indices(const Board& board, const Hand& hand) {
   std::array<uint16_t, 4> single_clusters;
   for(int round = 0; round < 4; ++round) {
-    single_clusters[round] = FlatClusterMap::get_instance()->cluster(round, board, hand);
+    single_clusters[round] = BlueprintClusterMap::get_instance()->cluster(round, board, hand);
   }
   return single_clusters;
 }
@@ -356,10 +357,31 @@ TEST_CASE("Progressive indexing", "[index]") {
     hand_index_t prog_indices[4];
     hand_index_all(HandIndexer::get_instance()->get_indexer(3), cards.data(), prog_indices);
     for(int round = 0; round < 4; ++round) {
-      const uint16_t prog_cluster = FlatClusterMap::get_instance()->cluster(round, prog_indices[round]);
+      const uint16_t prog_cluster = BlueprintClusterMap::get_instance()->cluster(round, prog_indices[round]);
       REQUIRE(prog_cluster == single_clusters[round]);
     }
   }
+}
+
+TEST_CASE("Flop indexing", "[index]") {
+  std::unordered_set<hand_index_t> indexes;
+  hand_index_t min_idx = std::numeric_limits<hand_index_t>::max();
+  hand_index_t max_idx = std::numeric_limits<hand_index_t>::min();
+  for(uint8_t c1 = 0; c1 < MAX_CARDS; ++c1) {
+    for(uint8_t c2 = 0; c2 < MAX_CARDS; ++c2) {
+      for(uint8_t c3 = 0; c3 < MAX_CARDS; ++c3) {
+        if(c1 == c2 || c1 == c3 || c2 == c3) continue;
+        const uint8_t cards[3] = {c1, c2, c3};
+        hand_index_t idx = FlopIndexer::get_instance()->index(cards);
+        indexes.insert(idx);
+        min_idx = std::min(idx, min_idx);
+        max_idx = std::max(idx, max_idx);
+      }
+    }
+  }
+  REQUIRE(indexes.size() == NUM_DISTINCT_FLOPS);
+  REQUIRE(min_idx == 0);
+  REQUIRE(max_idx == NUM_DISTINCT_FLOPS - 1);
 }
 
 TEST_CASE("Cached indexing", "[index]") {
@@ -373,7 +395,7 @@ TEST_CASE("Cached indexing", "[index]") {
     auto cards = collect_cards(board, hand);
     auto indexer = CachedIndexer(3);
     for(int round = 0; round < 4; ++round) {
-      const uint16_t cached_cluster = FlatClusterMap::get_instance()->cluster(round, indexer.index(board, hand, round));
+      const uint16_t cached_cluster = BlueprintClusterMap::get_instance()->cluster(round, indexer.index(board, hand, round));
       REQUIRE(cached_cluster == single_clusters[round]);
     }
   }
