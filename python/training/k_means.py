@@ -59,7 +59,7 @@ if __name__ == "__main__":
   parser.add_argument("--out", type=str, default="")
   args = parser.parse_args()
   print(vars(args))
-  for r in list(range(1, 4)) if args.round == "all" else [int(args.round)]:
+  for r in [2, 3] if args.round == "all" else [int(args.round)]:
     files = [f"features_r{r}_f{flop_idx}.npy" for flop_idx in range(1755)] if args.flops else [f"features_{r}.npy"]
     for fn in files:
       labels, centroids = cluster_batched(r, args.clusters) if r == 3 and not args.flops else cluster(np.load(Path(args.src) / fn), args.clusters)

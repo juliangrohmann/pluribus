@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
       else if(strcmp(argv[2], "--real-time") == 0) fun = build_ochs_features_filtered;
       else throw std::runtime_error("Invalid OCHS feature mode: " + std::string{argv[2]});
       if(strcmp(argv[3], "all") == 0) {
-        for(int round = 1; round <= 3; ++round) {
+        for(int round = 2; round <= 3; ++round) {
           fun(round, argv[4]);
         }
       }
