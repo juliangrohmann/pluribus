@@ -47,6 +47,9 @@ def cluster_batched(i, n_clusters):
   print(f"{sum([km.score(np.load(f'features_r{i}_b{b}.npy')) for b in range(10)])=}")
   return labels
 
+def to_output_fn(fn_, prefix, args_):
+  return str(Path(args_.out) / (fn_.replace("features_", prefix).rstrip(".npy") + f"_c{args_.clusters}.npy"))
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("round", type=str)
@@ -60,8 +63,8 @@ if __name__ == "__main__":
     files = [f"features_r{r}_f{flop_idx}.npy" for flop_idx in range(1755)] if args.flops else [f"features_{r}.npy"]
     for fn in files:
       labels, centroids = cluster_batched(r, args.clusters) if r == 3 and not args.flops else cluster(np.load(Path(args.src) / fn), args.clusters)
-      np.save(clusters_fn := str(Path(args.out) / (fn.replace("features_", "clusters_").rstrip(".npy") + f"_c{args.clusters}.npy")), labels)
+      np.save(clusters_fn := to_output_fn(fn, "clusters_", args), labels)
       print(f"clusters written to {clusters_fn}")
       if args.flops:
-        np.save(centroids_fn := clusters_fn.replace("clusters_", "centroids_"), centroids)
+        np.save(centroids_fn := to_output_fn(fn, "centroids_", args), centroids)
         print(f"centroids written to {centroids_fn}")
