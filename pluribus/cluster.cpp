@@ -17,6 +17,7 @@
 #include <pluribus/util.hpp>
 #include <tqdm/tqdm.hpp>
 
+#include "blueprint.hpp"
 #include "debug.hpp"
 
 namespace pluribus {
@@ -88,9 +89,10 @@ void map_index_to_features(const hand_index_t idx, const int round, const int ca
   assign_features(hand, board, data);
 }
 
-void solve_features(const int round, const int card_sum, const hand_index_t total, const std::function<hand_index_t(hand_index_t)>& get_index,
+void solve_features(const int round, const hand_index_t total, const std::function<hand_index_t(hand_index_t)>& get_index,
     const std::string& fn, const bool verbose) {
   Logger::log("Solving features for " + std::to_string(total) + " indexes...");
+  const int card_sum = n_board_cards(round) + 2;
   const hand_index_t chunk_size = std::max(total / omp_get_max_threads(), 1ul);
   const hand_index_t log_interval = std::max(chunk_size / 100, 1ul);
   std::vector<float> feature_map(total * 8);
@@ -112,67 +114,69 @@ void solve_features(const int round, const int card_sum, const hand_index_t tota
   cnpy::npy_save(fn, feature_map.data(), {total, 8}, "w");
 }
 
-void solve_features(const int round, const int card_sum, const hand_index_t start, const hand_index_t end,
+void solve_features(const int round, const hand_index_t start, const hand_index_t end,
     const std::string& fn, const bool verbose) {
-  return solve_features(round, card_sum, end - start, [start](const int i) {return start + i; }, fn, verbose);
+  return solve_features(round, end - start, [start](const int i) {return start + i; }, fn, verbose);
 }
 
-void solve_features(const int round, const int card_sum, const std::vector<hand_index_t>& indexes, const std::string& fn, const bool verbose) {
-  return solve_features(round, card_sum, indexes.size(), [&indexes](const int i) {return indexes[i]; }, fn, verbose);
+void solve_features(const int round, const std::vector<hand_index_t>& indexes, const std::string& fn, const bool verbose) {
+  return solve_features(round, indexes.size(), [&indexes](const int i) {return indexes[i]; }, fn, verbose);
 }
 
 void build_ochs_features(const int round, const std::string& dir) {
   if(round < 1 || round > 3) Logger::error("Cannot build filtered OCHS features for round " + std::to_string(round) + ".");
   Logger::log("Building OCHS features: " + round_to_str(round));
-  const int card_sum = n_board_cards(round) + 2;
   const size_t n_idx = HandIndexer::get_instance()->size(round);
   if(round == 3) {
     constexpr int n_batches = 10;
     const size_t batch_size = n_idx / n_batches;
     for(int batch = 0; batch < n_batches; ++batch) {
       Logger::log("Launching batch " + std::to_string(batch) + "...");
-      solve_features(round, card_sum, batch * batch_size, batch == n_batches - 1 ? n_idx : (batch + 1) * batch_size,
-          std::filesystem::path{dir} / (std::string("features_") + std::to_string(round) + "_b" + std::to_string(batch) + ".npy"), true);
+      solve_features(round, batch * batch_size, batch == n_batches - 1 ? n_idx : (batch + 1) * batch_size,
+          std::filesystem::path{dir} / ("features_r" + std::to_string(round) + "_b" + std::to_string(batch) + ".npy"), true);
     }
   }
   else {
-    solve_features(round, card_sum, 0, n_idx, std::filesystem::path{dir} / (std::string("features_") + std::to_string(round) + ".npy"), true);
+    solve_features(round, 0, n_idx, std::filesystem::path{dir} / ("features_r" + std::to_string(round) + ".npy"), true);
   }
 }
 
-void collect_indexes(const int i, const int round, const int max_cards, const uint64_t mask, uint8_t cards[7], std::unordered_set<hand_index_t>& indexes) {
+void collect_indexes_rec(const int i, const int round, const int max_cards, const uint64_t mask, uint8_t cards[7], std::unordered_set<hand_index_t>& indexes) {
   if(i < max_cards) {
     for(uint8_t card = i == 1 ? cards[i - 1] + 1 : 0; card < MAX_CARDS; ++card) {
       if(const auto curr_mask = card_mask(card); !(mask & curr_mask)) {
         cards[i] = card;
-        collect_indexes(i == 1 ? 5 : i + 1, round, max_cards, mask | curr_mask, cards, indexes);
+        collect_indexes_rec(i == 1 ? 5 : i + 1, round, max_cards, mask | curr_mask, cards, indexes);
       }
     }
   }
   else {
-    // std::cout << cards_to_str(cards, max_cards) << "\n";
     indexes.insert(HandIndexer::get_instance()->index(cards, round));
   }
+}
+
+std::unordered_set<hand_index_t> collect_indexes(const int round, uint8_t cards[7]) {
+  std::unordered_set<hand_index_t> index_set;
+  const int card_sum = n_board_cards(round) + 2;
+  if(card_sum > 7) Logger::error("Invalid card sum.");
+  collect_indexes_rec(0, round, card_sum, card_mask(cards + 2, 3), cards, index_set);
+  return index_set;
 }
 
 void build_ochs_features_filtered(const int round, const std::string& dir) {
   if(round < 1 || round > 3) Logger::error("Cannot build filtered OCHS features for round " + std::to_string(round) + ".");
   Logger::log("Building filtered OCHS features: " + round_to_str(round));
   for(hand_index_t flop_idx = 0; flop_idx < NUM_DISTINCT_FLOPS; ++flop_idx) {
-    std::unordered_set<hand_index_t> index_set;
     std::array<uint8_t, 7> cards{};
     FlopIndexer::get_instance()->unindex(flop_idx, cards.data() + 2);
     std::string flop = cards_to_str(cards.data() + 2, 3);
-    const int card_sum = n_board_cards(round) + 2;
-    if(card_sum > 7) Logger::error("Invalid card sum.");
-    constexpr int n_flop_cards = 3;
     Logger::log("Collecting indexes for flop: " + flop);
-    collect_indexes(0, round, card_sum, card_mask(cards.data() + 2, n_flop_cards), cards.data(), index_set);
+    auto index_set = collect_indexes(round, cards.data());
     std::vector<hand_index_t> indexes{index_set.begin(), index_set.end()};
     std::string infix = "r" + std::to_string(round) + "_f" + std::to_string(flop_idx);
     cereal_save(indexes, std::filesystem::path{dir} / ("indexes_" + infix + ".bin"));
     Logger::log("Building OCHS features for flop: " + flop + " (" + std::to_string(indexes.size()) + " indexes)");
-    solve_features(round, card_sum, indexes, std::filesystem::path{dir} / ("features_" + infix + ".npy"), false);
+    solve_features(round, indexes, std::filesystem::path{dir} / ("features_" + infix + ".npy"), false);
   }
 }
 
@@ -202,6 +206,69 @@ std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(const int n_clusters)
   return cluster_map;
 }
 
+int read_board(std::array<uint8_t, 5>& board) {
+  while(true) {
+    std::cout << "Board: ";
+    std::string flop;
+    std::getline(std::cin, flop);
+    if(flop.size() >= 6 && flop.size() <= 10 && flop.size() % 2 == 0) {
+      str_to_cards(flop, board.data());
+      return (flop.size() - 4) / 2;
+    }
+    std::cout << "Invalid board.\n";
+  }
+}
+
+int read_cluster(const int max) {
+  while(true) {
+    std::cout << "Cluster: ";
+    std::string cluster_str;
+    std::getline(std::cin, cluster_str);
+    try {
+      const int cluster = std::stoi(cluster_str);
+      if(cluster >= 0 && cluster < max) return cluster;
+    } catch (const std::invalid_argument&) {
+      std::cerr << "Invalid number.\n";
+    } catch (const std::out_of_range&) {
+      std::cerr << "Number out of range.\n";
+    }
+  }
+}
+
+std::unordered_map<int, std::unordered_set<Hand>> build_cluster_sets(const int round, const Board& board, const bool blueprint) {
+  const hand_index_t flop_idx = blueprint ? FlopIndexer::get_instance()->index(board) : -1;
+  std::unordered_map<int, std::unordered_set<Hand>> cluster_lists;
+  for(int h_idx = 0; h_idx < MAX_COMBOS; ++h_idx) {
+    Hand hand = HoleCardIndexer::get_instance()->hand(h_idx);
+    if(board.mask() & hand.mask()) continue;
+    const int index = HandIndexer::get_instance()->index(board, hand, round);
+    int cluster = blueprint ? BlueprintClusterMap::get_instance()->cluster(round, index) : RealTimeClusterMap::get_instance()->cluster(round, flop_idx, index);
+    cluster_lists[cluster].insert(canonicalize(hand));
+  }
+  return cluster_lists;
+}
+
+void print_clusters(const bool blueprint) {
+  while(true) {
+    std::array<uint8_t, 5> board;
+    const int round = read_board(board);
+    auto cluster_sets = build_cluster_sets(round, Board{board}, blueprint);
+    for(int cluster = 0; cluster < (blueprint ? 200 : 500); ++cluster) {
+      const auto& hand_set = cluster_sets[cluster];
+      if(hand_set.empty()) continue;
+      std::vector<Hand> hands{hand_set.begin(), hand_set.end()};
+      std::ranges::sort(hands, std::ranges::less{}, [](const Hand& hand) { return HoleCardIndexer::get_instance()->index(hand); });
+      Logger::log("======== Cluster: " + std::to_string(cluster) + " ========");
+      std::ostringstream oss;
+      for(int i = 0; i < hands.size(); ++i) {
+        oss << hands[i].to_string() << "  ";
+        if((i + 1) % 5 == 0) Logger::dump(oss);
+      }
+      if(!oss.str().empty()) Logger::dump(oss);
+    }
+  }
+}
+
 std::unique_ptr<BlueprintClusterMap> BlueprintClusterMap::_instance = nullptr;
 
 BlueprintClusterMap::BlueprintClusterMap() {
@@ -216,6 +283,8 @@ uint16_t RealTimeClusterMap::cluster(const int round, const Board& board, const 
   const hand_index_t flop_index = FlopIndexer::get_instance()->index(board.cards().data());
   return cluster(round, flop_index, HandIndexer::get_instance()->index(board, hand, round));
 }
+
+std::unique_ptr<RealTimeClusterMap> RealTimeClusterMap::_instance = nullptr;
 
 RealTimeClusterMap::RealTimeClusterMap() {
 

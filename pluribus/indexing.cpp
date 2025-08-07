@@ -10,15 +10,11 @@
 
 namespace pluribus {
 
-std::array<hand_indexer_t, 4> init_indexer_vec() {
-  std::array<hand_indexer_t, 4> indexers;
-  for(int i = 0; i < 4; ++i) init_indexer(indexers[i], i);
-  return indexers;
-}
-
 std::unique_ptr<HandIndexer> HandIndexer::_instance = nullptr;
 
-HandIndexer::HandIndexer() : _indexers{init_indexer_vec()} {}
+HandIndexer::HandIndexer() {
+  for(int i = 0; i < 4; ++i) init_indexer(_indexers[i], i);
+}
 
 uint64_t HandIndexer::index(const Board& board, const Hand& hand, const int round) const {
   return index(collect_cards(board, hand, round).data(), round);

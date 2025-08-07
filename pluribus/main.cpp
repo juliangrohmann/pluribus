@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
   else if(command == "ochs-features") {
     // ./Pluribus ochs-features [--blueprint, --real-time] round dir
     if(argc < 5) {
-      std::cout << "Missing arguments to build cluster features.\n";
+      std::cout << "Missing arguments to build OCHS features.\n";
     }
     else {
       std::function<void(int, const std::string&)> fun;
@@ -54,18 +54,35 @@ int main(int argc, char* argv[]) {
       }
     }
   }
+  else if(command == "print-clusters") {
+    // ./Pluribus print-clusters --blueprint/--real-time
+    if(argc < 3) {
+      std::cout << "Missing arguments to print clusters.\n";
+    }
+    else if(strcmp(argv[2], "--blueprint") == 0) {
+      print_clusters(true);
+    }
+    else if(strcmp(argv[2], "--real-time") == 0) {
+      print_clusters(false);
+    }
+    else {
+      std::cout << "Invalid print clusters mode: " << argv[2] << "\n";
+    }
+  }
   else if(command == "traverse") {
     // ./Pluribus traverse --blueprint --png out.png lossless_bp_fn
     // ./Pluribus traverse --tree --png out.png snapshot_fn
-    if(argc > 4 && strcmp(argv[3], "--png") == 0) {
+    if(argc > 5 && strcmp(argv[3], "--png") == 0) {
       PngRangeViewer viewer{argv[4]};
       traverse_strategy(&viewer, argv[5], argv[2]);
     }
-    else {
+    else if(argc > 3) {
       WindowRangeViewer viewer{"traverse"};
       traverse_strategy(&viewer, argv[3], argv[2]);
     }
-    
+    else {
+      std::cout << "Missing arguments to traverse strategy.\n";
+    }
   }
   else if(command == "blueprint") {
     // ./Pluribus blueprint final_snapshot_fn snapshot_dir buf_dir out_fn [--no-preflop]

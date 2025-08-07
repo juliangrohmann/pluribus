@@ -29,6 +29,7 @@ void build_ochs_features(int round, const std::string& dir);
 void build_ochs_features_filtered(int round, const std::string& dir);
 std::string cluster_filename(int round, int n_clusters, int split);
 std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(int n_clusters);
+[[noreturn]] void print_clusters(bool blueprint);
 
 class BlueprintClusterMap {
 public:
