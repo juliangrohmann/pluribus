@@ -11,7 +11,7 @@ def cluster(data, n_clusters):
   km = KMeans(
     n_clusters=n_clusters,
     init='k-means++',       # better centroid initialization
-    n_init=1,               # try n different centroid seeds and pick the best
+    n_init=2,               # try n different centroid seeds and pick the best
     max_iter=1000,          # allow convergence for tough clusters
     tol=1e-6,               # tighter convergence threshold
     copy_x=False,
