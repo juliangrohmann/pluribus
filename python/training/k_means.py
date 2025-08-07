@@ -1,5 +1,6 @@
 import numpy as np
 import argparse
+import time
 from pathlib import Path
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.cluster import KMeans
@@ -10,14 +11,16 @@ def cluster(data, n_clusters):
   km = KMeans(
     n_clusters=n_clusters,
     init='k-means++',       # better centroid initialization
-    n_init=100,             # try 100 different centroid seeds and pick the best
+    n_init=1,             # try 100 different centroid seeds and pick the best
     max_iter=1000,          # allow convergence for tough clusters
     tol=1e-6,               # tighter convergence threshold
     copy_x=False,
     algorithm='lloyd',      # default; 'elkan' is faster for dense Euclidean data, but 'lloyd' is more robust for high-dimensional or sparse input
     random_state=42         # ensures determinism across runs
   )
+  t_0 = time.time()
   labels = km.fit_predict(data)
+  print(f"clustered in {time.time() - t_0} s")
   print(f"{labels=}")  
   print(f"{km.score(data)=}")
   return labels, km.cluster_centers_
