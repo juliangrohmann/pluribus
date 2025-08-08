@@ -31,7 +31,7 @@ public:
 
 class WPTGoldRingBlueprintProfile : public ActionProfile {
 public:
-  explicit WPTGoldRingBlueprintProfile(int n_players);
+  explicit WPTGoldRingBlueprintProfile(int n_players, int n_active);
 };
 
 class WPTGoldRingSimpleProfile : public ActionProfile {
