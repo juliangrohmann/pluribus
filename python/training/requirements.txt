@@ -2,3 +2,4 @@ numpy
 cuml
 wandb
 scikit-learn
+scikit-learn-extra
