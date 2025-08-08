@@ -147,8 +147,13 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players) : 
   for(int pos = 3; pos < n_players; ++pos) {
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.52f}, Action::ALL_IN}, 0, 1, pos);
   }
-  set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.70f}, Action{1.00f}, Action{1.50f}, Action{2.00f}, Action::ALL_IN}, 0);
-  if(n_players <= 6) add_iso_action(Action{0.52f}, 0);
+  set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 0);
+  if(n_players <= 6) {
+    for(const Action a : {Action{0.52f}, Action{0.70f}, Action{1.50f}, Action{2.00f}}) {
+      add_iso_action(a, 0);
+    }
+  }
+
 
   // preflop 3-bet
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.83f}, Action{1.00f}, Action{1.17f}, Action::ALL_IN}, 0, 2, 0);
