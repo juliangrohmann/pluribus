@@ -147,7 +147,7 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players, co
   }
   set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{2.00f}, Action{3.00f}, Action::ALL_IN}, 0);
   if(n_active <= 6) {
-    for(const Action a : {Action{0.52f}, Action{0.70f}, Action{1.50f}, Action{2.00f}}) {
+    for(const Action a : {Action{1.50f}, Action{2.50f}}) {
       add_iso_action(a, 0);
     }
   }
