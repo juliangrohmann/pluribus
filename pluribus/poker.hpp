@@ -1,17 +1,18 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <unordered_set>
 #include <algorithm>
 #include <initializer_list>
+#include <string>
+#include <unordered_set>
+#include <vector>
+#include <cereal/types/array.hpp>
 #include <hand_isomorphism/hand_index.h>
 #include <omp/Hand.h>
 #include <omp/HandEvaluator.h>
-#include <cereal/types/array.hpp>
-#include <pluribus/constants.hpp>
-#include <pluribus/util.hpp>
 #include <pluribus/actions.hpp>
+#include <pluribus/constants.hpp>
+#include <pluribus/debug.hpp>
+#include <pluribus/util.hpp>
 
 namespace pluribus {
 
@@ -276,6 +277,7 @@ private:
   double _cap;
 };
 
+inline std::string pos_to_str(const PokerState& state) { return pos_to_str(state.get_active(), state.get_players().size(), state.is_straddle()); }
 int total_bet_size(const PokerState& state, Action action);
 double fractional_bet_size(const PokerState& state, int total_size);
 std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile);

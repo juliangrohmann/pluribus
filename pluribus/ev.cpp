@@ -59,11 +59,11 @@ void _validate_ev_inputs(const PokerState& state, const int i, const std::vector
   const std::vector<uint8_t> real_board = board.size() > n_cards ? std::vector<uint8_t>{board.begin(), board.begin() + n_cards} : board;
   std::cout << "Real round: " << round_to_str(round) << "\n";
   std::cout << "Real board: " << cards_to_str(real_board) << "\n";
-  std::cout << "Hero pos: " << i << " (" << pos_to_str(i, state.get_players().size()) << ")\n";
+  std::cout << "Hero pos: " << i << " (" << pos_to_str(i, state.get_players().size(), state.is_straddle()) << ")\n";
   int ridx = 0;
   for(int p = 0; p < state.get_players().size(); ++p) {
     if(!state.get_players()[p].has_folded()) {
-      std::cout << pos_to_str(p, state.get_players().size()) << ": " << ranges[ridx].n_combos() << " combos  ";
+      std::cout << pos_to_str(p, state.get_players().size(), state.is_straddle()) << ": " << ranges[ridx].n_combos() << " combos  ";
       ++ridx;
       if(ridx >= ranges.size()) break;
     }

@@ -370,16 +370,16 @@ bool should_track_strategy(const PokerState& state, const SolverConfig& solver_c
 std::string strategy_label(const PokerState& state, const PokerState& init_state, const Action action, const bool phi) {
   const auto rel_actions = state.get_action_history().slice(init_state.get_action_history().size()).get_history();
   std::ostringstream oss;
-  oss << "vs " << state.get_bet_level() << "-bet/";
+  oss << pos_to_str(state) << " vs " << static_cast<int>(state.get_bet_level()) << "-bet/";
   PokerState curr_state = init_state;
   for(int a_idx = 0; a_idx < rel_actions.size(); ++a_idx) {
     if(state.has_player_vpip(curr_state.get_active())) {
-      oss << pos_to_str(curr_state.get_active(), state.get_players().size()) << " " << rel_actions[a_idx].to_string()
+      oss << pos_to_str(curr_state) << " " << rel_actions[a_idx].to_string()
         << ", ";
     }
     curr_state = curr_state.apply(rel_actions[a_idx]);
   }
-  oss << "[" << pos_to_str(curr_state.get_active(), state.get_players().size()) << " " << action.to_string() << "]" 
+  oss << "[" << pos_to_str(curr_state) << " " << action.to_string() << "]"
       << (phi ? " (phi)" : " (regrets)");
   return oss.str();
 }

@@ -52,7 +52,7 @@ void Pluribus::new_game(const std::vector<std::string>& players, const std::vect
   _ranges = _sampled_bp->get_config().init_ranges;
   oss << "Starting ranges:\n";
   for(int p = 0; p < _ranges.size(); ++p) {
-    oss << pos_to_str(p, _real_state.get_players().size()) << ": " << _ranges[p].n_combos() << " combos\n";
+    oss << pos_to_str(p, _real_state.get_players().size(), _real_state.is_straddle()) << ": " << _ranges[p].n_combos() << " combos\n";
   }
   Logger::log(oss.str());
 
@@ -61,14 +61,14 @@ void Pluribus::new_game(const std::vector<std::string>& players, const std::vect
 }
 
 std::string chips_to_str(const PokerState& state, const int i) {
-  return pos_to_str(i, state.get_players().size()) + " chips = " + std::to_string(state.get_players()[i].get_chips());
+  return pos_to_str(i, state.get_players().size(), state.is_straddle()) + " chips = " + std::to_string(state.get_players()[i].get_chips());
 }
 
 void Pluribus::update_state(const Action action, const int pos) {
   Logger::log("============================== Update State ==============================");
-  Logger::log(pos_to_str(pos, _real_state.get_players().size()) + ": " + action.to_string());
+  Logger::log(pos_to_str(pos, _real_state.get_players().size(), _real_state.is_straddle()) + ": " + action.to_string());
   if(_real_state.get_active() != pos) {
-    Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state.get_active(), _real_state.get_players().size()) + " to act.");
+    Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state) + " to act.");
   }
   _apply_action(action);
 }
@@ -162,7 +162,7 @@ void Pluribus::_update_root() {
     const Action translated = translate_pseudo_harmonic(a, valid_actions(curr_state, _sampled_bp->get_config().action_profile), curr_state);
     _mapped_bp_actions.push_back(translated);
     Logger::log("Blueprint action translation: " + a.to_string() + " -> " + translated.to_string());
-    oss << pos_to_str(curr_state.get_active(), _ranges.size()) << " action applied to root: " + translated.to_string() << ", combos: "
+    oss << pos_to_str(curr_state) << " action applied to root: " + translated.to_string() << ", combos: "
         << std::fixed << std::setprecision(2) << _ranges[curr_state.get_active()].n_combos();
     update_ranges(_ranges, a, curr_state, Board{_board}, decision);
     oss << " -> " << _ranges[curr_state.get_active()].n_combos();
@@ -170,7 +170,7 @@ void Pluribus::_update_root() {
     curr_state = curr_state.apply(a);
   }
   for(int i = 0; i < _ranges.size(); ++i) {
-    oss << pos_to_str(i, _ranges.size()) << " card removal, combos: " << _ranges[i].n_combos();
+    oss << pos_to_str(i, _ranges.size(), curr_state.is_straddle()) << " card removal, combos: " << _ranges[i].n_combos();
     _ranges[i].remove_cards(_board);
     oss << " -> " << _ranges[i].n_combos();
     Logger::dump(oss);

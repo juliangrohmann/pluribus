@@ -22,9 +22,10 @@ std::string round_to_str(const int round) {
 }
 
 const std::vector<std::string> positions{"BTN", "CO", "HJ", "LJ", "UTG+2", "UTG+1", "UTG"};
-std::string pos_to_str(const size_t idx, const size_t n_players) {
+std::string pos_to_str(const size_t idx, const size_t n_players, const bool straddle) {
   if(idx == 0) return n_players == 2 ? "BB" : "SB";
   if(idx == 1) return n_players == 2 ? "SB" : "BB";
+  if(idx == 2 && straddle) return "STR";
   return positions[n_players - idx - 1];
 }
 
