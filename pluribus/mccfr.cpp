@@ -370,6 +370,7 @@ bool should_track_strategy(const PokerState& state, const SolverConfig& solver_c
 std::string strategy_label(const PokerState& state, const PokerState& init_state, const Action action, const bool phi) {
   const auto rel_actions = state.get_action_history().slice(init_state.get_action_history().size()).get_history();
   std::ostringstream oss;
+  oss << "vs " << state.get_bet_level() << "-bet/";
   PokerState curr_state = init_state;
   for(int a_idx = 0; a_idx < rel_actions.size(); ++a_idx) {
     if(state.has_player_vpip(curr_state.get_active())) {
