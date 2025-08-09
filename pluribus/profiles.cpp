@@ -115,8 +115,8 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players, co
   // preflop RFI & isos
   for(int pos = 0; pos < 3; ++pos) set_actions(single_size(0.85), 0, 1, pos);
   for(int pos = 3; pos < n_players; ++pos) set_actions(single_size(0.52), 0, 1, pos);
-  set_iso_actions(action_range(1.00, 2.00, 0.50), 0, false);
-  set_iso_actions(action_vec({1.00, 1.50}), 0, true);
+  set_iso_actions(single_size(1.50), 0, false);
+  set_iso_actions(single_size(1.00), 0, true);
 
   // preflop 3-bet
   for(int pos = 0; pos < 3; ++pos) {
