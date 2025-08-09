@@ -18,7 +18,7 @@ std::vector<Action> action_vec(const std::initializer_list<float>& action_list, 
 
 std::vector<Action> action_range(const float start, const float end, const float step, const bool can_fold = true) {
   if(step <= 0.02f) Logger::error("Action range step is too small: " + std::to_string(step));
-  if(start <= end) Logger::error("Invalid action range: [" + join_as_strs(std::vector{start, end, step}, ", ") + "]");
+  if(start >= end) Logger::error("Invalid action range: [" + join_as_strs(std::vector{start, end, step}, ", ") + "]");
   std::vector<Action> actions;
   if(can_fold) actions.push_back(Action::FOLD);
   actions.push_back(Action::CHECK_CALL);
