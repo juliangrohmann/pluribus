@@ -87,9 +87,9 @@ void ActionProfile::set_actions(const std::vector<Action>& actions, const int ro
   sort(round, bet_level, pos, in_position);
 }
 
-void ActionProfile::set_iso_actions(const std::vector<Action>& actions, const int pos) {
+void ActionProfile::set_iso_actions(const std::vector<Action>& actions, const int pos, const bool in_position) {
   grow_to_size(_iso_actions, pos + 1);
-  _iso_actions[pos] = actions;
+  _iso_actions[pos][static_cast<int>(in_position)] = actions;
 }
 
 void ActionProfile::add_action(const Action action, const int round, const int bet_level, const int pos, const bool in_position) {
@@ -98,9 +98,9 @@ void ActionProfile::add_action(const Action action, const int round, const int b
   sort(round, bet_level, pos, in_position);
 }
 
-void ActionProfile::add_iso_action(const Action action, const int pos) {
+void ActionProfile::add_iso_action(const Action action, const int pos, bool in_position) {
   grow_to_size(_iso_actions, pos + 1);
-  _iso_actions[pos].push_back(action);
+  _iso_actions[pos][static_cast<int>(in_position)].push_back(action);
 }
 
 const std::vector<Action>& ActionProfile::get_actions_from_raw(const int round, const int bet_level, const int pos, const bool in_position) const {
@@ -111,13 +111,15 @@ const std::vector<Action>& ActionProfile::get_actions_from_raw(const int round, 
   return ip_vec[static_cast<int>(in_position)];
 }
 
-const std::vector<Action>& ActionProfile::get_iso_actions(const int pos) const {
+const std::vector<Action>& ActionProfile::get_iso_actions(const int pos, const bool in_position) const {
   const int iso_idx = std::min(pos, static_cast<int>(_iso_actions.size()) - 1);
-  return _iso_actions[iso_idx];
+  return _iso_actions[iso_idx][static_cast<int>(in_position)];
 }
 
 const std::vector<Action>& ActionProfile::get_actions(const PokerState& state) const {
-  if(state.get_round() == 0 && state.get_bet_level() == 1 && state.vpip_players() > 0) return get_iso_actions(state.get_active());
+  if(state.get_round() == 0 && state.get_bet_level() == 1 && state.vpip_players() > 0) {
+    return get_iso_actions(state.get_active(), state.is_in_position(state.get_active()));
+  }
   return get_actions_from_raw(state.get_round(), state.get_bet_level(), state.get_active(), state.is_in_position(state.get_active()));
 }
 
@@ -167,7 +169,11 @@ std::string ActionProfile::to_string() const {
   else {
     oss << "Iso actions:\n";
     for(int pos = 0; pos < _iso_actions.size(); ++pos) {
-      oss << "\tPosition " << pos << ": " << actions_to_str(_iso_actions[pos]) << "\n";
+      oss << "\tPosition " << pos << ": " << "\n";
+      for(int ip = 0; ip < _iso_actions[pos].size(); ++ip) {
+        oss << "\t\t" << (ip == 0 ? "OOP:  " : " IP:  ") << actions_to_str(_iso_actions[pos][ip]) << "\n";
+      }
+
     }
   }
   oss << "\n";
@@ -190,7 +196,9 @@ CombinedActionProfile::CombinedActionProfile(const int hero_pos, const ActionPro
     : ActionProfile{std::max(hero_profile.n_players(), villain_profile.n_players())} {
   if(hero_profile.n_players() == -1 || villain_profile.n_players() == -1) Logger::error("Combined profile required player amount information.");
   for(int pos = 0; pos < n_players(); ++pos) {
-    set_iso_actions((pos == hero_pos ? hero_profile : villain_profile).get_iso_actions(pos), pos);
+    for(int ip = 0; ip <= 1; ++ip) {
+      set_iso_actions((pos == hero_pos ? hero_profile : villain_profile).get_iso_actions(pos, ip), pos, ip);
+    }
   }
   const int max_level = std::max(hero_profile.max_bet_level(), villain_profile.max_bet_level());
   if(max_level == -1) Logger::error("Cannot combine profiles with empty bet levels.");

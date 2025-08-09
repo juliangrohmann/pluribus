@@ -204,7 +204,7 @@ TEST_CASE("Simulate hands", "[poker][slow]") {
   constexpr int n_players = 9;
   constexpr int stack_size = 10'000;
   std::vector<RandomAgent> rng_agents;
-  for(int i = 0; i < n_players; ++i) rng_agents.push_back(RandomAgent{RingBlueprintProfile{n_players, stack_size}});
+  for(int i = 0; i < n_players; ++i) rng_agents.push_back(RandomAgent{RingBlueprintProfile{n_players}});
   std::vector<Agent*> agents;
   for(int i = 0; i < n_players; ++i) agents.push_back(&rng_agents[i]);
   const auto results = simulate(agents, PokerConfig{n_players, 0, false}, stack_size, 100'000);
@@ -269,7 +269,8 @@ TEST_CASE("Action profile", "[profile]") {
   const std::vector cutoff_ip = {Action::FOLD, Action{0.25f}, Action{1.20f}, Action{1.40f}, Action::ALL_IN};
   const std::vector bb_oop = {Action::FOLD, Action{0.65f}, Action{0.90f}, Action::ALL_IN};
   const std::vector bb_ip = {Action::FOLD, Action{0.30f}, Action{0.75f}, Action::ALL_IN};
-  profile.set_iso_actions(iso, 0);
+  profile.set_iso_actions(iso, 0, false);
+  profile.set_iso_actions(iso, 0, true);
   profile.set_actions(sb, 0, 0, 0);
   profile.set_actions(bb_oop, 0, 0, 1);
   profile.set_actions(bb_ip, 0, 0, 1, true);

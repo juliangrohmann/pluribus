@@ -40,6 +40,7 @@ private:
   float _bet_type;
 };
 
+std::string actions_to_str(const std::vector<Action>& actions);
 bool is_bias(Action a);
 
 class ActionHistory {
@@ -77,11 +78,11 @@ class ActionProfile {
 public:
   explicit ActionProfile(const int n_players = -1) : _n_players{n_players} {}
   void set_actions(const std::vector<Action>& actions, int round, int bet_level, int pos, bool in_position = false);
-  void set_iso_actions(const std::vector<Action>& actions, int pos);
+  void set_iso_actions(const std::vector<Action>& actions, int pos, bool in_position);
   void add_action(Action action, int round, int bet_level, int pos, bool in_position = false);
-  void add_iso_action(Action action, int pos);
+  void add_iso_action(Action action, int pos, bool in_position);
   const std::vector<Action>& get_actions_from_raw(int round, int bet_level, int pos, bool in_position) const;
-  const std::vector<Action>& get_iso_actions(int pos) const;
+  const std::vector<Action>& get_iso_actions(int pos, bool in_position) const;
   const std::vector<Action>& get_actions(const PokerState& state) const;
   const ProfileStorage& get_raw_profile() const { return _profile; }
   int n_bet_levels(const int round) const { return static_cast<int>(_profile[round].size()); }
@@ -106,7 +107,7 @@ private:
   void sort(int round, int bet_level, int pos, bool in_position);
 
   ProfileStorage _profile;
-  std::vector<std::vector<Action>> _iso_actions;
+  std::vector<std::array<std::vector<Action>, 2>> _iso_actions;
   int _n_players;
 };
 
