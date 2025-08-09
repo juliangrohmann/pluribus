@@ -7,6 +7,15 @@
 
 namespace pluribus {
 
+std::vector<Action> action_vec(const float start, const float end, const float step) {
+  if(step <= 0.02) Logger::error("Action vec step is too small: " + std::to_string(step));
+  std::vector actions {Action::FOLD, Action::CHECK_CALL};
+  for(int i = 0; start + static_cast<float>(i) * step + 0.01f < end; ++i) {
+    actions.emplace_back(start + static_cast<float>(i) * step);
+  }
+  actions.emplace_back(end);
+}
+
 BiasActionProfile::BiasActionProfile() : ActionProfile{1} {
   const std::vector bias_actions = {Action::BIAS_FOLD, Action::BIAS_CALL, Action::BIAS_RAISE, Action::BIAS_NONE};
   set_iso_actions(bias_actions, 0);
@@ -27,36 +36,6 @@ HeadsUpBlueprintProfile::HeadsUpBlueprintProfile(const int stack_size) : ActionP
   // preflop 4-bet+
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.70f}, Action{0.80f}, Action{0.90f}, Action{1.00f}, Action::ALL_IN}, 0, 3, 0);
   if(stack_size < 10'000) add_action(Action{0.50f}, 0, 3, 0);
-
-  // flop
-  set_actions({Action::CHECK_CALL, Action{0.16f}, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 1, 1, 0);
-
-  // turn
-  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 2, 0, 0);
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 2, 1, 0);
-  if(stack_size < 10'000) add_action(Action{0.33f}, 2, 0, 0);
-
-  // river
-  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 3, 0, 0);
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 3, 1, 0);
-  if(stack_size < 7'500) add_action(Action{0.33f}, 3, 0, 0);
-}
-
-HeadsUpSimpleProfile::HeadsUpSimpleProfile(const int stack_size) : ActionProfile{2} {
-  // preflop RFI
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.75f}, Action::ALL_IN}, 0, 1, 0);
-  set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 0);
-
-  // preflop 3-bet
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.50f}}, 0, 2, 0);
-
-  // preflop 4-bet+
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action::ALL_IN}, 0, 3, 0);
-  if(stack_size < 10'000) add_action(Action{0.55f}, 0, 3, 0);
-  else if(stack_size < 15'000) add_action(Action{0.70f}, 0, 3, 0);
-  else if(stack_size < 20'000) add_action(Action{0.80f}, 0, 3, 0);
-  else add_action(Action{0.85f}, 0, 3, 0);
 
   // flop
   set_actions({Action::CHECK_CALL, Action{0.16f}, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
@@ -147,16 +126,15 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players) : 
   for(int pos = 3; pos < n_players; ++pos) {
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.52f}, Action::ALL_IN}, 0, 1, pos);
   }
-  set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{0.70f}, Action::ALL_IN}, 0);
-  if(n_players <= 6) add_iso_action(Action{0.52f}, 0);
+  set_iso_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.50f}, Action{2.00f}, Action::ALL_IN}, 0);
 
   // preflop 3-bet
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.83f}, Action{1.00f}, Action{1.17f}, Action::ALL_IN}, 0, 2, 0);
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.85f}, Action{1.025f}, Action{1.20f}, Action::ALL_IN}, 0, 2, 1, false);
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.70f}, Action{0.875f}, Action{1.05f}, Action::ALL_IN}, 0, 2, 1, true);
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.90f}, Action{1.075f}, Action{1.25f}, Action::ALL_IN}, 0, 2, 2, false);
-  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.75f}, Action{0.935f}, Action{1.12f}, Action::ALL_IN}, 0, 2, 2, true);
+  for(int pos = 0; pos < 3; ++pos) {
+    set_actions(action_vec(0.70f, 1.40f, 0.10f), 0, 2, pos, false);
+    set_actions(action_vec(0.50f, 1.20f, 0.10f), 0, 2, pos, true);
+  }
   for(int pos = 3; pos < n_players; ++pos) {
+    set_actions(action_vec(0.55f, 0.85f, 0.10f), 0, 2, pos, true);
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.815f}, Action{1.00f}, Action{1.185f}, Action::ALL_IN}, 0, 2, pos, false);
     set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.65}, Action{0.815f}, Action{1.00f}, Action::ALL_IN}, 0, 2, pos, true);
   }

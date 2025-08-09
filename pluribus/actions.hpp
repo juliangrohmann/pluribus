@@ -40,7 +40,6 @@ private:
   float _bet_type;
 };
 
-std::string actions_to_str(const std::vector<Action>& actions);
 bool is_bias(Action a);
 
 class ActionHistory {
