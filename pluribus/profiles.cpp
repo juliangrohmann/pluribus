@@ -120,10 +120,11 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players, co
 
   // preflop 3-bet
   if(fine_grained) {
-    for(int pos = 0; pos < 3; ++pos) {
-      set_actions(action_range(0.70, 1.45, 0.15), 0, 2, pos, false);
-      set_actions(action_range(0.50, 1.40, 0.15), 0, 2, pos, true);
-    }
+    set_actions(action_range(0.70, 1.30, 0.15), 0, 2, 0, false);
+    set_actions(action_range(0.70, 1.45, 0.15), 0, 2, 1, false);
+    set_actions(action_range(0.50, 0.95, 0.15), 0, 2, 1, true);
+    set_actions(action_range(0.85, 1.60, 0.15), 0, 2, 2, false);
+    set_actions(action_range(0.50, 1.10, 0.15), 0, 2, 2, true);
     for(int pos = 3; pos < n_players; ++pos) {
       set_actions(action_range(0.70, 1.45, 0.15), 0, 2, pos, false);
       set_actions(action_range(0.55, 0.95, 0.10), 0, 2, pos, true);
