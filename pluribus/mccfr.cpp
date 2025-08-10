@@ -138,6 +138,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       Logger::log("============== Saving snapshot ==============");
       fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
       save_snapshot((_snapshot_dir / fn_stream.str()).string());
+      on_snapshot();
     }
   }
 
@@ -603,8 +604,15 @@ void TreeBlueprintSolver::on_start() {
   TreeSolver::on_start();
   BlueprintSolver::on_start();
   if(!_phi_root) {
-    Logger::log("Initializing avg storage tree ...");
+    Logger::log("Initializing avg storage tree...");
     _phi_root = std::make_unique<TreeStorageNode<float>>(get_config().init_state, make_tree_config());
+  }
+}
+
+void TreeBlueprintSolver::on_snapshot() {
+  if(get_iteration() >= get_blueprint_config().preflop_threshold) {
+    std::cout << "Reached preflop threshold. Deleting phi...";
+    _phi_root = nullptr;
   }
 }
 

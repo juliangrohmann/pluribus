@@ -86,7 +86,8 @@ protected:
       std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const { return utility(state, i, board, hands, stack_size, get_config().rake, eval); }
   virtual bool is_terminal(const PokerState& state, const int i) const { return state.is_terminal() || state.get_players()[i].has_folded(); }
   virtual void on_start() {}
-  virtual void on_step(long t,int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, std::ostringstream& debug) {}
+  virtual void on_step(long t, int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, std::ostringstream& debug) {}
+  virtual void on_snapshot() {}
 
   virtual bool should_prune(long t) const = 0;
   virtual bool should_discount(long t) const = 0;
@@ -283,6 +284,7 @@ public:
 
 protected:
   void on_start() override;
+  void on_snapshot() override;
 
   std::atomic<float>* get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, int cluster) override;
   TreeStorageNode<float>* init_avg_storage() override;
