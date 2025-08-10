@@ -119,13 +119,26 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players, co
   set_iso_actions(single_size(1.00), 0, true);
 
   // preflop 3-bet
-  for(int pos = 0; pos < 3; ++pos) {
-    set_actions(action_range(0.70, 1.45, 0.15), 0, 2, pos, false);
-    set_actions(action_range(0.50, 1.40, 0.15), 0, 2, pos, true);
+  if(fine_grained) {
+    for(int pos = 0; pos < 3; ++pos) {
+      set_actions(action_range(0.70, 1.45, 0.15), 0, 2, pos, false);
+      set_actions(action_range(0.50, 1.40, 0.15), 0, 2, pos, true);
+    }
+    for(int pos = 3; pos < n_players; ++pos) {
+      set_actions(action_range(0.70, 1.45, 0.15), 0, 2, pos, false);
+      set_actions(action_range(0.55, 0.95, 0.10), 0, 2, pos, true);
+    }
   }
-  for(int pos = 3; pos < n_players; ++pos) {
-    set_actions(action_range(0.70, 1.45, 0.15), 0, 2, pos, false);
-    set_actions(action_range(0.55, 0.95, 0.10), 0, 2, pos, true);
+  else {
+    set_actions(action_range(0.90, 1.30, 0.20), 0, 2, 0, false);
+    set_actions(action_range(1.00, 1.40, 0.20), 0, 2, 1, false);
+    set_actions(action_range(0.50, 0.90, 0.20), 0, 2, 1, true);
+    set_actions(action_range(1.00, 1.40, 0.20), 0, 2, 2, false);
+    set_actions(action_range(0.60, 1.00, 0.20), 0, 2, 2, true);
+    for(int pos = 3; pos < n_players; ++pos) {
+      set_actions(action_range(0.70, 1.45, 0.15), 0, 2, pos, false);
+      set_actions(action_range(0.55, 0.85, 0.15), 0, 2, pos, true);
+    }
   }
 
   // preflop 4-bet
