@@ -145,8 +145,12 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players, co
   set_actions(action_range(0.40, 1.00, 0.10), 0, 3, 0);
 
   // flop
-  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
-  if(fine_grained) add_action(Action{0.33f}, 1, 0, 0);
+  if(fine_grained) {
+    set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
+  }
+  else {
+    set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.67}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
+  }
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 1, 1, 0);
   if(fine_grained) add_action(Action{0.75f}, 1, 1, 0);
 
