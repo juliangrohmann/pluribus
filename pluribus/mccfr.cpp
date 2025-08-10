@@ -361,10 +361,16 @@ std::string MCCFRSolver<StorageT>::track_wandb_metrics(const long t) const {
 bool should_track_strategy(const PokerState& state, const SolverConfig& solver_config, const MetricsConfig& metrics_config) {
   return state.active_players() > 1 &&
       state.get_round() == solver_config.init_state.get_round() &&
-      (state.get_round() > 0 || state.vpip_players() - (state.has_player_vpip(state.get_active()) ? 1 : 0) <= metrics_config.max_vpip) &&
+      (state.get_round() > 0 || state.vpip_players()  <= metrics_config.max_vpip) &&
       state.get_bet_level() <= metrics_config.max_bet_level &&
       !should_restrict(state.get_action_history().get_history(), solver_config.restrict_players) &&
       metrics_config.should_track(state);
+}
+
+std::string action_label_str(const PokerState& state, const Action a) {
+  if(a != Action::CHECK_CALL) return a.to_string();
+  const Player& p = state.get_players()[state.get_active()];
+  return p.get_betsize() < state.get_max_bet() && p.get_chips() > 0 ? "Call" : "Check";
 }
 
 std::string strategy_label(const PokerState& state, const PokerState& init_state, const Action action, const bool phi) {
@@ -373,9 +379,9 @@ std::string strategy_label(const PokerState& state, const PokerState& init_state
   oss << pos_to_str(state) << " vs " << static_cast<int>(state.get_bet_level()) << "-bet/";
   PokerState curr_state = init_state;
   for(int a_idx = 0; a_idx < rel_actions.size(); ++a_idx) {
+    Action a = rel_actions[a_idx];
     if(state.has_player_vpip(curr_state.get_active())) {
-      oss << pos_to_str(curr_state) << " " << rel_actions[a_idx].to_string()
-        << ", ";
+      oss << pos_to_str(curr_state) << " " << action_label_str(curr_state, a) << ", ";
     }
     curr_state = curr_state.apply(rel_actions[a_idx]);
   }
@@ -387,17 +393,22 @@ std::string strategy_label(const PokerState& state, const PokerState& init_state
 template <template<typename> class StorageT>
 void MCCFRSolver<StorageT>::track_strategy_by_decision(const PokerState& state, const std::vector<PokerRange>& ranges, 
     const DecisionAlgorithm& decision, const MetricsConfig& metrics_config, const bool phi, nlohmann::json& metrics) const {
-  if(!should_track_strategy(state, get_config(), metrics_config)) return;
   PokerRange base_range = ranges[state.get_active()];
   base_range.remove_cards(get_config().init_board);
   for(Action a : valid_actions(state, get_config().action_profile)) {
-    PokerRange action_range = build_action_range(base_range, a, state, Board{get_config().init_board}, decision);
-    PokerRange next_range = base_range * action_range;
-    const std::string data_label = strategy_label(state, get_config().init_state, a, phi);
-    metrics[data_label] = next_range.n_combos() / base_range.n_combos();
-    std::vector<PokerRange> next_ranges = ranges;
-    next_ranges[state.get_active()] = next_range;
-    track_strategy_by_decision(state.apply(a), next_ranges, decision, metrics_config, phi, metrics);
+    if(!should_track_strategy(state.apply(a), get_config(), metrics_config)) continue;
+    if(a == Action::FOLD) {
+      track_strategy_by_decision(state.apply(a), ranges, decision, metrics_config, phi, metrics);
+    }
+    else {
+      std::vector<PokerRange> next_ranges = ranges;
+      PokerRange action_range = build_action_range(base_range, a, state, Board{get_config().init_board}, decision);
+      PokerRange next_range = base_range * action_range;
+      const std::string data_label = strategy_label(state, get_config().init_state, a, phi);
+      metrics[data_label] = next_range.n_combos() / base_range.n_combos();
+      next_ranges[state.get_active()] = next_range;
+      track_strategy_by_decision(state.apply(a), next_ranges, decision, metrics_config, phi, metrics);
+    }
   }
 }
 
