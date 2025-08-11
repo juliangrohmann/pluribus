@@ -338,7 +338,7 @@ int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions,
       state.get_round()));
   const std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
   const std::vector<float> freq = calculate_strategy(base_ptr, actions.size());
-  const int a_idx = sample_action_idx(freq);
+  const int a_idx = sample_action_idx_fast(freq);
   if(_log_level == SolverLogLevel::DEBUG) log_external_sampling(actions[a_idx], actions, freq, state, get_config().init_state, debug);
   return a_idx;
 }
@@ -491,7 +491,7 @@ void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, 
     int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
     const std::atomic<int>* base_ptr = this->get_base_regret_ptr(regret_storage, state, cluster);
     auto freq = calculate_strategy(base_ptr, actions.size());
-    int a_idx = sample_action_idx(freq);
+    int a_idx = sample_action_idx_fast(freq);
     if(this->get_log_level() == SolverLogLevel::DEBUG) {
       debug << "Update strategy: " << relative_history_str(state, this->get_config().init_state) << "\n";
       debug << "\t" << hands[i].to_string() << ": (cluster=" << cluster << ")\n\t";
