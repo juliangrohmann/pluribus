@@ -102,10 +102,10 @@ protected:
   virtual StorageT<float>* init_avg_storage() = 0;
   virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, int action_idx, const PokerState& next_state, int i) = 0;
   virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const PokerState& next_state, int i) = 0;
-  virtual std::vector<Action> regret_branching_actions(StorageT<int>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
-  virtual std::vector<Action> regret_value_actions(StorageT<int>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
-  virtual std::vector<Action> avg_branching_actions(StorageT<float>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
-  virtual std::vector<Action> avg_value_actions(StorageT<float>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
+  virtual const std::vector<Action>& regret_branching_actions(StorageT<int>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
+  virtual const std::vector<Action>& regret_value_actions(StorageT<int>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
+  virtual const std::vector<Action>& avg_branching_actions(StorageT<float>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
+  virtual const std::vector<Action>& avg_value_actions(StorageT<float>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
   virtual void save_snapshot(const std::string& fn) const = 0;
   
   virtual double get_discount_factor(long t) const = 0;
@@ -165,10 +165,10 @@ protected:
   std::atomic<int>* get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) override;
   TreeStorageNode<int>* init_regret_storage() override;
   TreeStorageNode<int>* next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state, int i) override;
-  std::vector<Action> regret_branching_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const override;
-  std::vector<Action> regret_value_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const override;
-  std::vector<Action> avg_branching_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const override;
-  std::vector<Action> avg_value_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const override;
+  const std::vector<Action>& regret_branching_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const override;
+  const std::vector<Action>& regret_value_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const override;
+  const std::vector<Action>& avg_branching_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const override;
+  const std::vector<Action>& avg_value_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const override;
 
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
