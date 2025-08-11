@@ -49,13 +49,7 @@ private:
   SolverConfig _config;
 };
 
-enum class SolverLogLevel : int {
-  NONE = 0,
-  ERRORS = 1,
-  DEBUG = 2
-};
-
-struct MetricsConfig { 
+struct MetricsConfig {
   int max_vpip = 2;
   int max_bet_level = 2;
   std::function<bool(const PokerState&)> should_track = [](const PokerState&) { return true; };
@@ -69,7 +63,6 @@ public:
   void set_snapshot_dir(const std::string& snapshot_dir) { _snapshot_dir = snapshot_dir; }
   void set_metrics_dir(const std::string& metrics_dir) { _metrics_dir = metrics_dir; }
   void set_log_dir(const std::string& log_dir) { _log_dir = log_dir; }
-  void set_log_level(const SolverLogLevel log_level) { _log_level = log_level; }
   void set_regret_metrics_config(const MetricsConfig& metrics_config) { _regret_metrics_config = metrics_config; }
 
   bool operator==(const MCCFRSolver& other) const { return Solver::operator==(other) && _t == other._t; }
@@ -120,7 +113,6 @@ protected:
   [[noreturn]] void error(const std::string& msg, const std::ostringstream& debug) const;
 
   long get_iteration() const { return _t; }
-  SolverLogLevel get_log_level() const { return _log_level; }
   MetricsConfig get_regret_metrics_config() const { return _regret_metrics_config; }
 
 private:
@@ -140,7 +132,6 @@ private:
   std::filesystem::path _snapshot_dir = "snapshots";
   std::filesystem::path _metrics_dir = "metrics";
   std::filesystem::path _log_dir = "logs";
-  SolverLogLevel _log_level = SolverLogLevel::ERRORS;
   MetricsConfig _regret_metrics_config;
 };
 
