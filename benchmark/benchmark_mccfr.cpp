@@ -9,9 +9,9 @@ using namespace pluribus;
 namespace pluribus {
 
 template <template<typename> class StorageT>
-int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state, int i, const Board& board, 
+int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state, int i, const Board& board,
     const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug) {
-  return trainer->traverse_mccfr(state, 1, i, board, hands, indexers, eval, trainer->init_regret_storage(), debug);
+  return trainer->traverse_mccfr(MCCFRContext<StorageT>{state, 1, i, board, hands, indexers, eval, trainer->init_regret_storage(), debug});
 }
 
 }

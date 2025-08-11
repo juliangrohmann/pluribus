@@ -5,7 +5,6 @@
 #include <iostream>
 #include <limits>
 #include <omp.h>
-#include <sstream>
 #include <string>
 #include <json/json.hpp>
 #include <pluribus/actions.hpp>
@@ -109,13 +108,14 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
           indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes
         }
         on_step(t, i, sample.hands, indexers, debug);
+        MCCFRContext<StorageT> context{get_config().init_state, t, i, board, sample.hands, indexers, eval, init_regret_storage(), debug};
         if(should_prune(t)) {
           if(is_debug) debug << "============== Traverse MCCFR-P ==============\n";
-          traverse_mccfr_p(get_config().init_state, t, i, board, sample.hands, indexers, eval, init_regret_storage(), debug);
+          traverse_mccfr_p(context);
         }
         else {
           if(is_debug) debug << "============== Traverse MCCFR ==============\n";
-          traverse_mccfr(get_config().init_state, t, i, board, sample.hands, indexers, eval, init_regret_storage(), debug);
+          traverse_mccfr(context);
         }
       }
       if(is_debug) {
@@ -147,11 +147,17 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
   Logger::log("============== Blueprint training complete ==============");
 }
 
-std::string info_str(const PokerState& state, const int prev_r, const int d_r, const long t, const Board& board, const std::vector<Hand>& hands) {
+template<template <typename> class StorageT>
+int MCCFRSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& context) const {
+  return utility(context.state, context.i, context.board, context.hands, get_config().stack_size(context.i), get_config().rake, context.eval);
+}
+
+template <template<typename> class StorageT>
+std::string info_str(const int prev_r, const int d_r, const MCCFRContext<StorageT>& context) {
   std::string str = "r=" + std::to_string(prev_r) + " + " + std::to_string(d_r) + "\nt=" + 
-         std::to_string(t) + "\nBoard=" + board.to_string() + "\nHands=";
-  for(const auto& hand : hands) str += hand.to_string() + "  ";
-  str += "\n" + state.get_action_history().to_string() + "\n";
+         std::to_string(context.t) + "\nBoard=" + context.board.to_string() + "\nHands=";
+  for(const auto& hand : context.hands) str += hand.to_string() + "  ";
+  str += "\n" + context.state.get_action_history().to_string() + "\n";
   return str;
 }
 
@@ -170,14 +176,15 @@ std::string relative_history_str(const PokerState& state, const PokerState& init
   return state.get_action_history().slice(init_state.get_action_history().size()).to_string();
 }
 
-void log_utility(const int utility, const PokerState& state, const PokerState& init_state, const std::vector<Hand>& hands, std::ostringstream& debug) {
-  debug << "Terminal: " << relative_history_str(state, init_state) << "\n";
-  debug << "\tHands: ";
-  for(int p_idx = 0; p_idx < state.get_players().size(); ++p_idx) {
-    debug << hands[p_idx].to_string() << " ";
+template <template<typename> class StorageT>
+void log_utility(const int utility, const PokerState& init_state, const MCCFRContext<StorageT>& context) {
+  context.debug << "Terminal: " << relative_history_str(context.state, init_state) << "\n";
+  context.debug << "\tHands: ";
+  for(int p_idx = 0; p_idx < context.state.get_players().size(); ++p_idx) {
+    context.debug << context.hands[p_idx].to_string() << " ";
   }
-  debug << "\n";
-  debug << "\tu(z) = " << utility << "\n";
+  context.debug << "\n";
+  context.debug << "\tu(z) = " << utility << "\n";
 }
 
 void log_action_ev(const Action a, const float freq, const int ev, const PokerState& state, const PokerState& init_state, std::ostringstream& debug) {
@@ -224,124 +231,128 @@ bool is_terminal_call(const Action a, const int i, const PokerState& state) {
 }
 
 template <template<typename> class StorageT>
-int MCCFRSolver<StorageT>::traverse_mccfr_p(const PokerState& state, const long t, const int i, const Board& board, const std::vector<Hand>& hands,
-    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug) {
-  if(is_terminal(state, i)) {
-    const int u = terminal_utility(state, i, board, hands, get_config().stack_size(i), indexers, eval);
-    if(is_debug) log_utility(u, state, get_config().init_state, hands, debug);
+int context_cluster(const MCCFRContext<StorageT>& context) {
+  return BlueprintClusterMap::get_instance()->cluster(
+      context.state.get_round(),
+      context.indexers[context.state.get_active()].index(context.board, context.hands[context.state.get_active()],
+      context.state.get_round()));
+}
+
+template <template<typename> class StorageT>
+int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& context) {
+  if(is_terminal(context.state, context.i)) {
+    const int u = terminal_utility(context);
+    if(is_debug) log_utility(u, get_config().init_state, context);
     return u;
   }
-  if(i > get_config().restrict_players - 1 && should_restrict(state.get_action_history().get_history(), get_config().restrict_players)) {
+  if(context.i > get_config().restrict_players - 1 && should_restrict(context.state.get_action_history().get_history(), get_config().restrict_players)) {
     return 0;
   }
-  if(state.get_active() == i) {
-    const auto& value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
-    const auto& branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
-    const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
-    if(is_debug) debug << "Cluster:" << cluster << "\n";
-    std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
+  if(context.state.get_active() == context.i) {
+    const auto& value_actions = regret_value_actions(context.regret_storage, context.state, get_config().action_profile);
+    const auto& branching_actions = regret_branching_actions(context.regret_storage, context.state, get_config().action_profile);
+    const int cluster = context_cluster(context);
+    if(is_debug) context.debug << "Cluster:" << cluster << "\n";
+    std::atomic<int>* base_ptr = get_base_regret_ptr(context.regret_storage, context.state, cluster);
     auto freq = calculate_strategy(base_ptr, value_actions.size());
 
     std::unordered_map<Action, int> values;
     float v_exact = 0;
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
-      if(state.get_round() == 3 || a == Action::FOLD || base_ptr[a_idx].load() > PRUNE_CUTOFF || is_terminal_call(a, i, state)) {
-        PokerState next_state = state.apply(a);
+      if(context.state.get_round() == 3 || a == Action::FOLD || base_ptr[a_idx].load() > PRUNE_CUTOFF || is_terminal_call(a, context.i, context.state)) {
+        PokerState next_state = context.state.apply(a);
         const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-        int v_a = traverse_mccfr_p(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, branching_idx, next_state, i), debug);
+        int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(context.regret_storage, branching_idx, next_state, context.i), context});
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
-        if(is_debug) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
+        if(is_debug) log_action_ev(a, freq[a_idx], v_a, context.state, get_config().init_state, context.debug);
       }
     }
     const int v = round(v_exact);
-    if(is_debug) log_net_ev(v, v_exact, state, get_config().init_state, debug);
+    if(is_debug) log_net_ev(v, v_exact, context.state, get_config().init_state, context.debug);
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
       if(auto it = values.find(a); it != values.end()) {
         auto& r_atom = base_ptr[a_idx];
         const int prev_r = r_atom.load();
         int d_r = it->second - v;
-        int next_r = prev_r + d_r;
-        if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
+        const int next_r = prev_r + d_r;
+        if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(prev_r, d_r, context), context.debug);
         if(next_r > REGRET_FLOOR) {
           r_atom.fetch_add(d_r);
         }
-        if(is_debug) log_regret(value_actions[a_idx], d_r, next_r, debug);
+        if(is_debug) log_regret(value_actions[a_idx], d_r, next_r, context.debug);
       }
     }
     return v;
   }
-  const auto& value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
-  const auto& branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
-  const int a_idx = external_sampling(value_actions, state, board, hands, indexers, regret_storage, debug);
-  const PokerState next_state = state.apply(value_actions[a_idx]);
+  const auto& value_actions = regret_value_actions(context.regret_storage, context.state, get_config().action_profile);
+  const auto& branching_actions = regret_branching_actions(context.regret_storage, context.state, get_config().action_profile);
+  const int a_idx = external_sampling(value_actions, context);
+  const PokerState next_state = context.state.apply(value_actions[a_idx]);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, branching_idx, next_state, i), debug);
+  return traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(context.regret_storage, branching_idx, next_state, context.i), context});
 }
 
 template <template<typename> class StorageT>
-int MCCFRSolver<StorageT>::traverse_mccfr(const PokerState& state, const long t, const int i, const Board& board, const std::vector<Hand>& hands,
-    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug) {
-  if(is_terminal(state, i)) {
-    const int u = terminal_utility(state, i, board, hands, get_config().stack_size(i), indexers, eval);
-    if(is_debug) log_utility(u, state, get_config().init_state, hands, debug);
+int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& context) {
+  if(is_terminal(context.state, context.i)) {
+    const int u = terminal_utility(context);
+    if(is_debug) log_utility(u, get_config().init_state, context);
     return u;
   }
-  if(i > get_config().restrict_players - 1 && should_restrict(state.get_action_history().get_history(), get_config().restrict_players)) {
+  if(context.i > get_config().restrict_players - 1 && should_restrict(context.state.get_action_history().get_history(), get_config().restrict_players)) {
     return 0;
   }
-  if(state.get_active() == i) {
-    const auto& value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
-    const auto& branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
-    const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
-    if(is_debug) debug << "Cluster:" << cluster << "\n";
-    std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
+  if(context.state.get_active() == context.i) {
+    const auto& value_actions = regret_value_actions(context.regret_storage, context.state, get_config().action_profile);
+    const auto& branching_actions = regret_branching_actions(context.regret_storage, context.state, get_config().action_profile);
+    const int cluster = context_cluster(context);
+    if(is_debug) context.debug << "Cluster:" << cluster << "\n";
+    std::atomic<int>* base_ptr = get_base_regret_ptr(context.regret_storage, context.state, cluster);
     auto freq = calculate_strategy(base_ptr, value_actions.size());
     std::unordered_map<Action, int> values;
     float v_exact = 0;
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
       const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-      PokerState next_state = state.apply(a);
-      int v_a = traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, branching_idx, next_state, i), debug);
+      PokerState next_state = context.state.apply(a);
+      int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(context.regret_storage, branching_idx, next_state, context.i), context});
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
-      if(is_debug) log_action_ev(a, freq[a_idx], v_a, state, get_config().init_state, debug);
+      if(is_debug) log_action_ev(a, freq[a_idx], v_a, context.state, get_config().init_state, context.debug);
     }
     int v = round(v_exact);
-    if(is_debug) log_net_ev(v, v_exact, state, get_config().init_state, debug);
+    if(is_debug) log_net_ev(v, v_exact, context.state, get_config().init_state, context.debug);
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       auto& r_atom = base_ptr[a_idx];
       const int prev_r = r_atom.load();
       int d_r = values[value_actions[a_idx]] - v;
       int next_r = prev_r + d_r;
-      if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(state, prev_r, d_r, t, board, hands), debug);
+      if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(prev_r, d_r, context), context.debug);
       if(next_r > REGRET_FLOOR) {
         r_atom.fetch_add(d_r);
       }
-      if(is_debug) log_regret(value_actions[a_idx], d_r, next_r, debug);
+      if(is_debug) log_regret(value_actions[a_idx], d_r, next_r, context.debug);
     }
     return v;
   }
-  const auto& value_actions = regret_value_actions(regret_storage, state, get_config().action_profile);
-  const auto& branching_actions = regret_branching_actions(regret_storage, state, get_config().action_profile);
-  const int a_idx = external_sampling(value_actions, state, board, hands, indexers, regret_storage, debug);
-  const PokerState next_state = state.apply(value_actions[a_idx]);
+  const auto& value_actions = regret_value_actions(context.regret_storage, context.state, get_config().action_profile);
+  const auto& branching_actions = regret_branching_actions(context.regret_storage, context.state, get_config().action_profile);
+  const int a_idx = external_sampling(value_actions, context);
+  const PokerState next_state = context.state.apply(value_actions[a_idx]);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr(next_state, t, i, board, hands, indexers, eval, next_regret_storage(regret_storage, branching_idx, next_state, i), debug);
+  return traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(context.regret_storage, branching_idx, next_state, context.i), context});
 }
 
 template <template<typename> class StorageT>
-int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const PokerState& state, const Board& board,
-    const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, StorageT<int>* regret_storage, std::ostringstream& debug) {
-  const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()],
-      state.get_round()));
-  const std::atomic<int>* base_ptr = get_base_regret_ptr(regret_storage, state, cluster);
+int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& context) {
+  const int cluster = context_cluster(context);
+  const std::atomic<int>* base_ptr = get_base_regret_ptr(context.regret_storage, context.state, cluster);
   const std::vector<float> freq = calculate_strategy(base_ptr, actions.size());
   const int a_idx = sample_action_idx_fast(freq);
-  if(is_debug) log_external_sampling(actions[a_idx], actions, freq, state, get_config().init_state, debug);
+  if(is_debug) log_external_sampling(actions[a_idx], actions, freq, context.state, get_config().init_state, context.debug);
   return a_idx;
 }
 
@@ -566,20 +577,20 @@ Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, con
 }
 
 template <template<typename> class StorageT>
-int RealTimeSolver<StorageT>::terminal_utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size,
-    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const {
-  if(state.has_biases() && state.get_active() != state._first_bias) {
+int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& context) const {
+  if(context.state.has_biases() && context.state.get_active() != context.state._first_bias) {
     std::ostringstream oss;
-    oss << "Active player changed after biasing. Active=" << static_cast<int>(state.get_active()) << ", First bias=" << static_cast<int>(state._first_bias)
-        << ", Biases=";
-    for(Action a : state.get_biases()) oss << a.to_string() << "  ";
+    oss << "Active player changed after biasing. Active=" << static_cast<int>(context.state.get_active()) << ", First bias="
+        << static_cast<int>(context.state._first_bias) << ", Biases=";
+    for(Action a : context.state.get_biases()) oss << a.to_string() << "  ";
     Logger::error(oss.str());
   }
-  PokerState curr_state = state;
-  while(!curr_state.is_terminal() && !curr_state.get_players()[i].has_folded()) {
-    curr_state = curr_state.apply(next_rollout_action(indexers[curr_state.get_active()], curr_state, hands[curr_state.get_active()], board));
+  PokerState curr_state = context.state;
+  while(!curr_state.is_terminal() && !curr_state.get_players()[context.i].has_folded()) {
+    curr_state = curr_state.apply(next_rollout_action(context.indexers[curr_state.get_active()], curr_state, context.hands[curr_state.get_active()],
+      context.board));
   }
-  return utility(curr_state, i, board, hands, stack_size, this->get_config().rake, eval);
+  return utility(curr_state, context.i, context.board, context.hands, this->get_config().stack_size(context.i), this->get_config().rake, context.eval);
 }
 
 template<template <typename> class StorageT>

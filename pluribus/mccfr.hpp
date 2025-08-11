@@ -56,6 +56,27 @@ struct MetricsConfig {
 };
 
 template <template<typename> class StorageT>
+struct MCCFRContext {
+  MCCFRContext(const PokerState& state_, const long t_, const int i_, const Board& board_, const std::vector<Hand>& hands_,
+      std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_, std::ostringstream& debug_)
+    : state{state_}, t{t_}, i{i_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
+      regret_storage{regret_storage_}, debug{debug_} {}
+  MCCFRContext(const PokerState& next_state, StorageT<int>* next_regret_storage, const MCCFRContext& context)
+    : state{next_state}, t{context.t}, i{context.i}, board{context.board}, hands{context.hands}, indexers{context.indexers}, eval{context.eval},
+      regret_storage{next_regret_storage}, debug{context.debug} {}
+
+  const PokerState& state;
+  const long t;
+  const int i;
+  const Board& board;
+  const std::vector<Hand>& hands;
+  std::vector<CachedIndexer>& indexers;
+  const omp::HandEvaluator& eval;
+  StorageT<int>* regret_storage;
+  std::ostringstream& debug;
+};
+
+template <template<typename> class StorageT>
 class MCCFRSolver : public Solver {
 public:
   explicit MCCFRSolver(const SolverConfig& config) : Solver{config} {}
@@ -75,8 +96,7 @@ public:
 protected:
   void _solve(long t_plus) override;
   
-  virtual int terminal_utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size,
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const { return utility(state, i, board, hands, stack_size, get_config().rake, eval); }
+  virtual int terminal_utility(const MCCFRContext<StorageT>& context) const;
   virtual bool is_terminal(const PokerState& state, const int i) const { return state.is_terminal() || state.get_players()[i].has_folded(); }
   virtual void on_start() {}
   virtual void on_step(long t, int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, std::ostringstream& debug) {}
@@ -116,12 +136,9 @@ protected:
   MetricsConfig get_regret_metrics_config() const { return _regret_metrics_config; }
 
 private:
-  int traverse_mccfr_p(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug);
-  int traverse_mccfr(const PokerState& state, long t, int i, const Board& board, const std::vector<Hand>& hands, 
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, StorageT<int>* regret_storage, std::ostringstream& debug);
-  int external_sampling(const std::vector<Action>& actions, const PokerState& state, const Board& board, const std::vector<Hand>& hands,
-      std::vector<CachedIndexer>& indexers, StorageT<int>* regret_storage, std::ostringstream& debug);
+  int traverse_mccfr_p(const MCCFRContext<StorageT>& context);
+  int traverse_mccfr(const MCCFRContext<StorageT>& context);
+  int external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& context);
 #ifdef UNIT_TEST
   template <template<typename> class T>
   friend int call_traverse_mccfr(MCCFRSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
@@ -232,8 +249,7 @@ public:
   }
 
 protected:
-  int terminal_utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, 
-    std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) const override;
+  int terminal_utility(const MCCFRContext<StorageT>& context) const override;
   bool is_terminal(const PokerState& state, const int i) const override { return state.has_biases() || state.is_terminal() || state.get_players()[i].has_folded(); }
 
   void on_start() override { Logger::log("Real time solver config:\n" + _rt_config.to_string()); }
