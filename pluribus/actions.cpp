@@ -141,16 +141,21 @@ std::unordered_set<Action> ActionProfile::all_actions() const {
 
 int ActionProfile::max_actions() const {
   int ret = 0;
-  for(auto& round : _profile) {
-    for(auto& level : round) {
-      for(auto& pos : level) {
-        for(auto& ip : pos) {
+  for(const auto& round : _profile) {
+    for(const auto& level : round) {
+      for(const auto& pos : level) {
+        for(const auto& ip : pos) {
           ret = std::max(static_cast<int>(ip.size()), ret);
         }
       }
     }
   }
-  return std::max(ret, static_cast<int>(_iso_actions.size()));
+  for(const auto& pos : _iso_actions.size()) {
+    for(const auto& ip : pos.size()) {
+      ret = std::max(static_cast<int>(ip.size()), ret);
+    }
+  }
+  return ret;
 }
 
 int ActionProfile::max_bet_level() const {
