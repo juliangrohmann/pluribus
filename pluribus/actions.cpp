@@ -151,7 +151,7 @@ int ActionProfile::max_actions() const {
     }
   }
   for(const auto& pos : _iso_actions) {
-    for(const auto& ip : pos.size()) {
+    for(const auto& ip : pos) {
       ret = std::max(static_cast<int>(ip.size()), ret);
     }
   }
