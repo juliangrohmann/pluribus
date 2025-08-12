@@ -79,16 +79,16 @@ struct MCCFRContext {
 
 template <template<typename> class StorageT>
 struct UpdateContext {
-  UpdateContext(const SlimPokerState& state_, const int i_, const int consec_folds_, const Board& board_, const std::vector<Hand>& hands_,
-      std::vector<CachedIndexer>& indexers_, StorageT<int>* regret_storage_, StorageT<float>* avg_storage_)
+  UpdateContext(SlimPokerState& state_, const int i_, const int consec_folds_, const Board& board_, const std::vector<Hand>& hands_,
+      std::vector<CachedIndexer>& indexers_, StorageT<int>* regret_storage_, StorageT<float>* avg_storage_, std::vector<float>& freq_buffer_)
     : state{state_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_},
-      regret_storage{regret_storage_}, avg_storage{avg_storage_} {}
-  UpdateContext(const SlimPokerState& next_state, StorageT<int>* next_regret_storage, StorageT<float>* next_avg_storage, const int next_consec_folds,
+      regret_storage{regret_storage_}, avg_storage{avg_storage_}, freq_buffer{freq_buffer_} {}
+  UpdateContext(SlimPokerState& next_state, StorageT<int>* next_regret_storage, StorageT<float>* next_avg_storage, const int next_consec_folds,
       const UpdateContext& context)
     : state{next_state}, i{context.i}, consec_folds{next_consec_folds}, board{context.board}, hands{context.hands}, indexers{context.indexers},
-      regret_storage{next_regret_storage}, avg_storage{next_avg_storage} {}
+      regret_storage{next_regret_storage}, avg_storage{next_avg_storage}, freq_buffer{context.freq_buffer} {}
 
-  const SlimPokerState& state;
+  SlimPokerState& state;
   int i;
   int consec_folds;
   const Board& board;
@@ -96,6 +96,7 @@ struct UpdateContext {
   std::vector<CachedIndexer>& indexers;
   StorageT<int>* regret_storage;
   StorageT<float>* avg_storage;
+  std::vector<float>& freq_buffer;
 };
 
 template <template<typename> class StorageT>
@@ -239,12 +240,6 @@ protected:
   double get_discount_factor(const long t) const override { return _bp_config.get_discount_factor(t); }
 
   MetricsConfig get_avg_metrics_config() const { return _avg_metrics_config; }
-
-  #ifdef UNIT_TEST
-  template <template<typename> class T>
-  friend void call_update_strategy(BlueprintSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands,
-      StorageT<int>* regret_storage, StorageT<float>* avg_storage);
-  #endif
 
 private:
   MetricsConfig _avg_metrics_config;

@@ -510,22 +510,22 @@ void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& c
     const auto& actions = this->avg_value_actions(ctx.avg_storage);
     int cluster = context_cluster(ctx);
     const std::atomic<int>* base_ptr = this->get_base_regret_ptr(ctx.regret_storage, cluster);
-    auto freq = calculate_strategy(base_ptr, actions.size());
-    int a_idx = sample_action_idx_fast(freq, freq.size());
+    calculate_strategy_in_place(base_ptr, actions.size(), ctx.freq_buffer);
+    int a_idx = sample_action_idx_fast(ctx.freq_buffer, actions.size());
     if(is_debug) {
       // debug << "Update strategy: " << relative_history_str(state, this->get_config().init_state) << "\n";
       std::ostringstream debug;
       debug << "\t" << ctx.hands[ctx.i].to_string() << ": (cluster=" << cluster << ")\n\t";
       for(int ai = 0; ai < actions.size(); ++ai) {
-        debug << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << freq[ai] << "  ";
+        debug << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << ctx.freq_buffer[ai] << "  ";
       }
       Logger::dump(debug);
     }
     this->get_base_avg_ptr(ctx.avg_storage, cluster)[a_idx].fetch_add(1.0f);
     const Action a = actions[a_idx];
-    SlimPokerState next_state = ctx.state.apply_copy(a);
-    update_strategy(UpdateContext<StorageT>{next_state, this->next_regret_storage(ctx.regret_storage, a_idx, next_state, ctx.i),
-                    this->next_avg_storage(ctx.avg_storage, a_idx, next_state, ctx.i), next_consec_folds(ctx.consec_folds, a), ctx});
+    ctx.state.apply_in_place(a);
+    update_strategy(UpdateContext<StorageT>{ctx.state, this->next_regret_storage(ctx.regret_storage, a_idx, ctx.state, ctx.i),
+                    this->next_avg_storage(ctx.avg_storage, a_idx, ctx.state, ctx.i), next_consec_folds(ctx.consec_folds, a), ctx});
   }
   else {
     const auto& actions = this->avg_branching_actions(ctx.avg_storage);
@@ -542,8 +542,10 @@ template <template<typename> class StorageT>
 void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
   if(t > 0 && t % get_blueprint_config().strategy_interval == 0 && t < get_blueprint_config().preflop_threshold) {
     if(is_debug) Logger::log("============== Updating strategy ==============");
-    update_strategy(UpdateContext<StorageT>{SlimPokerState{this->get_config().init_state}, i, 0, Board{this->get_config().init_board}, hands, indexers,
-        this->init_regret_storage(), this->init_avg_storage()});
+    SlimPokerState state{this->get_config().init_state};
+    std::vector freq_buffer(this->get_config().action_profile.max_actions(), 0.0f);
+    update_strategy(UpdateContext<StorageT>{state, i, 0, Board{this->get_config().init_board}, hands, indexers,
+        this->init_regret_storage(), this->init_avg_storage(), freq_buffer});
   }
 }
 
