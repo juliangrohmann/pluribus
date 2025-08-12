@@ -107,8 +107,8 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
           indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes
         }
         on_step(t, i, sample.hands, indexers);
-        SlimPokerState state{get_config().init_state};
         std::vector freq_buffer(get_config().action_profile.max_actions(), 0.0f);
+        SlimPokerState state{get_config().init_state};
         MCCFRContext<StorageT> context{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), freq_buffer};
         if(should_prune(t)) {
           if(is_debug) Logger::log("============== Traverse MCCFR-P ==============");
@@ -251,17 +251,19 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
     auto freq = calculate_strategy(base_ptr, value_actions.size());
 
-    std::unordered_map<Action, int> values;
+    std::vector<int> values(value_actions.size(), 0);
+    std::vector<bool> filter(value_actions.size(), false);
     float v_exact = 0;
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
       if(ctx.state.get_round() == 3 || a == Action::FOLD || base_ptr[a_idx].load() > PRUNE_CUTOFF || is_terminal_call(a, ctx.i, ctx.state)) {
         if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (traverser): " + a.to_string());
+        filter[a_idx] = true;
         SlimPokerState next_state = ctx.state.apply_copy(a);
         const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
         int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
             next_consec_folds(ctx.consec_folds, a), ctx});
-        values[a] = v_a;
+        values[a_idx] = v_a;
         v_exact += freq[a_idx] * v_a;
         if(is_debug) log_action_ev(a, freq[a_idx], v_a);
       }
@@ -269,11 +271,10 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
     const int v = round(v_exact);
     if(is_debug) log_net_ev(v, v_exact);
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
-      Action a = value_actions[a_idx];
-      if(auto it = values.find(a); it != values.end()) {
+      if(filter[a_idx]) {
         auto& r_atom = base_ptr[a_idx];
         const int prev_r = r_atom.load();
-        int d_r = it->second - v;
+        int d_r = values[a_idx] - v;
         const int next_r = prev_r + d_r;
         if(next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
         if(next_r > REGRET_FLOOR) {
@@ -312,7 +313,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
     if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
     auto freq = calculate_strategy(base_ptr, value_actions.size());
-    std::unordered_map<Action, int> values;
+
+    std::vector<int> values(value_actions.size(), 0);
     float v_exact = 0;
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
@@ -321,7 +323,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
       SlimPokerState next_state = ctx.state.apply_copy(a);
       int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
         next_consec_folds(ctx.consec_folds, a), ctx});
-      values[a] = v_a;
+      values[a_idx] = v_a;
       v_exact += freq[a_idx] * v_a;
       if(is_debug) log_action_ev(a, freq[a_idx], v_a);
     }
@@ -330,7 +332,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       auto& r_atom = base_ptr[a_idx];
       const int prev_r = r_atom.load();
-      int d_r = values[value_actions[a_idx]] - v;
+      int d_r = values[a_idx] - v;
       int next_r = prev_r + d_r;
       if(next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
       if(next_r > REGRET_FLOOR) {
