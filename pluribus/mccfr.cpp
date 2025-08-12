@@ -78,6 +78,10 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
 
   Logger::log("Training blueprint from " + std::to_string(_t) + " to " + std::to_string(T));
   std::ostringstream buf;
+  int max_actions = get_config().action_profile.max_actions();
+  constexpr int max_traverser_history = 1000;
+  std::vector freq_buffer(max_actions, 0.0f);
+  std::vector nested_freq_buffer(max_actions * max_traverser_history, 0.0f);
   while(_t < T) {
     long init_t = _t;
     _t = next_step(_t, T); 
@@ -107,9 +111,8 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
           indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes
         }
         on_step(t, i, sample.hands, indexers);
-        std::vector freq_buffer(get_config().action_profile.max_actions(), 0.0f);
         SlimPokerState state{get_config().init_state};
-        MCCFRContext<StorageT> context{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), freq_buffer};
+        MCCFRContext<StorageT> context{state, t, i, 0, 0, board, sample.hands, indexers, eval, init_regret_storage(), freq_buffer, nested_freq_buffer};
         if(should_prune(t)) {
           if(is_debug) Logger::log("============== Traverse MCCFR-P ==============");
           traverse_mccfr_p(context);
@@ -249,7 +252,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
     const int cluster = context_cluster(ctx);
     if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
-    auto freq = calculate_strategy(base_ptr, value_actions.size());
+    auto freq_ptr = ctx.nested_freq_buffer.data() + ctx.freq_idx;
+    calculate_strategy_in_place(base_ptr, value_actions.size(), freq_ptr);
 
     std::vector<int> values(value_actions.size(), 0);
     std::vector<bool> filter(value_actions.size(), false);
@@ -262,10 +266,10 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
         SlimPokerState next_state = ctx.state.apply_copy(a);
         const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
         int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-            next_consec_folds(ctx.consec_folds, a), ctx});
+            next_consec_folds(ctx.consec_folds, a), ctx.freq_idx + static_cast<int>(value_actions.size()), ctx});
         values[a_idx] = v_a;
-        v_exact += freq[a_idx] * v_a;
-        if(is_debug) log_action_ev(a, freq[a_idx], v_a);
+        v_exact += freq_ptr[a_idx] * v_a;
+        if(is_debug) log_action_ev(a, freq_ptr[a_idx], v_a);
       }
     }
     const int v = round(v_exact);
@@ -293,7 +297,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
   return traverse_mccfr_p(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
-      next_consec_folds(ctx.consec_folds, a), ctx});
+      next_consec_folds(ctx.consec_folds, a), ctx.freq_idx, ctx});
 }
 
 template <template<typename> class StorageT>
@@ -312,7 +316,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
     const int cluster = context_cluster(ctx);
     if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
-    auto freq = calculate_strategy(base_ptr, value_actions.size());
+    auto freq_ptr = ctx.nested_freq_buffer.data() + ctx.freq_idx;
+    calculate_strategy_in_place(base_ptr, value_actions.size(), freq_ptr);
 
     std::vector<int> values(value_actions.size(), 0);
     float v_exact = 0;
@@ -322,10 +327,10 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
       const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
       SlimPokerState next_state = ctx.state.apply_copy(a);
       int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-        next_consec_folds(ctx.consec_folds, a), ctx});
+        next_consec_folds(ctx.consec_folds, a), ctx.freq_idx + static_cast<int>(value_actions.size()), ctx});
       values[a_idx] = v_a;
-      v_exact += freq[a_idx] * v_a;
-      if(is_debug) log_action_ev(a, freq[a_idx], v_a);
+      v_exact += freq_ptr[a_idx] * v_a;
+      if(is_debug) log_action_ev(a, freq_ptr[a_idx], v_a);
     }
     int v = round(v_exact);
     if(is_debug) log_net_ev(v, v_exact);
@@ -350,14 +355,14 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
   return traverse_mccfr(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
-      next_consec_folds(ctx.consec_folds, a), ctx});
+      next_consec_folds(ctx.consec_folds, a), ctx.freq_idx, ctx});
 }
 
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& ctx) {
   const int cluster = context_cluster(ctx);
   const std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
-  calculate_strategy_in_place(base_ptr, actions.size(), ctx.freq_buffer);
+  calculate_strategy_in_place(base_ptr, actions.size(), ctx.freq_buffer.data());
   const int a_idx = sample_action_idx_fast(ctx.freq_buffer, actions.size());
   if(is_debug) log_external_sampling(actions[a_idx], actions, ctx.freq_buffer);
   return a_idx;
@@ -512,10 +517,10 @@ void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& c
     const auto& actions = this->avg_value_actions(ctx.avg_storage);
     int cluster = context_cluster(ctx);
     const std::atomic<int>* base_ptr = this->get_base_regret_ptr(ctx.regret_storage, cluster);
-    calculate_strategy_in_place(base_ptr, actions.size(), ctx.freq_buffer);
+    calculate_strategy_in_place(base_ptr, actions.size(), ctx.freq_buffer.data());
     int a_idx = sample_action_idx_fast(ctx.freq_buffer, actions.size());
     if(is_debug) {
-      Logger::log("Update strategy: " << ctx.hands[ctx.i].to_string() << " (cluster=" << cluster << ")");
+      Logger::log("Update strategy: " + ctx.hands[ctx.i].to_string() + " (cluster=" + std::to_string(cluster) + ")");
       std::ostringstream debug;
       for(int ai = 0; ai < actions.size(); ++ai) {
         debug << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << ctx.freq_buffer[ai] << "  ";

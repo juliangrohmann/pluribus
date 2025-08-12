@@ -57,24 +57,29 @@ struct MetricsConfig {
 
 template <template<typename> class StorageT>
 struct MCCFRContext {
-  MCCFRContext(SlimPokerState& state_, const long t_, const int i_, const int consec_folds_, const Board& board_, const std::vector<Hand>& hands_,
-      std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_, std::vector<float>& freq_buffer_)
-    : state{state_}, t{t_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
-      regret_storage{regret_storage_}, freq_buffer{freq_buffer_} {}
-  MCCFRContext(SlimPokerState& next_state, StorageT<int>* next_regret_storage, const int next_consec_folds, const MCCFRContext& context)
-    : state{next_state}, t{context.t}, i{context.i}, consec_folds{next_consec_folds}, board{context.board}, hands{context.hands}, indexers{context.indexers},
-      eval{context.eval}, regret_storage{next_regret_storage}, freq_buffer{context.freq_buffer} {}
+  MCCFRContext(SlimPokerState& state_, const long t_, const int i_, const int freq_idx_, const int consec_folds_, const Board& board_,
+      const std::vector<Hand>& hands_, std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_,
+      std::vector<float>& freq_buffer_, std::vector<float>& nested_freq_buffer_)
+    : state{state_}, t{t_}, i{i_}, consec_folds{consec_folds_}, freq_idx{freq_idx_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
+      regret_storage{regret_storage_}, freq_buffer{freq_buffer_}, nested_freq_buffer{nested_freq_buffer_} {}
+  MCCFRContext(SlimPokerState& next_state, StorageT<int>* next_regret_storage, const int next_consec_folds, const int next_freq_idx,
+      const MCCFRContext& context)
+    : state{next_state}, t{context.t}, i{context.i}, consec_folds{next_consec_folds}, freq_idx{next_freq_idx}, board{context.board}, hands{context.hands},
+      indexers{context.indexers}, eval{context.eval}, regret_storage{next_regret_storage}, freq_buffer{context.freq_buffer},
+      nested_freq_buffer{context.nested_freq_buffer} {}
 
   SlimPokerState& state;
   const long t;
   const int i;
   const int consec_folds;
+  const int freq_idx;
   const Board& board;
   const std::vector<Hand>& hands;
   std::vector<CachedIndexer>& indexers;
   const omp::HandEvaluator& eval;
   StorageT<int>* regret_storage;
   std::vector<float>& freq_buffer;
+  std::vector<float>& nested_freq_buffer;
 };
 
 template <template<typename> class StorageT>
