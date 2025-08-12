@@ -288,9 +288,9 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
-  const SlimPokerState next_state = ctx.state.apply_copy(a);
+  ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
+  return traverse_mccfr_p(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
       next_consec_folds(ctx.consec_folds, a), ctx});
 }
 
@@ -344,9 +344,9 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
-  const SlimPokerState next_state = ctx.state.apply_copy(a);
+  ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
+  return traverse_mccfr(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
       next_consec_folds(ctx.consec_folds, a), ctx});
 }
 
