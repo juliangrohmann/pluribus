@@ -80,8 +80,6 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
   std::ostringstream buf;
   int max_actions = get_config().action_profile.max_actions();
   constexpr int max_traverser_history = 1000;
-  std::vector freq_buffer(max_actions, 0.0f);
-  std::vector nested_freq_buffer(max_actions * max_traverser_history, 0.0f);
   while(_t < T) {
     long init_t = _t;
     _t = next_step(_t, T); 
@@ -96,6 +94,8 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       thread_local Deck deck{get_config().init_board};
       thread_local Board board;
       thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board, get_config().dead_ranges};
+      thread_local std::vector freq_buffer(max_actions, 0.0f);
+      thread_local std::vector nested_freq_buffer(max_actions * max_traverser_history, 0.0f);
       if(is_debug) Logger::log("============== t = " + std::to_string(t) + " ==============");
       if(should_log(t)) {
         std::ostringstream metrics_fn;
@@ -252,7 +252,10 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
     const int cluster = context_cluster(ctx);
     if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
-    auto freq_ptr = ctx.nested_freq_buffer.data() + ctx.freq_idx;
+    if(ctx.freq_idx + value_actions.size() > ctx.nested_freq_buffer.size()) {
+      Logger::error("Nested freq buffer overflowing.");
+    }
+    float* freq_ptr = ctx.nested_freq_buffer.data() + ctx.freq_idx;
     calculate_strategy_in_place(base_ptr, value_actions.size(), freq_ptr);
 
     std::vector<int> values(value_actions.size(), 0);
@@ -316,7 +319,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
     const int cluster = context_cluster(ctx);
     if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
-    auto freq_ptr = ctx.nested_freq_buffer.data() + ctx.freq_idx;
+    float* freq_ptr = ctx.nested_freq_buffer.data() + ctx.freq_idx;
     calculate_strategy_in_place(base_ptr, value_actions.size(), freq_ptr);
 
     std::vector<int> values(value_actions.size(), 0);
