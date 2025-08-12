@@ -515,9 +515,8 @@ void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& c
     calculate_strategy_in_place(base_ptr, actions.size(), ctx.freq_buffer);
     int a_idx = sample_action_idx_fast(ctx.freq_buffer, actions.size());
     if(is_debug) {
-      // debug << "Update strategy: " << relative_history_str(state, this->get_config().init_state) << "\n";
+      Logger::log("Update strategy: " << ctx.hands[ctx.i].to_string() << " (cluster=" << cluster << ")");
       std::ostringstream debug;
-      debug << "\t" << ctx.hands[ctx.i].to_string() << ": (cluster=" << cluster << ")\n\t";
       for(int ai = 0; ai < actions.size(); ++ai) {
         debug << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << ctx.freq_buffer[ai] << "  ";
       }
