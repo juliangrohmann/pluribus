@@ -10,8 +10,8 @@ namespace pluribus {
 
 template <template<typename> class StorageT>
 int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state, int i, const Board& board,
-    const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug) {
-  return trainer->traverse_mccfr(MCCFRContext<StorageT>{state, 1, i, 0, board, hands, indexers, eval, trainer->init_regret_storage(), debug});
+    const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) {
+  return trainer->traverse_mccfr(MCCFRContext<StorageT>{state, 1, i, 0, board, hands, indexers, eval, trainer->init_regret_storage()});
 }
 
 }
@@ -22,7 +22,6 @@ int main(int argc, char* argv[]) {
   SolverConfig config{PokerConfig{2, 0, false}, HeadsUpBlueprintProfile{10'000}};
   omp::HandEvaluator eval;
   TreeBlueprintSolver trainer{config, BlueprintSolverConfig{}};
-  std::ostringstream debug;
   // TODO: allocate all storage nodes
 
   // preload cache
@@ -49,6 +48,6 @@ int main(int argc, char* argv[]) {
     for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
       indexers[h_idx].index(board, sample.hands[h_idx], 3);
     }
-    call_traverse_mccfr(&trainer, config.init_state, 0, board, sample.hands, indexers, eval, debug);
+    call_traverse_mccfr(&trainer, config.init_state, 0, board, sample.hands, indexers, eval);
   }
 }

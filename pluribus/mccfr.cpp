@@ -91,37 +91,33 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       thread_local omp::HandEvaluator eval;
       thread_local Deck deck{get_config().init_board};
       thread_local Board board;
-      thread_local std::ostringstream debug;
       thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board, get_config().dead_ranges};
-      if(is_debug) debug << "============== t = " << t << " ==============\n";
+      if(is_debug) Logger::log("============== t = " + std::to_string(t) + " ==============");
       if(should_log(t)) {
         std::ostringstream metrics_fn;
         metrics_fn << std::setprecision(1) << std::fixed << t / 1'000'000.0 << ".json";
         write_to_file(_metrics_dir / metrics_fn.str(), track_wandb_metrics(t));
       }
       for(int i = 0; i < get_config().poker.n_players; ++i) {
-        if(is_debug) debug << "============== i = " << i << " ==============\n";
+        if(is_debug) Logger::log("============== i = " + std::to_string(i) + " ==============");
         std::vector<CachedIndexer> indexers(get_config().poker.n_players);
         RoundSample sample = sampler.sample();
         board = sample_board(get_config().init_board, sample.mask);
         for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
           indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes
         }
-        on_step(t, i, sample.hands, indexers, debug);
-        MCCFRContext<StorageT> context{SlimPokerState{get_config().init_state}, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), debug};
+        on_step(t, i, sample.hands, indexers);
+        const SlimPokerState state{get_config().init_state};
+        MCCFRContext<StorageT> context{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage()};
         if(should_prune(t)) {
-          if(is_debug) debug << "============== Traverse MCCFR-P ==============\n";
+          if(is_debug) Logger::log("============== Traverse MCCFR-P ==============");
           traverse_mccfr_p(context);
         }
         else {
-          if(is_debug) debug << "============== Traverse MCCFR ==============\n";
+          if(is_debug) Logger::log("============== Traverse MCCFR ==============");
           traverse_mccfr(context);
         }
       }
-      if(is_debug) {
-        write_to_file(_log_dir / ("t" + std::to_string(t) + ".log"), debug.str());
-      }
-      debug.str("");
     }
     
     auto interval_end = std::chrono::high_resolution_clock::now();
@@ -161,54 +157,50 @@ std::string info_str(const int prev_r, const int d_r, const MCCFRContext<Storage
   return str;
 }
 
-template <template<typename> class StorageT>
-void MCCFRSolver<StorageT>::error(const std::string& msg, const std::ostringstream& debug) const {
-  std::string error_msg = msg;
-  if(is_debug) {
-    const auto debug_dir = _log_dir / ("thread" + std::to_string(omp_get_thread_num()) + ".error");
-    write_to_file(debug_dir, debug.str() + "\nRUNTIME ERROR: " + msg);
-    error_msg += "\nDebug logs written to " + debug_dir.string();
-  }
-  Logger::error(error_msg);
-}
-
 // std::string relative_history_str(const PokerState& state, const PokerState& init_state) {
 //   return state.get_action_history().slice(init_state.get_action_history().size()).to_string();
 // }
 
 template <template<typename> class StorageT>
-void log_utility(const int utility, const MCCFRContext<StorageT>& context) {
+void log_utility(const int utility, const MCCFRContext<StorageT>& ctx) {
   // context.debug << "Terminal: " << relative_history_str(context.state, init_state) << "\n";
-  context.debug << "\tHands: ";
-  for(int p_idx = 0; p_idx < context.state.get_players().size(); ++p_idx) {
-    context.debug << context.hands[p_idx].to_string() << " ";
+  std::ostringstream debug;
+  debug << "Terminal: Hands=[";
+  for(int p_idx = 0; p_idx < ctx.state.get_players().size(); ++p_idx) {
+    debug << ctx.hands[p_idx].to_string() << (p_idx != ctx.state.get_players().size() - 1 ? " " : "");
   }
-  context.debug << "\n";
-  context.debug << "\tu(z) = " << utility << "\n";
+  debug << "]  u(z) = " << utility;
+  Logger::dump(debug);
 }
 
-void log_action_ev(const Action a, const float freq, const int ev, std::ostringstream& debug) {
-  // debug << "Action EV: " << relative_history_str(state, init_state) << "\n";
-  debug << "\tu(" << a.to_string() << ") @ " << std::setprecision(2) << std::fixed << freq << " = " << ev << "\n";
+void log_action_ev(const Action a, const float freq, const int ev) {
+  std::ostringstream debug;
+  debug << "Action EV: u(" << a.to_string() << ") @ " << std::setprecision(2) << std::fixed << freq << " = " << ev;
+  Logger::dump(debug);
 }
 
-void log_net_ev(const int ev, const float ev_exact, std::ostringstream& debug) {
-  // debug << "Net EV: " << relative_history_str(state, init_state) << "\n";
-  debug << "\tu(sigma) = " << std::setprecision(2) << std::fixed << ev << " (exact=" << ev_exact << ")\n";
+void log_net_ev(const int ev, const float ev_exact) {
+  std::ostringstream debug;
+  debug << "Net EV: u(sigma) = " << std::setprecision(2) << std::fixed << ev << " (exact=" << ev_exact << ")";
+  Logger::dump(debug);
 }
 
-void log_regret(const Action a, const int d_r, const int next_r, std::ostringstream& debug) {
+void log_regret(const Action a, const int d_r, const int next_r) {
+  std::ostringstream debug;
   debug << "\tR(" << a.to_string() << ") = " << d_r << "\n";
-  debug << "\tcum R(" << a.to_string() << ") = " << next_r << "\n";
+  Logger::dump(debug);
+  debug << "\tcum R(" << a.to_string() << ") = " << next_r;
+  Logger::dump(debug);
 }
 
-void log_external_sampling(const Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq, std::ostringstream& debug) {
-  // debug << "Sampling: " << relative_history_str(state, init_state) << "\n\t";
+void log_external_sampling(const Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq) {
+  std::ostringstream debug;
+  debug << "Sampling: ";
   for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-    debug << std::setprecision(2) << std::fixed << actions[a_idx].to_string() << "=" << freq[a_idx] << " ";
+    debug << std::setprecision(2) << std::fixed << actions[a_idx].to_string() << "=" << freq[a_idx] << "  ";
   }
-  debug << "\n";
-  debug << "\tSampled: " << sampled.to_string() << "\n";
+  Logger::dump(debug);
+  Logger::log("Sampled: " + sampled.to_string());
 }
 
 bool should_restrict(const std::vector<Action>& actions, const int restrict_players) {
@@ -233,8 +225,7 @@ template<class Context>
 int context_cluster(const Context& ctx) {
   const int r = ctx.state.get_round();
   const int p = ctx.state.get_active();
-  const int idx = ctx.indexers[p].index(ctx.board, ctx.hands[p], r);
-  return BlueprintClusterMap::get_instance()->cluster(r, idx);
+  return BlueprintClusterMap::get_instance()->cluster(r, ctx.indexers[p].index(ctx.board, ctx.hands[p], r));
 }
 
 int next_consec_folds(const int consec_folds, const Action a) {
@@ -255,7 +246,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
     const auto& value_actions = regret_value_actions(ctx.regret_storage);
     const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
     const int cluster = context_cluster(ctx);
-    if(is_debug) ctx.debug << "Cluster:" << cluster << "\n";
+    if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
     auto freq = calculate_strategy(base_ptr, value_actions.size());
 
@@ -264,17 +255,18 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
       if(ctx.state.get_round() == 3 || a == Action::FOLD || base_ptr[a_idx].load() > PRUNE_CUTOFF || is_terminal_call(a, ctx.i, ctx.state)) {
+        if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (traverser): " + a.to_string());
         SlimPokerState next_state = ctx.state.apply_copy(a);
         const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
         int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
             next_consec_folds(ctx.consec_folds, a), ctx});
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
-        if(is_debug) log_action_ev(a, freq[a_idx], v_a, ctx.debug);
+        if(is_debug) log_action_ev(a, freq[a_idx], v_a);
       }
     }
     const int v = round(v_exact);
-    if(is_debug) log_net_ev(v, v_exact, ctx.debug);
+    if(is_debug) log_net_ev(v, v_exact);
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
       if(auto it = values.find(a); it != values.end()) {
@@ -282,11 +274,11 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
         const int prev_r = r_atom.load();
         int d_r = it->second - v;
         const int next_r = prev_r + d_r;
-        if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx), ctx.debug);
+        if(next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
         if(next_r > REGRET_FLOOR) {
           r_atom.fetch_add(d_r);
         }
-        if(is_debug) log_regret(value_actions[a_idx], d_r, next_r, ctx.debug);
+        if(is_debug) log_regret(value_actions[a_idx], d_r, next_r);
       }
     }
     return v;
@@ -295,6 +287,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
   const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
+  if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
   const SlimPokerState next_state = ctx.state.apply_copy(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
   return traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
@@ -315,33 +308,34 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
     const auto& value_actions = regret_value_actions(ctx.regret_storage);
     const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
     const int cluster = context_cluster(ctx);
-    if(is_debug) ctx.debug << "Cluster:" << cluster << "\n";
+    if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
     auto freq = calculate_strategy(base_ptr, value_actions.size());
     std::unordered_map<Action, int> values;
     float v_exact = 0;
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
+      if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (traverser): " + a.to_string());
       const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
       SlimPokerState next_state = ctx.state.apply_copy(a);
       int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
         next_consec_folds(ctx.consec_folds, a), ctx});
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
-      if(is_debug) log_action_ev(a, freq[a_idx], v_a, ctx.debug);
+      if(is_debug) log_action_ev(a, freq[a_idx], v_a);
     }
     int v = round(v_exact);
-    if(is_debug) log_net_ev(v, v_exact, ctx.debug);
+    if(is_debug) log_net_ev(v, v_exact);
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       auto& r_atom = base_ptr[a_idx];
       const int prev_r = r_atom.load();
       int d_r = values[value_actions[a_idx]] - v;
       int next_r = prev_r + d_r;
-      if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx), ctx.debug);
+      if(next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
       if(next_r > REGRET_FLOOR) {
         r_atom.fetch_add(d_r);
       }
-      if(is_debug) log_regret(value_actions[a_idx], d_r, next_r, ctx.debug);
+      if(is_debug) log_regret(value_actions[a_idx], d_r, next_r);
     }
     return v;
   }
@@ -349,6 +343,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
   const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
+  if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
   const SlimPokerState next_state = ctx.state.apply_copy(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
   return traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
@@ -361,7 +356,7 @@ int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions,
   const std::atomic<int>* base_ptr = get_base_regret_ptr(context.regret_storage, cluster);
   const std::vector<float> freq = calculate_strategy(base_ptr, actions.size());
   const int a_idx = sample_action_idx_fast(freq);
-  if(is_debug) log_external_sampling(actions[a_idx], actions, freq, context.debug);
+  if(is_debug) log_external_sampling(actions[a_idx], actions, freq);
   return a_idx;
 }
 
@@ -518,11 +513,12 @@ void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& c
     int a_idx = sample_action_idx_fast(freq);
     if(is_debug) {
       // debug << "Update strategy: " << relative_history_str(state, this->get_config().init_state) << "\n";
-      ctx.debug << "\t" << ctx.hands[ctx.i].to_string() << ": (cluster=" << cluster << ")\n\t";
+      std::ostringstream debug;
+      debug << "\t" << ctx.hands[ctx.i].to_string() << ": (cluster=" << cluster << ")\n\t";
       for(int ai = 0; ai < actions.size(); ++ai) {
-        ctx.debug << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << freq[ai] << "  ";
+        debug << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << freq[ai] << "  ";
       }
-      ctx.debug << "\n";
+      Logger::dump(debug);
     }
     this->get_base_avg_ptr(ctx.avg_storage, cluster)[a_idx].fetch_add(1.0f);
     const Action a = actions[a_idx];
@@ -542,12 +538,11 @@ void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& c
 }
 
 template <template<typename> class StorageT>
-void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
-    std::ostringstream& debug) {
+void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
   if(t > 0 && t % get_blueprint_config().strategy_interval == 0 && t < get_blueprint_config().preflop_threshold) {
-    if(is_debug) debug << "============== Updating strategy ==============\n";
+    if(is_debug) Logger::log("============== Updating strategy ==============");
     update_strategy(UpdateContext<StorageT>{SlimPokerState{this->get_config().init_state}, i, 0, Board{this->get_config().init_board}, hands, indexers,
-        this->init_regret_storage(), this->init_avg_storage(), debug});
+        this->init_regret_storage(), this->init_avg_storage()});
   }
 }
 

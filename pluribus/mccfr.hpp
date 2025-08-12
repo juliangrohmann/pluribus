@@ -58,12 +58,12 @@ struct MetricsConfig {
 template <template<typename> class StorageT>
 struct MCCFRContext {
   MCCFRContext(const SlimPokerState& state_, const long t_, const int i_, const int consec_folds_, const Board& board_, const std::vector<Hand>& hands_,
-      std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_, std::ostringstream& debug_)
+      std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_)
     : state{state_}, t{t_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
-      regret_storage{regret_storage_}, debug{debug_} {}
+      regret_storage{regret_storage_} {}
   MCCFRContext(const SlimPokerState& next_state, StorageT<int>* next_regret_storage, const int next_consec_folds, const MCCFRContext& context)
     : state{next_state}, t{context.t}, i{context.i}, consec_folds{next_consec_folds}, board{context.board}, hands{context.hands}, indexers{context.indexers},
-      eval{context.eval}, regret_storage{next_regret_storage}, debug{context.debug} {}
+      eval{context.eval}, regret_storage{next_regret_storage} {}
 
   const SlimPokerState& state;
   const long t;
@@ -74,19 +74,18 @@ struct MCCFRContext {
   std::vector<CachedIndexer>& indexers;
   const omp::HandEvaluator& eval;
   StorageT<int>* regret_storage;
-  std::ostringstream& debug;
 };
 
 template <template<typename> class StorageT>
 struct UpdateContext {
   UpdateContext(const SlimPokerState& state_, const int i_, const int consec_folds_, const Board& board_, const std::vector<Hand>& hands_,
-      std::vector<CachedIndexer>& indexers_, StorageT<int>* regret_storage_, StorageT<float>* avg_storage_, std::ostringstream& debug_)
+      std::vector<CachedIndexer>& indexers_, StorageT<int>* regret_storage_, StorageT<float>* avg_storage_)
     : state{state_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_},
-      regret_storage{regret_storage_}, avg_storage{avg_storage_}, debug{debug_} {}
+      regret_storage{regret_storage_}, avg_storage{avg_storage_} {}
   UpdateContext(const SlimPokerState& next_state, StorageT<int>* next_regret_storage, StorageT<float>* next_avg_storage, const int next_consec_folds,
       const UpdateContext& context)
     : state{next_state}, i{context.i}, consec_folds{next_consec_folds}, board{context.board}, hands{context.hands}, indexers{context.indexers},
-      regret_storage{next_regret_storage}, avg_storage{next_avg_storage}, debug{context.debug} {}
+      regret_storage{next_regret_storage}, avg_storage{next_avg_storage} {}
 
   const SlimPokerState& state;
   int i;
@@ -96,7 +95,6 @@ struct UpdateContext {
   std::vector<CachedIndexer>& indexers;
   StorageT<int>* regret_storage;
   StorageT<float>* avg_storage;
-  std::ostringstream& debug;
 };
 
 template <template<typename> class StorageT>
@@ -122,7 +120,7 @@ protected:
   virtual int terminal_utility(const MCCFRContext<StorageT>& context) const;
   virtual bool is_terminal(const SlimPokerState& state, const int i) const { return state.is_terminal() || state.get_players()[i].has_folded(); }
   virtual void on_start() {}
-  virtual void on_step(long t, int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, std::ostringstream& debug) {}
+  virtual void on_step(long t, int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {}
   virtual void on_snapshot() {}
 
   virtual bool should_prune(long t) const = 0;
@@ -153,8 +151,6 @@ protected:
   void track_strategy_by_decision(const PokerState& state, const std::vector<PokerRange>& ranges, const DecisionAlgorithm& decision,
       const MetricsConfig& metrics_config, bool phi, nlohmann::json& metrics) const;
 
-  [[noreturn]] void error(const std::string& msg, const std::ostringstream& debug) const;
-
   long get_iteration() const { return _t; }
   MetricsConfig get_regret_metrics_config() const { return _regret_metrics_config; }
 
@@ -165,7 +161,7 @@ private:
 #ifdef UNIT_TEST
   template <template<typename> class T>
   friend int call_traverse_mccfr(MCCFRSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::ostringstream& debug);
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval);
 #endif
 
   long _t = 0;
@@ -230,7 +226,7 @@ protected:
   void update_strategy(const UpdateContext<StorageT>& ctx);
 
   void on_start() override { Logger::log("Blueprint solver config:\n" + _bp_config.to_string()); }
-  void on_step(long t,int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, std::ostringstream& debug) override;
+  void on_step(long t,int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
 
   bool should_prune(long t) const override;
   bool should_discount(const long t) const override { return _bp_config.is_discount_step(t); }
@@ -246,7 +242,7 @@ protected:
   #ifdef UNIT_TEST
   template <template<typename> class T>
   friend void call_update_strategy(BlueprintSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands,
-      StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug);
+      StorageT<int>* regret_storage, StorageT<float>* avg_storage);
   #endif
 
 private:
