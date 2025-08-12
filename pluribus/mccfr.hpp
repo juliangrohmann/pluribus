@@ -168,7 +168,7 @@ private:
 #ifdef UNIT_TEST
   template <template<typename> class T>
   friend int call_traverse_mccfr(MCCFRSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::vector<float>& freq_buffer);
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::vector<float>& freq_buffer, std::vector<float>& nested_freq_buffer);
 #endif
 
   long _t = 0;
