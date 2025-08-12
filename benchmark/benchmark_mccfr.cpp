@@ -10,8 +10,9 @@ namespace pluribus {
 
 template <template<typename> class StorageT>
 int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state, int i, const Board& board,
-    const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) {
-  return trainer->traverse_mccfr(MCCFRContext<StorageT>{state, 1, i, 0, board, hands, indexers, eval, trainer->init_regret_storage()});
+    const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::vector<float>& freq_buffer) {
+  SlimPokerState slim_state{state};
+  return trainer->traverse_mccfr(MCCFRContext<StorageT>{slim_state, 1, i, 0, board, hands, indexers, eval, trainer->init_regret_storage(), freq_buffer});
 }
 
 }
@@ -30,6 +31,7 @@ int main(int argc, char* argv[]) {
 
   RoundSampler sampler{config.init_ranges, config.init_board};
   RoundSample sample = sampler.sample();
+  std::vector freq_buffer(config.action_profile.max_actions(), 0.0f);
   auto t_0 = std::chrono::high_resolution_clock::now();
   int step = 5000;
   for(long i = 0; i < n; ++i) {
@@ -48,6 +50,6 @@ int main(int argc, char* argv[]) {
     for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
       indexers[h_idx].index(board, sample.hands[h_idx], 3);
     }
-    call_traverse_mccfr(&trainer, config.init_state, 0, board, sample.hands, indexers, eval);
+    call_traverse_mccfr(&trainer, config.init_state, 0, board, sample.hands, indexers, eval, freq_buffer);
   }
 }

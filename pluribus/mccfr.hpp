@@ -57,15 +57,15 @@ struct MetricsConfig {
 
 template <template<typename> class StorageT>
 struct MCCFRContext {
-  MCCFRContext(const SlimPokerState& state_, const long t_, const int i_, const int consec_folds_, const Board& board_, const std::vector<Hand>& hands_,
-      std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_)
+  MCCFRContext(SlimPokerState& state_, const long t_, const int i_, const int consec_folds_, const Board& board_, const std::vector<Hand>& hands_,
+      std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_, std::vector<float>& freq_buffer_)
     : state{state_}, t{t_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
-      regret_storage{regret_storage_} {}
-  MCCFRContext(const SlimPokerState& next_state, StorageT<int>* next_regret_storage, const int next_consec_folds, const MCCFRContext& context)
+      regret_storage{regret_storage_}, freq_buffer{freq_buffer_} {}
+  MCCFRContext(SlimPokerState& next_state, StorageT<int>* next_regret_storage, const int next_consec_folds, const MCCFRContext& context)
     : state{next_state}, t{context.t}, i{context.i}, consec_folds{next_consec_folds}, board{context.board}, hands{context.hands}, indexers{context.indexers},
-      eval{context.eval}, regret_storage{next_regret_storage} {}
+      eval{context.eval}, regret_storage{next_regret_storage}, freq_buffer{context.freq_buffer} {}
 
-  const SlimPokerState& state;
+  SlimPokerState& state;
   const long t;
   const int i;
   const int consec_folds;
@@ -74,6 +74,7 @@ struct MCCFRContext {
   std::vector<CachedIndexer>& indexers;
   const omp::HandEvaluator& eval;
   StorageT<int>* regret_storage;
+  std::vector<float>& freq_buffer;
 };
 
 template <template<typename> class StorageT>
@@ -157,11 +158,11 @@ protected:
 private:
   int traverse_mccfr_p(const MCCFRContext<StorageT>& ctx);
   int traverse_mccfr(const MCCFRContext<StorageT>& ctx);
-  int external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& context);
+  int external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& ctx);
 #ifdef UNIT_TEST
   template <template<typename> class T>
   friend int call_traverse_mccfr(MCCFRSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
-      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval);
+      std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::vector<float>& freq_buffer);
 #endif
 
   long _t = 0;

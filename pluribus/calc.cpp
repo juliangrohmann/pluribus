@@ -8,14 +8,14 @@ int sample_action_idx(const std::vector<float>& freq) {
   return dist(GlobalRNG::instance());
 }
 
-int sample_action_idx_fast(const std::vector<float>& freq) {
+int sample_action_idx_fast(const std::vector<float>& freq, const int n_actions) {
   float cumsum = 0.0f;
   const auto r = static_cast<float>(GSLGlobalRNG::uniform());
-  for(int i = 0; i < static_cast<int>(freq.size()); ++i) {
+  for(int i = 0; i < n_actions; ++i) {
     cumsum += freq[i];
     if(r <= cumsum) return i;
   }
-  return static_cast<int>(freq.size()) - 1;
+  return n_actions - 1;
 }
 
 }

@@ -6,7 +6,7 @@
 namespace pluribus {
 
 int sample_action_idx(const std::vector<float>& freq);
-int sample_action_idx_fast(const std::vector<float>& freq);
+int sample_action_idx_fast(const std::vector<float>& freq, int n_actions);
 
 template <class T>
 std::vector<float> calculate_strategy(const std::atomic<T>* base_ptr, const int n_actions) {
@@ -31,6 +31,28 @@ std::vector<float> calculate_strategy(const std::atomic<T>* base_ptr, const int 
     }
   }
   return freq;
+}
+
+template <class T>
+void calculate_strategy_in_place(const std::atomic<T>* base_ptr, const int n_actions, std::vector<float>& buffer) {
+  float sum = 0;
+  for(int a_idx = 0; a_idx < n_actions; ++a_idx) {
+    const float value = std::max(static_cast<float>(base_ptr[a_idx].load(std::memory_order_relaxed)), 0.0f);
+    buffer[a_idx] = value;
+    sum += value;
+  }
+
+  if(sum > 0) {
+    for(int i = 0; i < n_actions; ++i) {
+      buffer[i] /= sum;
+    }
+  }
+  else {
+    const float uni = 1.0f / static_cast<float>(n_actions);
+    for(int i = 0; i < n_actions; ++i) {
+      buffer[i] = uni;
+    }
+  }
 }
 
 }

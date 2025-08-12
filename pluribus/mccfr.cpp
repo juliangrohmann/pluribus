@@ -107,8 +107,9 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
           indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes
         }
         on_step(t, i, sample.hands, indexers);
-        const SlimPokerState state{get_config().init_state};
-        MCCFRContext<StorageT> context{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage()};
+        SlimPokerState state{get_config().init_state};
+        std::vector freq_buffer(get_config().action_profile.max_actions(), 0.0f);
+        MCCFRContext<StorageT> context{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), freq_buffer};
         if(should_prune(t)) {
           if(is_debug) Logger::log("============== Traverse MCCFR-P ==============");
           traverse_mccfr_p(context);
@@ -351,12 +352,12 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
 }
 
 template <template<typename> class StorageT>
-int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& context) {
-  const int cluster = context_cluster(context);
-  const std::atomic<int>* base_ptr = get_base_regret_ptr(context.regret_storage, cluster);
-  const std::vector<float> freq = calculate_strategy(base_ptr, actions.size());
-  const int a_idx = sample_action_idx_fast(freq);
-  if(is_debug) log_external_sampling(actions[a_idx], actions, freq);
+int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& ctx) {
+  const int cluster = context_cluster(ctx);
+  const std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
+  calculate_strategy_in_place(base_ptr, actions.size(), ctx.freq_buffer);
+  const int a_idx = sample_action_idx_fast(ctx.freq_buffer, actions.size());
+  if(is_debug) log_external_sampling(actions[a_idx], actions, ctx.freq_buffer);
   return a_idx;
 }
 
@@ -510,7 +511,7 @@ void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& c
     int cluster = context_cluster(ctx);
     const std::atomic<int>* base_ptr = this->get_base_regret_ptr(ctx.regret_storage, cluster);
     auto freq = calculate_strategy(base_ptr, actions.size());
-    int a_idx = sample_action_idx_fast(freq);
+    int a_idx = sample_action_idx_fast(freq, freq.size());
     if(is_debug) {
       // debug << "Update strategy: " << relative_history_str(state, this->get_config().init_state) << "\n";
       std::ostringstream debug;
