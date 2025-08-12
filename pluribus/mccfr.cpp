@@ -24,7 +24,7 @@ namespace pluribus {
 static constexpr int PRUNE_CUTOFF = -300'000'000;
 static constexpr int REGRET_FLOOR = -310'000'000;
 
-int utility(const PokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size, const RakeStructure& rake,
+int utility(const SlimPokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const int stack_size, const RakeStructure& rake,
     const omp::HandEvaluator& eval) {
   if(state.get_players()[i].has_folded()) {
     return state.get_players()[i].get_chips() - stack_size;
@@ -108,7 +108,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
           indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes
         }
         on_step(t, i, sample.hands, indexers, debug);
-        MCCFRContext<StorageT> context{get_config().init_state, t, i, board, sample.hands, indexers, eval, init_regret_storage(), debug};
+        MCCFRContext<StorageT> context{SlimPokerState{get_config().init_state}, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), debug};
         if(should_prune(t)) {
           if(is_debug) debug << "============== Traverse MCCFR-P ==============\n";
           traverse_mccfr_p(context);
@@ -157,7 +157,7 @@ std::string info_str(const int prev_r, const int d_r, const MCCFRContext<Storage
   std::string str = "r=" + std::to_string(prev_r) + " + " + std::to_string(d_r) + "\nt=" + 
          std::to_string(context.t) + "\nBoard=" + context.board.to_string() + "\nHands=";
   for(const auto& hand : context.hands) str += hand.to_string() + "  ";
-  str += "\n" + context.state.get_action_history().to_string() + "\n";
+  str += "\n";
   return str;
 }
 
@@ -172,13 +172,13 @@ void MCCFRSolver<StorageT>::error(const std::string& msg, const std::ostringstre
   Logger::error(error_msg);
 }
 
-std::string relative_history_str(const PokerState& state, const PokerState& init_state) {
-  return state.get_action_history().slice(init_state.get_action_history().size()).to_string();
-}
+// std::string relative_history_str(const PokerState& state, const PokerState& init_state) {
+//   return state.get_action_history().slice(init_state.get_action_history().size()).to_string();
+// }
 
 template <template<typename> class StorageT>
-void log_utility(const int utility, const PokerState& init_state, const MCCFRContext<StorageT>& context) {
-  context.debug << "Terminal: " << relative_history_str(context.state, init_state) << "\n";
+void log_utility(const int utility, const MCCFRContext<StorageT>& context) {
+  // context.debug << "Terminal: " << relative_history_str(context.state, init_state) << "\n";
   context.debug << "\tHands: ";
   for(int p_idx = 0; p_idx < context.state.get_players().size(); ++p_idx) {
     context.debug << context.hands[p_idx].to_string() << " ";
@@ -187,13 +187,13 @@ void log_utility(const int utility, const PokerState& init_state, const MCCFRCon
   context.debug << "\tu(z) = " << utility << "\n";
 }
 
-void log_action_ev(const Action a, const float freq, const int ev, const PokerState& state, const PokerState& init_state, std::ostringstream& debug) {
-  debug << "Action EV: " << relative_history_str(state, init_state) << "\n";
+void log_action_ev(const Action a, const float freq, const int ev, std::ostringstream& debug) {
+  // debug << "Action EV: " << relative_history_str(state, init_state) << "\n";
   debug << "\tu(" << a.to_string() << ") @ " << std::setprecision(2) << std::fixed << freq << " = " << ev << "\n";
 }
 
-void log_net_ev(const int ev, const float ev_exact, const PokerState& state, const PokerState& init_state, std::ostringstream& debug) {
-  debug << "Net EV: " << relative_history_str(state, init_state) << "\n";
+void log_net_ev(const int ev, const float ev_exact, std::ostringstream& debug) {
+  // debug << "Net EV: " << relative_history_str(state, init_state) << "\n";
   debug << "\tu(sigma) = " << std::setprecision(2) << std::fixed << ev << " (exact=" << ev_exact << ")\n";
 }
 
@@ -202,9 +202,8 @@ void log_regret(const Action a, const int d_r, const int next_r, std::ostringstr
   debug << "\tcum R(" << a.to_string() << ") = " << next_r << "\n";
 }
 
-void log_external_sampling(const Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq, const PokerState& state,
-    const PokerState& init_state, std::ostringstream& debug) {
-  debug << "Sampling: " << relative_history_str(state, init_state) << "\n\t";
+void log_external_sampling(const Action sampled, const std::vector<Action>& actions, const std::vector<float>& freq, std::ostringstream& debug) {
+  // debug << "Sampling: " << relative_history_str(state, init_state) << "\n\t";
   for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
     debug << std::setprecision(2) << std::fixed << actions[a_idx].to_string() << "=" << freq[a_idx] << " ";
   }
@@ -220,7 +219,7 @@ bool should_restrict(const std::vector<Action>& actions, const int restrict_play
   return true;
 }
 
-bool is_terminal_call(const Action a, const int i, const PokerState& state) {
+bool is_terminal_call(const Action a, const int i, const SlimPokerState& state) {
   if(a != Action::CHECK_CALL) return false;
   for(int p_idx = 0; p_idx < state.get_players().size(); ++p_idx) {
     if(p_idx != i && !state.get_players()[p_idx].has_folded() && state.get_players()[p_idx].get_chips() > 0) {
@@ -230,47 +229,52 @@ bool is_terminal_call(const Action a, const int i, const PokerState& state) {
   return true;
 }
 
-template <template<typename> class StorageT>
-int context_cluster(const MCCFRContext<StorageT>& context) {
-  return BlueprintClusterMap::get_instance()->cluster(
-      context.state.get_round(),
-      context.indexers[context.state.get_active()].index(context.board, context.hands[context.state.get_active()],
-      context.state.get_round()));
+template<class Context>
+int context_cluster(const Context& ctx) {
+  const int r = ctx.state.get_round();
+  const int p = ctx.state.get_active();
+  const int idx = ctx.indexers[p].index(ctx.board, ctx.hands[p], r);
+  return BlueprintClusterMap::get_instance()->cluster(r, idx);
+}
+
+int next_consec_folds(const int consec_folds, const Action a) {
+  return consec_folds > -1 && a == Action::FOLD ? consec_folds + 1 : -1;
 }
 
 template <template<typename> class StorageT>
-int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& context) {
-  if(is_terminal(context.state, context.i)) {
-    const int u = terminal_utility(context);
-    if(is_debug) log_utility(u, get_config().init_state, context);
+int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
+  if(is_terminal(ctx.state, ctx.i)) {
+    const int u = terminal_utility(ctx);
+    if(is_debug) log_utility(u, ctx);
     return u;
   }
-  if(context.i > get_config().restrict_players - 1 && should_restrict(context.state.get_action_history().get_history(), get_config().restrict_players)) {
+  if(ctx.consec_folds >= get_config().restrict_players) {
     return 0;
   }
-  if(context.state.get_active() == context.i) {
-    const auto& value_actions = regret_value_actions(context.regret_storage, context.state, get_config().action_profile);
-    const auto& branching_actions = regret_branching_actions(context.regret_storage, context.state, get_config().action_profile);
-    const int cluster = context_cluster(context);
-    if(is_debug) context.debug << "Cluster:" << cluster << "\n";
-    std::atomic<int>* base_ptr = get_base_regret_ptr(context.regret_storage, context.state, cluster);
+  if(ctx.state.get_active() == ctx.i) {
+    const auto& value_actions = regret_value_actions(ctx.regret_storage);
+    const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
+    const int cluster = context_cluster(ctx);
+    if(is_debug) ctx.debug << "Cluster:" << cluster << "\n";
+    std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
     auto freq = calculate_strategy(base_ptr, value_actions.size());
 
     std::unordered_map<Action, int> values;
     float v_exact = 0;
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
-      if(context.state.get_round() == 3 || a == Action::FOLD || base_ptr[a_idx].load() > PRUNE_CUTOFF || is_terminal_call(a, context.i, context.state)) {
-        PokerState next_state = context.state.apply(a);
+      if(ctx.state.get_round() == 3 || a == Action::FOLD || base_ptr[a_idx].load() > PRUNE_CUTOFF || is_terminal_call(a, ctx.i, ctx.state)) {
+        SlimPokerState next_state = ctx.state.apply_copy(a);
         const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-        int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(context.regret_storage, branching_idx, next_state, context.i), context});
+        int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
+            next_consec_folds(ctx.consec_folds, a), ctx});
         values[a] = v_a;
         v_exact += freq[a_idx] * v_a;
-        if(is_debug) log_action_ev(a, freq[a_idx], v_a, context.state, get_config().init_state, context.debug);
+        if(is_debug) log_action_ev(a, freq[a_idx], v_a, ctx.debug);
       }
     }
     const int v = round(v_exact);
-    if(is_debug) log_net_ev(v, v_exact, context.state, get_config().init_state, context.debug);
+    if(is_debug) log_net_ev(v, v_exact, ctx.debug);
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
       if(auto it = values.find(a); it != values.end()) {
@@ -278,81 +282,86 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& contex
         const int prev_r = r_atom.load();
         int d_r = it->second - v;
         const int next_r = prev_r + d_r;
-        if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(prev_r, d_r, context), context.debug);
+        if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx), ctx.debug);
         if(next_r > REGRET_FLOOR) {
           r_atom.fetch_add(d_r);
         }
-        if(is_debug) log_regret(value_actions[a_idx], d_r, next_r, context.debug);
+        if(is_debug) log_regret(value_actions[a_idx], d_r, next_r, ctx.debug);
       }
     }
     return v;
   }
-  const auto& value_actions = regret_value_actions(context.regret_storage, context.state, get_config().action_profile);
-  const auto& branching_actions = regret_branching_actions(context.regret_storage, context.state, get_config().action_profile);
-  const int a_idx = external_sampling(value_actions, context);
-  const PokerState next_state = context.state.apply(value_actions[a_idx]);
+  const auto& value_actions = regret_value_actions(ctx.regret_storage);
+  const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
+  const int a_idx = external_sampling(value_actions, ctx);
+  const Action a = value_actions[a_idx];
+  const SlimPokerState next_state = ctx.state.apply_copy(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(context.regret_storage, branching_idx, next_state, context.i), context});
+  return traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
+      next_consec_folds(ctx.consec_folds, a), ctx});
 }
 
 template <template<typename> class StorageT>
-int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& context) {
-  if(is_terminal(context.state, context.i)) {
-    const int u = terminal_utility(context);
-    if(is_debug) log_utility(u, get_config().init_state, context);
+int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
+  if(is_terminal(ctx.state, ctx.i)) {
+    const int u = terminal_utility(ctx);
+    if(is_debug) log_utility(u, ctx);
     return u;
   }
-  if(context.i > get_config().restrict_players - 1 && should_restrict(context.state.get_action_history().get_history(), get_config().restrict_players)) {
+  if(ctx.consec_folds >= get_config().restrict_players) {
     return 0;
   }
-  if(context.state.get_active() == context.i) {
-    const auto& value_actions = regret_value_actions(context.regret_storage, context.state, get_config().action_profile);
-    const auto& branching_actions = regret_branching_actions(context.regret_storage, context.state, get_config().action_profile);
-    const int cluster = context_cluster(context);
-    if(is_debug) context.debug << "Cluster:" << cluster << "\n";
-    std::atomic<int>* base_ptr = get_base_regret_ptr(context.regret_storage, context.state, cluster);
+  if(ctx.state.get_active() == ctx.i) {
+    const auto& value_actions = regret_value_actions(ctx.regret_storage);
+    const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
+    const int cluster = context_cluster(ctx);
+    if(is_debug) ctx.debug << "Cluster:" << cluster << "\n";
+    std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
     auto freq = calculate_strategy(base_ptr, value_actions.size());
     std::unordered_map<Action, int> values;
     float v_exact = 0;
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       Action a = value_actions[a_idx];
       const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-      PokerState next_state = context.state.apply(a);
-      int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(context.regret_storage, branching_idx, next_state, context.i), context});
+      SlimPokerState next_state = ctx.state.apply_copy(a);
+      int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
+        next_consec_folds(ctx.consec_folds, a), ctx});
       values[a] = v_a;
       v_exact += freq[a_idx] * v_a;
-      if(is_debug) log_action_ev(a, freq[a_idx], v_a, context.state, get_config().init_state, context.debug);
+      if(is_debug) log_action_ev(a, freq[a_idx], v_a, ctx.debug);
     }
     int v = round(v_exact);
-    if(is_debug) log_net_ev(v, v_exact, context.state, get_config().init_state, context.debug);
+    if(is_debug) log_net_ev(v, v_exact, ctx.debug);
     for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
       auto& r_atom = base_ptr[a_idx];
       const int prev_r = r_atom.load();
       int d_r = values[value_actions[a_idx]] - v;
       int next_r = prev_r + d_r;
-      if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(prev_r, d_r, context), context.debug);
+      if(next_r > 2'000'000'000) error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx), ctx.debug);
       if(next_r > REGRET_FLOOR) {
         r_atom.fetch_add(d_r);
       }
-      if(is_debug) log_regret(value_actions[a_idx], d_r, next_r, context.debug);
+      if(is_debug) log_regret(value_actions[a_idx], d_r, next_r, ctx.debug);
     }
     return v;
   }
-  const auto& value_actions = regret_value_actions(context.regret_storage, context.state, get_config().action_profile);
-  const auto& branching_actions = regret_branching_actions(context.regret_storage, context.state, get_config().action_profile);
-  const int a_idx = external_sampling(value_actions, context);
-  const PokerState next_state = context.state.apply(value_actions[a_idx]);
+  const auto& value_actions = regret_value_actions(ctx.regret_storage);
+  const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
+  const int a_idx = external_sampling(value_actions, ctx);
+  const Action a = value_actions[a_idx];
+  const SlimPokerState next_state = ctx.state.apply_copy(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(context.regret_storage, branching_idx, next_state, context.i), context});
+  return traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
+      next_consec_folds(ctx.consec_folds, a), ctx});
 }
 
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& context) {
   const int cluster = context_cluster(context);
-  const std::atomic<int>* base_ptr = get_base_regret_ptr(context.regret_storage, context.state, cluster);
+  const std::atomic<int>* base_ptr = get_base_regret_ptr(context.regret_storage, cluster);
   const std::vector<float> freq = calculate_strategy(base_ptr, actions.size());
   const int a_idx = sample_action_idx_fast(freq);
-  if(is_debug) log_external_sampling(actions[a_idx], actions, freq, context.state, get_config().init_state, context.debug);
+  if(is_debug) log_external_sampling(actions[a_idx], actions, freq, context.debug);
   return a_idx;
 }
 
@@ -446,7 +455,7 @@ void TreeSolver::on_start() {
   }
 }
 
-std::atomic<int>* TreeSolver::get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, const int cluster) {
+std::atomic<int>* TreeSolver::get_base_regret_ptr(TreeStorageNode<int>* storage, const int cluster) {
   return storage->get(cluster); 
 }
 
@@ -454,23 +463,23 @@ TreeStorageNode<int>* TreeSolver::init_regret_storage() {
   return _regrets_root.get();
 }
 
-TreeStorageNode<int>* TreeSolver::next_regret_storage(TreeStorageNode<int>* storage, const int action_idx, const PokerState& next_state, const int i) {
+TreeStorageNode<int>* TreeSolver::next_regret_storage(TreeStorageNode<int>* storage, const int action_idx, const SlimPokerState& next_state, const int i) {
   return !is_terminal(next_state, i) ? storage->apply_index(action_idx, next_state) : nullptr;
 }
 
-const std::vector<Action>& TreeSolver::regret_branching_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const {
+const std::vector<Action>& TreeSolver::regret_branching_actions(TreeStorageNode<int>* storage) const {
   return storage->get_branching_actions();
 }
 
-const std::vector<Action>& TreeSolver::regret_value_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const {
+const std::vector<Action>& TreeSolver::regret_value_actions(TreeStorageNode<int>* storage) const {
   return storage->get_value_actions();
 }
 
-const std::vector<Action>& TreeSolver::avg_branching_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const {
+const std::vector<Action>& TreeSolver::avg_branching_actions(TreeStorageNode<float>* storage) const {
   return storage->get_branching_actions();
 }
 
-const std::vector<Action>& TreeSolver::avg_value_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const {
+const std::vector<Action>& TreeSolver::avg_value_actions(TreeStorageNode<float>* storage) const {
   return storage->get_value_actions();
 }
 
@@ -489,41 +498,45 @@ BlueprintSolver<StorageT>::BlueprintSolver(const SolverConfig& config, const Blu
     : MCCFRSolver<StorageT>{config}, _bp_config{bp_config} {}
 
 template <template<typename> class StorageT>
-bool BlueprintSolver<StorageT>::is_update_terminal(const PokerState& state, const int i) const {
+bool BlueprintSolver<StorageT>::is_update_terminal(const SlimPokerState& state, const int i) const {
   return state.get_winner() != -1 || state.get_round() > 0 || state.get_players()[i].has_folded();
 }
 
 template <template<typename> class StorageT>
-void BlueprintSolver<StorageT>::update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
-    std::vector<CachedIndexer>& indexers, StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug) {
-  if(is_update_terminal(state, i)) {
+void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& ctx) {
+  if(is_update_terminal(ctx.state, ctx.i)) {
     return;
   }
-  if(state.get_active() == i) {
-    const auto& actions = this->avg_value_actions(avg_storage, state, this->get_config().action_profile);
-    int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[i], state.get_round()));
-    const std::atomic<int>* base_ptr = this->get_base_regret_ptr(regret_storage, state, cluster);
+  if(ctx.consec_folds >= this->get_config().restrict_players) {
+    return;
+  }
+  if(ctx.state.get_active() == ctx.i) {
+    const auto& actions = this->avg_value_actions(ctx.avg_storage);
+    int cluster = context_cluster(ctx);
+    const std::atomic<int>* base_ptr = this->get_base_regret_ptr(ctx.regret_storage, cluster);
     auto freq = calculate_strategy(base_ptr, actions.size());
     int a_idx = sample_action_idx_fast(freq);
     if(is_debug) {
-      debug << "Update strategy: " << relative_history_str(state, this->get_config().init_state) << "\n";
-      debug << "\t" << hands[i].to_string() << ": (cluster=" << cluster << ")\n\t";
+      // debug << "Update strategy: " << relative_history_str(state, this->get_config().init_state) << "\n";
+      ctx.debug << "\t" << ctx.hands[ctx.i].to_string() << ": (cluster=" << cluster << ")\n\t";
       for(int ai = 0; ai < actions.size(); ++ai) {
-        debug << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << freq[ai] << "  ";
+        ctx.debug << actions[ai].to_string() << "=" << std::setprecision(2) << std::fixed << freq[ai] << "  ";
       }
-      debug << "\n";
+      ctx.debug << "\n";
     }
-    this->get_base_avg_ptr(avg_storage, state, cluster)[a_idx].fetch_add(1.0f);
-    PokerState next_state = state.apply(actions[a_idx]);
-    update_strategy(next_state, i, board, hands, indexers, this->next_regret_storage(regret_storage, a_idx, next_state, i),
-                    this->next_avg_storage(avg_storage, a_idx, next_state, i), debug);
+    this->get_base_avg_ptr(ctx.avg_storage, cluster)[a_idx].fetch_add(1.0f);
+    const Action a = actions[a_idx];
+    SlimPokerState next_state = ctx.state.apply_copy(a);
+    update_strategy(UpdateContext<StorageT>{next_state, this->next_regret_storage(ctx.regret_storage, a_idx, next_state, ctx.i),
+                    this->next_avg_storage(ctx.avg_storage, a_idx, next_state, ctx.i), next_consec_folds(ctx.consec_folds, a), ctx});
   }
   else {
-    const auto& actions = this->avg_branching_actions(avg_storage, state, this->get_config().action_profile);
+    const auto& actions = this->avg_branching_actions(ctx.avg_storage);
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
-      PokerState next_state = state.apply(actions[a_idx]);
-      update_strategy(next_state, i, board, hands, indexers, this->next_regret_storage(regret_storage, a_idx, next_state, i),
-                      this->next_avg_storage(avg_storage, a_idx, next_state, i), debug);
+      const Action a = actions[a_idx];
+      SlimPokerState next_state = ctx.state.apply_copy(a);
+      update_strategy(UpdateContext<StorageT>{next_state, this->next_regret_storage(ctx.regret_storage, a_idx, next_state, ctx.i),
+          this->next_avg_storage(ctx.avg_storage, a_idx, next_state, ctx.i), next_consec_folds(ctx.consec_folds, a), ctx});
     }
   }
 }
@@ -533,8 +546,8 @@ void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::ve
     std::ostringstream& debug) {
   if(t > 0 && t % get_blueprint_config().strategy_interval == 0 && t < get_blueprint_config().preflop_threshold) {
     if(is_debug) debug << "============== Updating strategy ==============\n";
-    update_strategy(this->get_config().init_state, i, Board{this->get_config().init_board}, hands, indexers,
-        this->init_regret_storage(), this->init_avg_storage(), debug);
+    update_strategy(UpdateContext<StorageT>{SlimPokerState{this->get_config().init_state}, i, 0, Board{this->get_config().init_board}, hands, indexers,
+        this->init_regret_storage(), this->init_avg_storage(), debug});
   }
 }
 
@@ -549,7 +562,7 @@ long BlueprintSolver<StorageT>::next_step(const long t, const long T) const {
 }
 
 template<template<typename> class StorageT>
-int BlueprintSolver<StorageT>::get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
+int BlueprintSolver<StorageT>::get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
   return BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round()));
 }
 
@@ -562,11 +575,12 @@ RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlue
     : _bp{bp}, _root_node{bp->get_strategy()->apply(rt_config.init_actions)}, _rt_config{rt_config} {}
 
 template <template<typename> class StorageT>
-Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, const PokerState& state, const Hand& hand, const Board& board) const {
+Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, const SlimPokerState& state, const Hand& hand, const Board& board) const {
   const hand_index_t hand_idx = indexer.index(board, hand, state.get_round());
   const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
   // std::cout << "Rollout cluster=" << cluster << "\n";
-  const std::vector<Action> history = state.get_action_history().slice(_rt_config.init_actions.size()).get_history();
+  // const std::vector<Action> history = state.get_action_history().slice(_rt_config.init_actions.size()).get_history(); TODO: uncomment
+  const std::vector<Action> history; // TODO: just a placeholder for SlimPokerState compatibility
   // std::cout << "Live history=" << actions_to_str(history) << "\n";
   // TODO: action translation
   const TreeStorageNode<uint8_t>* node = _root_node->apply(history);
@@ -585,16 +599,21 @@ int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& con
     for(Action a : context.state.get_biases()) oss << a.to_string() << "  ";
     Logger::error(oss.str());
   }
-  PokerState curr_state = context.state;
+  SlimPokerState curr_state = context.state;
   while(!curr_state.is_terminal() && !curr_state.get_players()[context.i].has_folded()) {
-    curr_state = curr_state.apply(next_rollout_action(context.indexers[curr_state.get_active()], curr_state, context.hands[curr_state.get_active()],
+    curr_state.apply_in_place(next_rollout_action(context.indexers[curr_state.get_active()], curr_state, context.hands[curr_state.get_active()],
       context.board));
   }
   return utility(curr_state, context.i, context.board, context.hands, this->get_config().stack_size(context.i), this->get_config().rake, context.eval);
 }
 
 template<template <typename> class StorageT>
-int RealTimeSolver<StorageT>::get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
+bool RealTimeSolver<StorageT>::is_terminal(const SlimPokerState& state, const int i) const {
+  return state.has_biases() || state.is_terminal() || state.get_players()[i].has_folded();
+}
+
+template<template <typename> class StorageT>
+int RealTimeSolver<StorageT>::get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
   if(state.get_round() == this->get_config().init_state.get_round()) return HoleCardIndexer::get_instance()->index(hands[state.get_active()]);
   Logger::error("Real time clusters on future rounds are not implemented.");
 }
@@ -629,7 +648,7 @@ void TreeBlueprintSolver::on_snapshot() {
   }
 }
 
-std::atomic<float>* TreeBlueprintSolver::get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, const int cluster) {
+std::atomic<float>* TreeBlueprintSolver::get_base_avg_ptr(TreeStorageNode<float>* storage, const int cluster) {
   return storage->get(cluster);
 }
 
@@ -637,7 +656,7 @@ TreeStorageNode<float>* TreeBlueprintSolver::init_avg_storage() {
   return _phi_root.get();
 }
 
-TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<float>* storage, const int action_idx, const PokerState& next_state,
+TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<float>* storage, const int action_idx, const SlimPokerState& next_state,
     const int i) {
   return !is_update_terminal(next_state, i) ? storage->apply_index(action_idx, next_state) : nullptr;
 }

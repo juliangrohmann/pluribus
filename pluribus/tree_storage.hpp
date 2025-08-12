@@ -12,7 +12,7 @@
 
 namespace pluribus {
 
-inline std::vector<Action> real_time_actions(const PokerState& state, const ActionProfile& profile, const RealTimeSolverConfig& rt_config,
+inline std::vector<Action> real_time_actions(const SlimPokerState& state, const ActionProfile& profile, const RealTimeSolverConfig& rt_config,
     const bool branching) {
   if(state.get_round() >= rt_config.terminal_round || state.get_bet_level() >= rt_config.terminal_bet_level) {
     return branching ? std::vector{{Action::BIAS_DUMMY}} : rt_config.bias_profile.get_actions(state);
@@ -38,8 +38,8 @@ public:
   //       For bias sampling, branching actions must be a single action, Action::BIAS_DUMMY, to make each player's choice of bias private information.
   //       (i.e. players cannot choose their bias strategy based on knowledge of the biases chosen by previous players)
   //       In a sampled blueprint, value actions are the biases, values are the sampled action, and branching actions are the actions mapping the game tree.
-  std::vector<Action> branching_actions(const PokerState& state) const { return get_actions(state, true); }
-  std::vector<Action> value_actions(const PokerState& state) const { return get_actions(state, false); }
+  std::vector<Action> branching_actions(const SlimPokerState& state) const { return get_actions(state, true); }
+  std::vector<Action> value_actions(const SlimPokerState& state) const { return get_actions(state, false); }
 
   bool operator==(const ActionMode& other) const = default;
 
@@ -49,7 +49,7 @@ public:
   }
 
 private:
-  std::vector<Action> get_actions(const PokerState& state, const bool branching) const {
+  std::vector<Action> get_actions(const SlimPokerState& state, const bool branching) const {
     switch(_mode) {
       case 0: return valid_actions(state, _profile);
       case 1: return real_time_actions(state, _profile, _rt_config, branching);
@@ -119,14 +119,14 @@ inline int node_value_index(const int n_actions, const int cluster, const int ac
 template <class T>
 class TreeStorageNode {
 public:
-  TreeStorageNode(const PokerState& state, const std::shared_ptr<const TreeStorageConfig>& config) : TreeStorageNode{state, config, true} {}
+  TreeStorageNode(const SlimPokerState& state, const std::shared_ptr<const TreeStorageConfig>& config) : TreeStorageNode{state, config, true} {}
   TreeStorageNode(): _n_clusters(0), _is_root{true} {}
 
   ~TreeStorageNode() {
     free_memory();
   }
 
-  TreeStorageNode* apply_index(int action_idx, const PokerState& next_state) {
+  TreeStorageNode* apply_index(int action_idx, const SlimPokerState& next_state) {
     auto& node_atom = _nodes[action_idx];
     TreeStorageNode* next = node_atom.load(std::memory_order_acquire);
     if(!next) {
@@ -146,7 +146,7 @@ public:
     return next;
   }
 
-  TreeStorageNode* apply(const Action a, const PokerState& next_state) { return apply_index(_compute_action_index(a, _branching_actions), next_state); }
+  TreeStorageNode* apply(const Action a, const SlimPokerState& next_state) { return apply_index(_compute_action_index(a, _branching_actions), next_state); }
   const TreeStorageNode* apply(const Action a) const { return apply_index(_compute_action_index(a, _branching_actions)); }
 
   const TreeStorageNode* apply(const std::vector<Action>& actions) const {
@@ -271,7 +271,7 @@ public:
   }
 
 private:
-  TreeStorageNode(const PokerState& state, const std::shared_ptr<const TreeStorageConfig>& config, const bool is_root)
+  TreeStorageNode(const SlimPokerState& state, const std::shared_ptr<const TreeStorageConfig>& config, const bool is_root)
       : _branching_actions{config->action_mode.branching_actions(state)},
         _value_actions{config->action_mode.value_actions(state)},
         _n_clusters{config->cluster_spec.n_clusters(state.get_round())},

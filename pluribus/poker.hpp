@@ -145,8 +145,8 @@ bool collides(const Hand& hand, const Board& board);
 bool collides(const Hand& hand, const std::vector<uint8_t>& cards);
 std::vector<uint8_t> collect_cards(const Board& board, const Hand& hand, int round = 3);
 
-int big_blind_idx(const PokerState& state);
-int blind_size(const PokerState& state, int pos);
+int big_blind_idx(const SlimPokerState& state);
+int blind_size(const SlimPokerState& state, int pos);
 
 class Player {
 public:
@@ -194,20 +194,19 @@ struct PokerConfig {
   bool straddle = false;
 };
 
-class PokerState {
+class SlimPokerState {
 public:
-  explicit PokerState(int n_players, const std::vector<int>& chips, int ante = 0, bool straddle = false);
-  explicit PokerState(int n_players = 2, int chips = 10'000, int ante = 0, bool straddle = false);
-  explicit PokerState(const PokerConfig& config, int n_chips);
-  PokerState(const PokerState&) = default;
-  PokerState(PokerState&&) = default;
+  explicit SlimPokerState(int n_players, const std::vector<int>& chips, int ante = 0, bool straddle = false);
+  explicit SlimPokerState(int n_players = 2, int chips = 10'000, int ante = 0, bool straddle = false);
+  explicit SlimPokerState(const PokerConfig& config, int n_chips);
+  SlimPokerState(const SlimPokerState&) = default;
+  SlimPokerState(SlimPokerState&&) = default;
 
-  PokerState& operator=(const PokerState&) = default;
-  PokerState& operator=(PokerState&&) = default;
-  bool operator==(const PokerState& other) const = default;
+  SlimPokerState& operator=(const SlimPokerState&) = default;
+  SlimPokerState& operator=(SlimPokerState&&) = default;
+  bool operator==(const SlimPokerState& other) const = default;
 
   const std::vector<Player>& get_players() const { return _players; }
-  const ActionHistory& get_action_history() const { return _actions; }
   bool is_straddle() const { return _straddle; }
   int get_pot() const { return _pot; }
   int get_max_bet() const { return _max_bet; }
@@ -221,15 +220,20 @@ public:
   bool is_in_position(int pos) const;
   int vpip_players() const;
   int active_players() const;
-  [[nodiscard]] PokerState apply(Action action) const;
-  [[nodiscard]] PokerState apply(const ActionHistory& action_history) const;
-  [[nodiscard]] PokerState apply_biases(const std::vector<Action>& biases) const;
+
+  void apply_in_place(Action action);
+  void apply_in_place(const ActionHistory& action_history);
+  void apply_biases_in_place(const std::vector<Action>& biases);
+  SlimPokerState apply_copy(Action action) const;
+  SlimPokerState apply_copy(const ActionHistory& action_history) const;
+  SlimPokerState apply_biases_copy(const std::vector<Action>& biases) const;
+
   bool has_biases() const { return _biases.size() > _active && _biases[_active] != Action::BIAS_DUMMY; }
   std::string to_string() const;
   
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(_players, _biases, _actions, _pot, _max_bet, _active, _round, _bet_level, _winner, _straddle);
+    ar(_players, _biases, _pot, _max_bet, _active, _round, _bet_level, _winner, _straddle);
   }
 
   uint8_t _first_bias = 10; // TODO: remove, just for asserts
@@ -237,7 +241,6 @@ public:
 private:
   std::vector<Player> _players;
   std::vector<Action> _biases;
-  ActionHistory _actions;
   int _pot;
   int _max_bet;
   uint8_t _active;
@@ -246,22 +249,41 @@ private:
   int8_t _winner;
   bool _straddle;
 
-  PokerState bet(int amount) const;
-  PokerState call() const;
-  PokerState check() const;
-  PokerState fold() const;
-  PokerState bias(Action bias) const;
-  PokerState next_state(Action action) const;
+  void bet(int amount);
+  void call();
+  void check();
+  void fold();
+  void bias(Action bias);
+
   void next_player();
   void next_round();
   void next_bias();
+};
+
+class PokerState : public SlimPokerState {
+public:
+  using SlimPokerState::SlimPokerState;
+  PokerState(const SlimPokerState& state, const ActionHistory& actions) : SlimPokerState{state}, _actions{actions} {}
+
+  const ActionHistory& get_action_history() const { return _actions ;}
+  [[nodiscard]] PokerState apply(Action action) const;
+  [[nodiscard]] PokerState apply(const ActionHistory& action_history) const;
+  [[nodiscard]] PokerState apply_biases(const std::vector<Action>& biases) const;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_actions, cereal::base_class<SlimPokerState>(this));
+  }
+
+private:
+  ActionHistory _actions;
 };
 
 class RakeStructure {
 public:
   RakeStructure(const double percent, const double cap) : _percent{percent}, _cap{cap} {}
 
-  int payoff(const PokerState& state) const {
+  int payoff(const SlimPokerState& state) const {
     return state.get_round() == 0 ? state.get_pot() : static_cast<int>(round(std::max(state.get_pot() * (1.0 - _percent), state.get_pot() - _cap)));
   }
 
@@ -277,13 +299,13 @@ private:
   double _cap;
 };
 
-inline std::string pos_to_str(const PokerState& state) { return pos_to_str(state.get_active(), state.get_players().size(), state.is_straddle()); }
-int total_bet_size(const PokerState& state, Action action);
-double fractional_bet_size(const PokerState& state, int total_size);
-std::vector<Action> valid_actions(const PokerState& state, const ActionProfile& profile);
-int round_of_last_action(const PokerState& state);
-std::vector<uint8_t> winners(const PokerState& state, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval);
-int showdown_payoff(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
+inline std::string pos_to_str(const SlimPokerState& state) { return pos_to_str(state.get_active(), state.get_players().size(), state.is_straddle()); }
+int total_bet_size(const SlimPokerState& state, Action action);
+double fractional_bet_size(const SlimPokerState& state, int total_size);
+std::vector<Action> valid_actions(const SlimPokerState& state, const ActionProfile& profile);
+int round_of_last_action(const SlimPokerState& state);
+std::vector<uint8_t> winners(const SlimPokerState& state, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval);
+int showdown_payoff(const SlimPokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
     const omp::HandEvaluator& eval);
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands);
 void deal_board(Deck& deck, std::array<uint8_t, 5>& board);

@@ -116,7 +116,7 @@ const std::vector<Action>& ActionProfile::get_iso_actions(const int pos, const b
   return _iso_actions[iso_idx][static_cast<int>(in_position)];
 }
 
-const std::vector<Action>& ActionProfile::get_actions(const PokerState& state) const {
+const std::vector<Action>& ActionProfile::get_actions(const SlimPokerState& state) const {
   if(state.get_round() == 0 && state.get_bet_level() == 1 && state.vpip_players() > 0) {
     return get_iso_actions(state.get_active(), state.is_in_position(state.get_active()));
   }

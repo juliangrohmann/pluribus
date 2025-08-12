@@ -70,7 +70,7 @@ private:
   std::vector<Action> _history;
 };
 
-class PokerState;
+class SlimPokerState;
 
 using ProfileStorage = std::array<std::vector<std::vector<std::vector<std::vector<Action>>>>, 4>;
 
@@ -83,7 +83,7 @@ public:
   void add_iso_action(Action action, int pos, bool in_position);
   const std::vector<Action>& get_actions_from_raw(int round, int bet_level, int pos, bool in_position) const;
   const std::vector<Action>& get_iso_actions(int pos, bool in_position) const;
-  const std::vector<Action>& get_actions(const PokerState& state) const;
+  const std::vector<Action>& get_actions(const SlimPokerState& state) const;
   const ProfileStorage& get_raw_profile() const { return _profile; }
   int n_bet_levels(const int round) const { return static_cast<int>(_profile[round].size()); }
   std::unordered_set<Action> all_actions() const;

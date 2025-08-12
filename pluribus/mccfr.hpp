@@ -18,7 +18,7 @@
 
 namespace pluribus {
 
-int utility(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, const RakeStructure& rake,
+int utility(const SlimPokerState& state, int i, const Board& board, const std::vector<Hand>& hands, int stack_size, const RakeStructure& rake,
     const omp::HandEvaluator& eval);
 
 enum class SolverState {
@@ -57,22 +57,45 @@ struct MetricsConfig {
 
 template <template<typename> class StorageT>
 struct MCCFRContext {
-  MCCFRContext(const PokerState& state_, const long t_, const int i_, const Board& board_, const std::vector<Hand>& hands_,
+  MCCFRContext(const SlimPokerState& state_, const long t_, const int i_, const int consec_folds_, const Board& board_, const std::vector<Hand>& hands_,
       std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_, std::ostringstream& debug_)
-    : state{state_}, t{t_}, i{i_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
+    : state{state_}, t{t_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
       regret_storage{regret_storage_}, debug{debug_} {}
-  MCCFRContext(const PokerState& next_state, StorageT<int>* next_regret_storage, const MCCFRContext& context)
-    : state{next_state}, t{context.t}, i{context.i}, board{context.board}, hands{context.hands}, indexers{context.indexers}, eval{context.eval},
-      regret_storage{next_regret_storage}, debug{context.debug} {}
+  MCCFRContext(const SlimPokerState& next_state, StorageT<int>* next_regret_storage, const int next_consec_folds, const MCCFRContext& context)
+    : state{next_state}, t{context.t}, i{context.i}, consec_folds{next_consec_folds}, board{context.board}, hands{context.hands}, indexers{context.indexers},
+      eval{context.eval}, regret_storage{next_regret_storage}, debug{context.debug} {}
 
-  const PokerState& state;
+  const SlimPokerState& state;
   const long t;
   const int i;
+  const int consec_folds;
   const Board& board;
   const std::vector<Hand>& hands;
   std::vector<CachedIndexer>& indexers;
   const omp::HandEvaluator& eval;
   StorageT<int>* regret_storage;
+  std::ostringstream& debug;
+};
+
+template <template<typename> class StorageT>
+struct UpdateContext {
+  UpdateContext(const SlimPokerState& state_, const int i_, const int consec_folds_, const Board& board_, const std::vector<Hand>& hands_,
+      std::vector<CachedIndexer>& indexers_, StorageT<int>* regret_storage_, StorageT<float>* avg_storage_, std::ostringstream& debug_)
+    : state{state_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_},
+      regret_storage{regret_storage_}, avg_storage{avg_storage_}, debug{debug_} {}
+  UpdateContext(const SlimPokerState& next_state, StorageT<int>* next_regret_storage, StorageT<float>* next_avg_storage, const int next_consec_folds,
+      const UpdateContext& context)
+    : state{next_state}, i{context.i}, consec_folds{next_consec_folds}, board{context.board}, hands{context.hands}, indexers{context.indexers},
+      regret_storage{next_regret_storage}, avg_storage{next_avg_storage}, debug{context.debug} {}
+
+  const SlimPokerState& state;
+  int i;
+  int consec_folds;
+  const Board& board;
+  const std::vector<Hand>& hands;
+  std::vector<CachedIndexer>& indexers;
+  StorageT<int>* regret_storage;
+  StorageT<float>* avg_storage;
   std::ostringstream& debug;
 };
 
@@ -97,7 +120,7 @@ protected:
   void _solve(long t_plus) override;
   
   virtual int terminal_utility(const MCCFRContext<StorageT>& context) const;
-  virtual bool is_terminal(const PokerState& state, const int i) const { return state.is_terminal() || state.get_players()[i].has_folded(); }
+  virtual bool is_terminal(const SlimPokerState& state, const int i) const { return state.is_terminal() || state.get_players()[i].has_folded(); }
   virtual void on_start() {}
   virtual void on_step(long t, int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, std::ostringstream& debug) {}
   virtual void on_snapshot() {}
@@ -108,17 +131,17 @@ protected:
   virtual bool should_log(long t) const = 0;
   virtual long next_step(long t, long T) const = 0;
 
-  virtual int get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) = 0;
-  virtual std::atomic<int>* get_base_regret_ptr(StorageT<int>* storage, const PokerState& state, int cluster) = 0;
-  virtual std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, const PokerState& state, int cluster) = 0;
+  virtual int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) = 0;
+  virtual std::atomic<int>* get_base_regret_ptr(StorageT<int>* storage, int cluster) = 0;
+  virtual std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, int cluster) = 0;
   virtual StorageT<int>* init_regret_storage() = 0;
   virtual StorageT<float>* init_avg_storage() = 0;
-  virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, int action_idx, const PokerState& next_state, int i) = 0;
-  virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const PokerState& next_state, int i) = 0;
-  virtual const std::vector<Action>& regret_branching_actions(StorageT<int>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
-  virtual const std::vector<Action>& regret_value_actions(StorageT<int>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
-  virtual const std::vector<Action>& avg_branching_actions(StorageT<float>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
-  virtual const std::vector<Action>& avg_value_actions(StorageT<float>* storage, const PokerState& state, const ActionProfile& profile) const = 0;
+  virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, int action_idx, const SlimPokerState& next_state, int i) = 0;
+  virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const SlimPokerState& next_state, int i) = 0;
+  virtual const std::vector<Action>& regret_branching_actions(StorageT<int>* storage) const = 0;
+  virtual const std::vector<Action>& regret_value_actions(StorageT<int>* storage) const = 0;
+  virtual const std::vector<Action>& avg_branching_actions(StorageT<float>* storage) const = 0;
+  virtual const std::vector<Action>& avg_value_actions(StorageT<float>* storage) const = 0;
   virtual void save_snapshot(const std::string& fn) const = 0;
   
   virtual double get_discount_factor(long t) const = 0;
@@ -136,8 +159,8 @@ protected:
   MetricsConfig get_regret_metrics_config() const { return _regret_metrics_config; }
 
 private:
-  int traverse_mccfr_p(const MCCFRContext<StorageT>& context);
-  int traverse_mccfr(const MCCFRContext<StorageT>& context);
+  int traverse_mccfr_p(const MCCFRContext<StorageT>& ctx);
+  int traverse_mccfr(const MCCFRContext<StorageT>& ctx);
   int external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& context);
 #ifdef UNIT_TEST
   template <template<typename> class T>
@@ -170,13 +193,13 @@ public:
 protected:
   void on_start() override;
 
-  std::atomic<int>* get_base_regret_ptr(TreeStorageNode<int>* storage, const PokerState& state, int cluster) override;
+  std::atomic<int>* get_base_regret_ptr(TreeStorageNode<int>* storage, int cluster) override;
   TreeStorageNode<int>* init_regret_storage() override;
-  TreeStorageNode<int>* next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const PokerState& next_state, int i) override;
-  const std::vector<Action>& regret_branching_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const override;
-  const std::vector<Action>& regret_value_actions(TreeStorageNode<int>* storage, const PokerState& state, const ActionProfile& profile) const override;
-  const std::vector<Action>& avg_branching_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const override;
-  const std::vector<Action>& avg_value_actions(TreeStorageNode<float>* storage, const PokerState& state, const ActionProfile& profile) const override;
+  TreeStorageNode<int>* next_regret_storage(TreeStorageNode<int>* storage, int action_idx, const SlimPokerState& next_state, int i) override;
+  const std::vector<Action>& regret_branching_actions(TreeStorageNode<int>* storage) const override;
+  const std::vector<Action>& regret_value_actions(TreeStorageNode<int>* storage) const override;
+  const std::vector<Action>& avg_branching_actions(TreeStorageNode<float>* storage) const override;
+  const std::vector<Action>& avg_value_actions(TreeStorageNode<float>* storage) const override;
 
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
@@ -185,8 +208,6 @@ protected:
 private:
   std::unique_ptr<TreeStorageNode<int>> _regrets_root = nullptr;
 };
-
-using StateActionsProvider = std::function<std::vector<Action>(const PokerState&, const ActionProfile&)>;
 
 template <template<typename> class StorageT>
 class BlueprintSolver : virtual public MCCFRSolver<StorageT> {
@@ -204,10 +225,9 @@ public:
   }
 
 protected:
-  virtual bool is_update_terminal(const PokerState& state, int i) const;
+  virtual bool is_update_terminal(const SlimPokerState& state, int i) const;
 
-  void update_strategy(const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
-      StorageT<int>* regret_storage, StorageT<float>* avg_storage, std::ostringstream& debug);
+  void update_strategy(const UpdateContext<StorageT>& ctx);
 
   void on_start() override { Logger::log("Blueprint solver config:\n" + _bp_config.to_string()); }
   void on_step(long t,int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, std::ostringstream& debug) override;
@@ -218,12 +238,11 @@ protected:
   bool should_log(const long t) const override { return t > 0 && t % _bp_config.log_interval == 0; }
   long next_step(long t, long T) const override;
 
-  int get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
+  int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
   double get_discount_factor(const long t) const override { return _bp_config.get_discount_factor(t); }
 
   MetricsConfig get_avg_metrics_config() const { return _avg_metrics_config; }
-  StateActionsProvider get_state_actions_provider() const { return _state_actions_provider; }
-  
+
   #ifdef UNIT_TEST
   template <template<typename> class T>
   friend void call_update_strategy(BlueprintSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands,
@@ -231,7 +250,6 @@ protected:
   #endif
 
 private:
-  const StateActionsProvider _state_actions_provider;
   MetricsConfig _avg_metrics_config;
   BlueprintSolverConfig _bp_config;
 };
@@ -250,7 +268,7 @@ public:
 
 protected:
   int terminal_utility(const MCCFRContext<StorageT>& context) const override;
-  bool is_terminal(const PokerState& state, const int i) const override { return state.has_biases() || state.is_terminal() || state.get_players()[i].has_folded(); }
+  bool is_terminal(const SlimPokerState& state, int i) const override;
 
   void on_start() override { Logger::log("Real time solver config:\n" + _rt_config.to_string()); }
   bool should_prune(long t) const override { return false; /* TODO: test pruning */ }
@@ -259,15 +277,15 @@ protected:
   bool should_log(const long t) const override { return t % _rt_config.log_interval == 0; }
   long next_step(const long t, const long T) const override { return _rt_config.next_discount_step(t, T); }
 
-  int get_cluster(const PokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
+  int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
   double get_discount_factor(const long t) const override { return _rt_config.get_discount_factor(t); }
 
-  std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, const PokerState& state, int cluster) override { return nullptr; }
+  std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, int cluster) override { return nullptr; }
   StorageT<float>* init_avg_storage() override { return nullptr; }
-  StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const PokerState& next_state, int i) override { return nullptr; }
+  StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const SlimPokerState& next_state, int i) override { return nullptr; }
 
 private:
-  Action next_rollout_action(CachedIndexer& indexer, const PokerState& state, const Hand& hand, const Board& board) const;
+  Action next_rollout_action(CachedIndexer& indexer, const SlimPokerState& state, const Hand& hand, const Board& board) const;
 
   const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
   const TreeStorageNode<uint8_t>* _root_node = nullptr;
@@ -293,9 +311,9 @@ protected:
   void on_start() override;
   void on_snapshot() override;
 
-  std::atomic<float>* get_base_avg_ptr(TreeStorageNode<float>* storage, const PokerState& state, int cluster) override;
+  std::atomic<float>* get_base_avg_ptr(TreeStorageNode<float>* storage, int cluster) override;
   TreeStorageNode<float>* init_avg_storage() override;
-  TreeStorageNode<float>* next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const PokerState& next_state, int i) override;
+  TreeStorageNode<float>* next_avg_storage(TreeStorageNode<float>* storage, int action_idx, const SlimPokerState& next_state, int i) override;
   void save_snapshot(const std::string& fn) const override { cereal_save(*this, fn); }
 
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override;
