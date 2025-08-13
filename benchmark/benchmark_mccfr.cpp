@@ -10,11 +10,9 @@ namespace pluribus {
 
 template <template<typename> class StorageT>
 int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state, int i, const Board& board,
-    const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval, std::vector<float>& freq_buffer,
-    std::vector<float>& nested_freq_buffer) {
+    const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) {
   SlimPokerState slim_state{state};
-  return trainer->traverse_mccfr(MCCFRContext<StorageT>{slim_state, 1, i, 0, 0, board, hands, indexers, eval, trainer->init_regret_storage(), freq_buffer,
-    nested_freq_buffer});
+  return trainer->traverse_mccfr(MCCFRContext<StorageT>{slim_state, 1, i, 0, 0, board, hands, indexers, eval, trainer->init_regret_storage()});
 }
 
 }
@@ -55,6 +53,6 @@ int main(int argc, char* argv[]) {
     for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
       indexers[h_idx].index(board, sample.hands[h_idx], 3);
     }
-    call_traverse_mccfr(&trainer, config.init_state, 0, board, sample.hands, indexers, eval, freq_buffer, nested_freq_buffer);
+    call_traverse_mccfr(&trainer, config.init_state, 0, board, sample.hands, indexers, eval);
   }
 }

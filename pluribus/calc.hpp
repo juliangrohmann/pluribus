@@ -5,8 +5,7 @@
 
 namespace pluribus {
 
-int sample_action_idx(const std::vector<float>& freq);
-int sample_action_idx_fast(const std::vector<float>& freq, int n_actions);
+int sample_action_idx(const float freq[], int n_actions);
 
 template <class T>
 std::vector<float> calculate_strategy(const std::atomic<T>* base_ptr, const int n_actions) {
