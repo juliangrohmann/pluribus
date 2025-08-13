@@ -192,7 +192,7 @@ public:
     }
     for(int a = 0; a < _branching_actions.size(); ++a) {
       if(TreeStorageNode* child = _nodes[a].load()) {
-        child->lcfr_discount(d);
+        child->lcfr_discount(d, std::memory_order_relaxed);
       }
     }
   }
