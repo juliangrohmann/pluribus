@@ -188,11 +188,11 @@ public:
 
   void lcfr_discount(double d) {
     for(int i = 0; i < get_n_values(); ++i) {
-      _values[i].store(_values[i].load() * d);
+      _values[i].store(_values[i].load(std::memory_order_relaxed) * d, std::memory_order_relaxed);
     }
     for(int a = 0; a < _branching_actions.size(); ++a) {
       if(TreeStorageNode* child = _nodes[a].load()) {
-        child->lcfr_discount(d, std::memory_order_relaxed);
+        child->lcfr_discount(d);
       }
     }
   }
