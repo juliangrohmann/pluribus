@@ -249,6 +249,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
   if(ctx.state.get_active() == ctx.i) {
     const auto& value_actions = regret_value_actions(ctx.regret_storage);
     const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
+    const int n_value_actions = value_actions.size();
     const int cluster = context_cluster(ctx);
     if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
@@ -258,15 +259,15 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
     double v_exact = 0.0;
     double v_r_sum = 0.0;
     double v_a_sum = 0.0;
-    for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
+    for(int a_idx = 0; a_idx < n_value_actions; ++a_idx) {
       Action a = value_actions[a_idx];
       if(ctx.state.get_round() == 3 || a == Action::FOLD || base_ptr[a_idx].load(std::memory_order_relaxed) > PRUNE_CUTOFF || is_terminal_call(a, ctx.i, ctx.state)) {
         if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (traverser): " + a.to_string());
         filter[a_idx] = true;
         SlimPokerState next_state = ctx.state.apply_copy(a);
-        const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
+        const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
         const int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-            next_consec_folds(ctx.consec_folds, a), ctx.freq_idx + static_cast<int>(value_actions.size()), ctx});
+            next_consec_folds(ctx.consec_folds, a), ctx.freq_idx + static_cast<int>(n_value_actions), ctx});
         const int v_r = std::max(base_ptr[a_idx].load(std::memory_order_relaxed), 0);
         values[a_idx] = v_a;
         v_exact += static_cast<double>(v_r) * static_cast<double>(v_a);
@@ -278,10 +279,10 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
         filter[a_idx] = false;
       }
     }
-    v_exact = v_r_sum > 0 ? v_exact / v_r_sum : v_a_sum / value_actions.size();
+    v_exact = v_r_sum > 0 ? v_exact / v_r_sum : v_a_sum / n_value_actions;
     const int v = static_cast<int>(std::lrint(v_exact));
     if(is_debug) log_net_ev(v, v_exact);
-    for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
+    for(int a_idx = 0; a_idx < n_value_actions; ++a_idx) {
       if(filter[a_idx]) {
         auto& r_atom = base_ptr[a_idx];
         const int prev_r = r_atom.load(std::memory_order_relaxed);
@@ -320,6 +321,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
   if(ctx.state.get_active() == ctx.i) {
     const auto& value_actions = regret_value_actions(ctx.regret_storage);
     const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
+    const int n_value_actions = value_actions.size();
     const int cluster = context_cluster(ctx);
     if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
@@ -327,13 +329,13 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
     double v_exact = 0.0;
     double v_r_sum = 0.0;
     double v_a_sum = 0.0;
-    for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
+    for(int a_idx = 0; a_idx < n_value_actions; ++a_idx) {
       Action a = value_actions[a_idx];
       if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (traverser): " + a.to_string());
-      const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
+      const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
       SlimPokerState next_state = ctx.state.apply_copy(a);
       const int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-        next_consec_folds(ctx.consec_folds, a), ctx.freq_idx + static_cast<int>(value_actions.size()), ctx});
+        next_consec_folds(ctx.consec_folds, a), ctx.freq_idx + static_cast<int>(n_value_actions), ctx});
       const int v_r = std::max(base_ptr[a_idx].load(std::memory_order_relaxed), 0);
       values[a_idx] = v_a;
       v_exact += static_cast<double>(v_r) * static_cast<double>(v_a);
@@ -341,10 +343,10 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
       v_a_sum += v_a;
       // if(is_debug) log_action_ev(a, freq[a_idx], v_a);
     }
-    v_exact = v_r_sum > 0 ? v_exact / v_r_sum : v_a_sum / value_actions.size();
+    v_exact = v_r_sum > 0 ? v_exact / v_r_sum : v_a_sum / n_value_actions;
     const int v = static_cast<int>(std::lrint(v_exact));
     if(is_debug) log_net_ev(v, v_exact);
-    for(int a_idx = 0; a_idx < value_actions.size(); ++a_idx) {
+    for(int a_idx = 0; a_idx < n_value_actions; ++a_idx) {
       auto& r_atom = base_ptr[a_idx];
       const int prev_r = r_atom.load(std::memory_order_relaxed);
       int d_r = values[a_idx] - v;
