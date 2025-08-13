@@ -215,7 +215,7 @@ bool should_restrict(const std::vector<Action>& actions, const int restrict_play
   return true;
 }
 
-bool is_terminal_call(const Action a, const int i, const SlimPokerState& state) {
+inline bool is_terminal_call(const Action a, const int i, const SlimPokerState& state) {
   if(a != Action::CHECK_CALL) return false;
   for(int p_idx = 0; p_idx < state.get_players().size(); ++p_idx) {
     if(p_idx != i && !state.get_players()[p_idx].has_folded() && state.get_players()[p_idx].get_chips() > 0) {
@@ -232,7 +232,7 @@ int context_cluster(const Context& ctx) {
   return BlueprintClusterMap::get_instance()->cluster(r, ctx.indexers[p].index(ctx.board, ctx.hands[p], r));
 }
 
-int next_consec_folds(const int consec_folds, const Action a) {
+inline int next_consec_folds(const int consec_folds, const Action a) {
   return consec_folds > -1 && a == Action::FOLD ? consec_folds + 1 : -1;
 }
 
