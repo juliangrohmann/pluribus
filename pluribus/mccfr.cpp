@@ -285,7 +285,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
         const int next_r = prev_r + d_r;
         if(is_debug && next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
         if(next_r > REGRET_FLOOR) {
-          r_atom.fetch_add(d_r);
+          r_atom.fetch_add(d_r, std::memory_order_relaxed);
         }
         if(is_debug) log_regret(value_actions[a_idx], d_r, next_r);
       }
@@ -344,7 +344,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
       int next_r = prev_r + d_r;
       if(is_debug && next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
       if(next_r > REGRET_FLOOR) {
-        r_atom.fetch_add(d_r);
+        r_atom.fetch_add(d_r, std::memory_order_relaxed);
       }
       if(is_debug) log_regret(value_actions[a_idx], d_r, next_r);
     }
@@ -532,7 +532,7 @@ void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& c
       }
       Logger::dump(debug);
     }
-    this->get_base_avg_ptr(ctx.avg_storage, cluster)[a_idx].fetch_add(1.0f);
+    this->get_base_avg_ptr(ctx.avg_storage, cluster)[a_idx].fetch_add(1.0f, std::memory_order_relaxed);
     const Action a = actions[a_idx];
     ctx.state.apply_in_place(a);
     update_strategy(UpdateContext<StorageT>{ctx.state, this->next_regret_storage(ctx.regret_storage, a_idx, ctx.state, ctx.i),
