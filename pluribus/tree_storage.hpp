@@ -141,7 +141,7 @@ public:
   }
 
   const TreeStorageNode* apply_index(int action_idx) const {
-    TreeStorageNode* next = _nodes[action_idx].load(std::memory_order_seq_cst);
+    TreeStorageNode* next = _nodes[action_idx].load(std::memory_order_acquire);
     if(!next) Logger::error("TreeStorageNode is not allocated. Index=" + std::to_string(action_idx));
     return next;
   }
