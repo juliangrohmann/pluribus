@@ -236,6 +236,30 @@ inline int next_consec_folds(const int consec_folds, const Action a) {
   return consec_folds > -1 && a == Action::FOLD ? consec_folds + 1 : -1;
 }
 
+template<class T>
+int sample_idx_from_regrets(const std::atomic<T>* base_ptr, const int n_actions) {
+  float w_local[MAX_ACTIONS];
+  float S = 0.0f;
+  for(int i = 0; i < n_actions; ++i) {
+    const float v = static_cast<float>(base_ptr[i].load(std::memory_order_relaxed));
+    const float w = v > 0.0f ? v : 0.0f;
+    w_local[i] = w;
+    S += w;
+  }
+  const float u01 = GSLGlobalRNG::uniform();
+  if(S <= 0.0f) {
+    const int k = static_cast<int>(u01 * n_actions);
+    return k < n_actions ? k : n_actions - 1;
+  }
+  const float threshold = u01 * S;
+  float c = 0.0f;
+  for(int i=0; i<n_actions; ++i) {
+    c += w_local[i];
+    if(c >= threshold) return i;
+  }
+  return n_actions - 1;
+}
+
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
   if(is_terminal(ctx.state, ctx.i)) {
@@ -352,8 +376,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
     for(int a_idx = 0; a_idx < n_value_actions; ++a_idx) {
       auto& r_atom = base_ptr[a_idx];
       const int prev_r = r_atom.load(std::memory_order_relaxed);
-      int d_r = values[a_idx] - v;
-      int next_r = prev_r + d_r;
+      const int d_r = values[a_idx] - v;
+      const int next_r = prev_r + d_r;
       if(is_debug && next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
       if(next_r > REGRET_FLOOR) {
         r_atom.fetch_add(d_r, std::memory_order_relaxed);
@@ -419,7 +443,7 @@ std::string strategy_label(const PokerState& state, const PokerState& init_state
   oss << pos_to_str(state) << " vs " << static_cast<int>(state.get_bet_level()) << "-bet/";
   PokerState curr_state = init_state;
   for(int a_idx = 0; a_idx < rel_actions.size(); ++a_idx) {
-    Action a = rel_actions[a_idx];
+    const Action a = rel_actions[a_idx];
     if(state.has_player_vpip(curr_state.get_active())) {
       oss << pos_to_str(curr_state) << " " << action_label_str(curr_state, a) << ", ";
     }
