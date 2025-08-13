@@ -678,7 +678,7 @@ TreeBlueprintSolver::TreeBlueprintSolver(const SolverConfig& config, const Bluep
 void TreeBlueprintSolver::on_start() {
   TreeSolver::on_start();
   BlueprintSolver::on_start();
-  if(!_phi_root) {
+  if(!_phi_root && get_iteration() < get_blueprint_config().preflop_threshold) {
     Logger::log("Initializing avg storage tree...");
     _phi_root = std::make_unique<TreeStorageNode<float>>(get_config().init_state, make_tree_config());
   }
@@ -707,8 +707,10 @@ TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<fl
 void TreeBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
   TreeSolver::track_strategy(metrics, out_str);
   const auto init_ranges = get_config().init_ranges;
-  track_strategy_by_decision(get_config().init_state, init_ranges, TreeDecision{_phi_root.get(), get_config().init_state},
+  if(_phi_root) {
+    track_strategy_by_decision(get_config().init_state, init_ranges, TreeDecision{_phi_root.get(), get_config().init_state},
       get_avg_metrics_config(), true, metrics);
+  }
 }
 
 struct NodeMetrics {
@@ -744,25 +746,29 @@ NodeMetrics collect_node_metrics(const TreeStorageNode<T>* node) {
 
 void TreeBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstream& out_str, const long t) const {
   NodeMetrics regret_metrics = collect_node_metrics(get_strategy());
-  NodeMetrics phi_metrics = collect_node_metrics(get_phi_root());
   const long avg_regret = regret_metrics.max_value_sum / t; // should be sum of the maximum regret at each infoset, not sum of all regrets
   const double free_ram = static_cast<double>(get_free_ram()) / 1'000'000'000.0;
   out_str << std::setw(8) << avg_regret << " avg regret   ";
   out_str << std::setw(12) << regret_metrics.nodes << " regret nodes   ";
   out_str << std::setw(12) << regret_metrics.values << " regret values   ";
-  out_str << std::setw(12) << phi_metrics.nodes << " avg nodes   ";
-  out_str << std::setw(12) << phi_metrics.values << " avg values   ";
   out_str << std::setw(8) << std::fixed << std::setprecision(2) << free_ram << " GB free ram   ";
   metrics["avg max regret"] = static_cast<int>(avg_regret);
   metrics["regret_nodes"] = regret_metrics.nodes;
   metrics["regret_values"] = regret_metrics.values;
-  metrics["avg_nodes"] = phi_metrics.nodes;
-  metrics["avg_values"] = phi_metrics.values;
   metrics["free_ram"] = free_ram;
+  if(_phi_root) {
+    NodeMetrics phi_metrics = collect_node_metrics(get_phi_root());
+    out_str << std::setw(12) << phi_metrics.nodes << " avg nodes   ";
+    out_str << std::setw(12) << phi_metrics.values << " avg values   ";
+    metrics["avg_nodes"] = phi_metrics.nodes;
+    metrics["avg_values"] = phi_metrics.values;
+  }
 }
 
 bool TreeBlueprintSolver::operator==(const TreeBlueprintSolver& other) const {
-  return TreeSolver::operator==(other) && BlueprintSolver::operator==(other) && *_phi_root == *other._phi_root;
+  return TreeSolver::operator==(other) &&
+    BlueprintSolver::operator==(other) &&
+    ((!_phi_root && !other._phi_root) || (_phi_root && other._phi_root && *_phi_root == *other._phi_root));
 }
 
 // ==========================================================================================
