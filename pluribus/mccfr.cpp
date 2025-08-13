@@ -686,7 +686,7 @@ void TreeBlueprintSolver::on_start() {
 
 void TreeBlueprintSolver::on_snapshot() {
   if(get_iteration() >= get_blueprint_config().preflop_threshold) {
-    std::cout << "Reached preflop threshold. Deleting phi...";
+    Logger::log("Reached preflop threshold. Deleting phi...");
     _phi_root = nullptr;
   }
 }
