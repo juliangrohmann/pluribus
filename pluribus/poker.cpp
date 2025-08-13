@@ -79,7 +79,6 @@ std::vector<uint8_t> collect_cards(const Board& board, const Hand& hand, const i
 }
 
 int blind_size(const SlimPokerState& state, const int pos) {
-
   switch(pos) {
     case 0: return state.get_players().size() > 2 ? 50 : 100;
     case 1: return state.get_players().size() > 2 ? 100 : 50;
