@@ -2,10 +2,35 @@
 
 #include <atomic>
 #include <vector>
+#include <pluribus/rng.hpp>
 
 namespace pluribus {
 
 int sample_action_idx(const float freq[], int n_actions);
+
+template<class T>
+inline int sample_idx_from_regrets(const std::atomic<T>* base_ptr, const int n_actions) {
+  float w_local[16];
+  float S = 0.f;
+  for(int i = 0; i < n_actions; ++i) {
+    const float v = static_cast<float>(base_ptr[i].load(std::memory_order_relaxed));
+    const float w = v > 0.f ? v : 0.f;
+    w_local[i] = w;
+    S += w;
+  }
+  const float u01 = GSLGlobalRNG::uniform();
+  if(S <= 0.f) {
+    const int k = static_cast<int>(u01 * n_actions);
+    return k < n_actions ? k : (n_actions-1);
+  }
+  const float threshold = u01 * S;
+  float c = 0.f;
+  for(int i=0;i<n_actions;++i) {
+    c += w_local[i];
+    if(c >= threshold) return i;
+  }
+  return n_actions-1;
+}
 
 template <class T>
 std::vector<float> calculate_strategy(const std::atomic<T>* base_ptr, const int n_actions) {

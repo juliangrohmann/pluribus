@@ -374,10 +374,8 @@ template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& ctx) {
   const int cluster = context_cluster(ctx);
   const std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
-  float freq[MAX_ACTIONS];
-  calculate_strategy_in_place(base_ptr, actions.size(), freq);
-  const int a_idx = sample_action_idx(freq, actions.size());
-  if(is_debug) log_external_sampling(actions[a_idx], actions, freq);
+  const int a_idx = sample_idx_from_regrets(base_ptr, actions.size());
+  // if(is_debug) log_external_sampling(actions[a_idx], actions, freq);
   return a_idx;
 }
 

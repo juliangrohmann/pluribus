@@ -1,5 +1,4 @@
 #include <pluribus/calc.hpp>
-#include <pluribus/rng.hpp>
 
 namespace pluribus {
 
