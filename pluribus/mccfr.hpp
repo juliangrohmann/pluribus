@@ -231,7 +231,7 @@ protected:
   bool should_prune(long t) const override;
   bool should_discount(const long t) const override { return _bp_config.is_discount_step(t); }
   bool should_snapshot(const long t, const long T) const override { return _bp_config.is_snapshot_step(t, T); }
-  bool should_log(const long t) const override { return t > 0 && t % _bp_config.log_interval == 0; }
+  bool should_log(const long t) const override { return (t + 1) % _bp_config.log_interval == 0; }
   long next_step(long t, long T) const override;
 
   int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
@@ -264,7 +264,7 @@ protected:
   bool should_prune(long t) const override { return false; /* TODO: test pruning */ }
   bool should_discount(const long t) const override { return t % _rt_config.discount_interval == 0; }
   bool should_snapshot(long t, long T) const override { return false; }
-  bool should_log(const long t) const override { return t % _rt_config.log_interval == 0; }
+  bool should_log(const long t) const override { return (t + 1) % _rt_config.log_interval == 0; }
   long next_step(const long t, const long T) const override { return _rt_config.next_discount_step(t, T); }
 
   int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
