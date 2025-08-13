@@ -283,7 +283,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
         const int prev_r = r_atom.load();
         int d_r = values[a_idx] - v;
         const int next_r = prev_r + d_r;
-        if(next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
+        if(is_debug && next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
         if(next_r > REGRET_FLOOR) {
           r_atom.fetch_add(d_r);
         }
@@ -342,7 +342,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
       const int prev_r = r_atom.load();
       int d_r = values[a_idx] - v;
       int next_r = prev_r + d_r;
-      if(next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
+      if(is_debug && next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
       if(next_r > REGRET_FLOOR) {
         r_atom.fetch_add(d_r);
       }
