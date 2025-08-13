@@ -425,7 +425,7 @@ std::string MCCFRSolver<StorageT>::track_wandb_metrics(const long t) const {
 bool should_track_strategy(const PokerState& state, const SolverConfig& solver_config, const MetricsConfig& metrics_config) {
   return state.active_players() > 1 &&
       state.get_round() == solver_config.init_state.get_round() &&
-      (state.get_round() > 0 || state.vpip_players()  <= metrics_config.max_vpip) &&
+      (state.get_round() > 0 || state.vpip_players() <= metrics_config.max_vpip) &&
       state.get_bet_level() <= metrics_config.max_bet_level &&
       !should_restrict(state.get_action_history().get_history(), solver_config.restrict_players) &&
       metrics_config.should_track(state);
