@@ -459,6 +459,7 @@ void MCCFRSolver<StorageT>::track_strategy_by_decision(const PokerState& state, 
     const DecisionAlgorithm& decision, const MetricsConfig& metrics_config, const bool phi, nlohmann::json& metrics) const {
   PokerRange base_range = ranges[state.get_active()];
   base_range.remove_cards(get_config().init_board);
+  if(state.get_round() >= 4) return;
   for(Action a : valid_actions(state, get_config().action_profile)) {
     PokerState next_state = state.apply(a);
     if(!should_track_strategy(state, next_state, get_config(), metrics_config)) continue;
@@ -470,7 +471,8 @@ void MCCFRSolver<StorageT>::track_strategy_by_decision(const PokerState& state, 
       PokerRange action_range = build_action_range(base_range, a, state, Board{get_config().init_board}, decision);
       PokerRange next_range = base_range * action_range;
       const std::string data_label = strategy_label(state, get_config().init_state, a, phi);
-      metrics[data_label] = next_range.n_combos() / base_range.n_combos();
+      const double n_base_combos = base_range.n_combos();
+      metrics[data_label] = n_base_combos > 0.0 ? next_range.n_combos() / n_base_combos : 0.0;
       next_ranges[state.get_active()] = next_range;
       track_strategy_by_decision(next_state, next_ranges, decision, metrics_config, phi, metrics);
     }
