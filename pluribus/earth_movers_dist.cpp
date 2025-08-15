@@ -137,6 +137,7 @@ std::vector<std::vector<std::pair<double, int>>> build_sorted_distances(const st
   std::vector<std::vector<std::pair<double, int>>> sorted_distances;
   for(int c = 0; c < n_clusters; ++c) {
     for(int h_idx = 0; h_idx < mean_histogram.size(); ++h_idx) {
+      std::cout << "ochs matrix: " << ochs_matrix.size() << " x " << ochs_matrix[c].size() << "\n";
       sorted_distances[c].emplace_back(ochs_matrix[c][mean_histogram[h_idx]], h_idx);
     }
     std::ranges::sort(sorted_distances[c], [](const auto& e1, const auto& e2) { return e1.first < e2.first; });
