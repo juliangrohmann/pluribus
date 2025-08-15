@@ -158,7 +158,9 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     const auto t_0 = std::chrono::high_resolution_clock::now();
     for(hand_index_t i = 0; i < turn_indexes.size(); ++i) {
       if(i > 0 && i % log_interval == 0) progress_str(i, turn_indexes.size(), t_0);
-      auto [unique_histogram, weights] = preprocess(build_histogram(turn_indexes[i], cluster_map));
+      auto full_histogram = build_histogram(turn_indexes[i], cluster_map);
+      std::cout << "Full histogram: [" << join_as_strs(full_histogram, " ") << "]\n";
+      auto [unique_histogram, weights] = preprocess(full_histogram);
       std::cout << "Unique histogram: [" << join_as_strs(unique_histogram, " ") << "]\n";
       std::cout << std::fixed << std::setprecision(2) << "Weights: [" << join_as_strs(weights, " ") << "]\n";
       cache.histograms.push_back(unique_histogram);
