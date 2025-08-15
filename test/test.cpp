@@ -494,19 +494,15 @@ TEST_CASE("Serialize TreeBlueprintSolver", "[serialize][blueprint][slow]") {
 
 TEST_CASE("EMD heuristic - partial mass", "[emd]") {
     constexpr int C = 2;
-    std::vector<int> x = {0, 0};        // both points in cluster 0
-    std::vector<double> m = {0.75, 0.25};
+    const std::vector x = {0, 0}; // both points in cluster 0
+    const std::vector m = {0.75, 0.25};
 
-    std::array<std::vector<double>, C> sorted_distances = {{
-        {0.0, 1.0}, // sorted ascending
-        {0.0, 1.0}
-    }};
-    std::array<std::vector<int>, C> ordered_clusters = {{
-        {0, 1}, // match self first
-        {1, 0}
+    const std::array<std::vector<std::pair<double, int>>, C> sorted_distances = {{
+        {{0.0, 0}, {1.0, 1}}, // sorted ascending
+        {{0.0, 1}, {1.0, 0}}
     }};
 
-    double cost = emd_heuristic<C>(x, m, sorted_distances, ordered_clusters);
+    double cost = emd_heuristic<C>(x, m, sorted_distances);
     // First point gets all from mean 0 (0 cost)
     // Second point gets 0.25 from mean 0 (0 cost) + 0.25 from mean 1 (cost 0.25)
     REQUIRE_THAT(cost, WithinAbs(0.25, 1e-12));
@@ -514,57 +510,43 @@ TEST_CASE("EMD heuristic - partial mass", "[emd]") {
 
 TEST_CASE("EMD heuristic - zero distances", "[emd]") {
     constexpr int C = 3;
-    std::vector<int> x = {0, 1, 2};
-    std::vector<double> m = {1.0/3, 1.0/3, 1.0/3};
+    const std::vector x = {0, 1, 2};
+    const std::vector m = {1.0/3, 1.0/3, 1.0/3};
 
-    std::array<std::vector<double>, C> sorted_distances;
-    std::array<std::vector<int>, C> ordered_clusters;
+    std::array<std::vector<std::pair<double, int>>, C> sorted_distances;
     for (int pc = 0; pc < C; ++pc) {
-        sorted_distances[pc] = {0.0, 0.0, 0.0}; // all zero distances
-        ordered_clusters[pc] = {pc, (pc+1)%C, (pc+2)%C}; // valid order mapping
+        sorted_distances[pc] = {{0.0, pc}, {0.0, (pc+1)%C}, {0.0, (pc+2)%C}}; // all zero distances
     }
 
-    double cost = emd_heuristic<C>(x, m, sorted_distances, ordered_clusters);
+    double cost = emd_heuristic<C>(x, m, sorted_distances);
     REQUIRE_THAT(cost, WithinAbs(0.0, 1e-12));
 }
 
 TEST_CASE("EMD heuristic - mismatched sizes logs error", "[emd]") {
     constexpr int C = 2;
-    std::vector<int> x = {0, 1};
-    std::vector<double> m = {0.5, 0.5};
+    const std::vector x = {0, 1};
+    const std::vector m = {0.5, 0.5};
 
     // Wrong length in sorted_distances[0]
-    std::array<std::vector<double>, C> sorted_distances = {{
-        {0.0}, // invalid
-        {0.0, 1.0}
+    const std::array<std::vector<std::pair<double, int>>, C> sorted_distances = {{
+        {{0.0, 0}}, // invalid
+        {{0.0, 1}, {1.0, 0}}
     }};
-    std::array<std::vector<int>, C> ordered_clusters = {{
-        {0, 1},
-        {1, 0}
-    }};
-
-    // Will throw only if Logger::error is configured to throw.
-    REQUIRE_THROWS(emd_heuristic<C>(x, m, sorted_distances, ordered_clusters));
+    REQUIRE_THROWS(emd_heuristic<C>(x, m, sorted_distances));
 }
 
 TEST_CASE("EMD heuristic - closest cluster is not self", "[emd]") {
   constexpr int C = 3;
-  std::vector<int> x = {0, 1, 2};
-  std::vector<double> m = {1.0/3, 1.0/3, 1.0/3};
+  const std::vector x = {0, 1, 2};
+  const std::vector m = {1.0/3, 1.0/3, 1.0/3};
 
   // Distances are sorted ascending per point cluster
-  std::array<std::vector<double>, C> sorted_distances = {{
-    {0.5, 1.0, 2.0}, // from cluster 0: closest mean cluster is #2 (0.5 away)
-    {0.2, 0.7, 1.5}, // from cluster 1: closest mean cluster is #0 (0.2 away)
-    {0.1, 0.3, 1.0}  // from cluster 2: closest mean cluster is #1 (0.1 away)
+  const std::array<std::vector<std::pair<double, int>>, C> sorted_distances = {{
+    {{0.5, 2}, {1.0, 0}, {2.0, 1}}, // from cluster 0: closest mean cluster is #2 (0.5 away)
+    {{0.2, 0}, {0.7, 2}, {1.5, 1}}, // from cluster 1: closest mean cluster is #0 (0.2 away)
+    {{0.1, 1}, {0.3, 0}, {1.0, 2}}  // from cluster 2: closest mean cluster is #1 (0.1 away)
   }};
-  std::array<std::vector<int>, C> ordered_clusters = {{
-    {2, 0, 1}, // cluster 0 matches to 2 first
-    {0, 2, 1}, // cluster 1 matches to 0 first
-    {1, 0, 2}  // cluster 2 matches to 1 first
-  }};
-
-  double cost = emd_heuristic<C>(x, m, sorted_distances, ordered_clusters);
+  double cost = emd_heuristic<C>(x, m, sorted_distances);
   REQUIRE_THAT(cost, WithinAbs(1.0/6.0 + 1.0/15.0 + 1.0/30.0, 1e-12));
 }
 

@@ -74,4 +74,6 @@ private:
   Log _log;
 };
 
+std::string progress_str(hand_index_t idx, hand_index_t total, const std::chrono::high_resolution_clock::time_point& t_0);
+
 }

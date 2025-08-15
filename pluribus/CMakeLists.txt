@@ -11,6 +11,7 @@ add_library(
   PluribusLib
   poker.cpp
   cluster.cpp
+  earth_movers_dist.cpp
   agent.cpp
   simulate.cpp
   actions.cpp
