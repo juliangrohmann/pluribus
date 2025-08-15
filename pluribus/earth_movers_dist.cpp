@@ -8,11 +8,11 @@
 
 namespace pluribus {
 
-double emd_heuristic(const std::vector<int>& x, const std::vector<double>& targets, const std::vector<double>& m,
+double emd_heuristic(const std::vector<int>& x, const std::vector<double>& x_w, const std::vector<double>& m_w,
     const std::vector<std::vector<std::pair<double, int>>>& sorted_distances) {
   const size_t C = sorted_distances.size();
   const size_t N = x.size();
-  const size_t Q = m.size();
+  const size_t Q = m_w.size();
 
   for(const int c : x) if(c >= C) Logger::error("Cluster in x is too large: " + std::to_string(c));
   for(const auto& vec : sorted_distances) {
@@ -25,8 +25,8 @@ double emd_heuristic(const std::vector<int>& x, const std::vector<double>& targe
     }
   }
 
-  std::vector targets(N, 1.0 / static_cast<double>(N));
-  std::vector mean_remaining(Q, 1.0 / static_cast<double>(Q));
+  std::vector targets = x_w;
+  std::vector mean_remaining = m_w;
   std::vector done(N, false);
   double tot_cost = 0.0;
   for(int i = 0; i < Q; ++i) {
