@@ -180,16 +180,13 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
 
     Logger::log("Building EMD matrix...");
     auto matrix = std::vector(turn_indexes.size(), std::vector(turn_indexes.size(), 0.0));
-    const unsigned long total_iter = (turn_indexes.size() * turn_indexes.size() - 1) / 2;
-    const unsigned long log_interval = total_iter / 100UL;
+    const unsigned long log_interval = turn_indexes.size() / 100UL;
     const auto t_0 = std::chrono::high_resolution_clock::now();
-    unsigned long iter = 0;
-    #pragma omp parallel for schedule(dynamic, 1)
+    #pragma omp parallel for schedule(static, 1)
     for(hand_index_t idx1 = 0; idx1 < turn_indexes.size(); ++idx1) {
+      if(idx1 > 0 && idx1 % log_interval == 0) Logger::log(progress_str(idx1, turn_indexes.size(), t_0));
       for(hand_index_t idx2 = 0; idx2 < turn_indexes.size(); ++idx2) {
-        if(iter > 0 && iter % log_interval == 0) Logger::log(progress_str(iter, total_iter, t_0));
         matrix[idx1][idx2] = emd_heuristic(histograms[idx1], weights[idx1], weights[idx2], sorted_dists[idx2]);
-        ++iter;
       }
     }
     cereal_save(matrix, dir / ("emd_matrix_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin"));
