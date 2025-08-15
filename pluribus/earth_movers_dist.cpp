@@ -175,7 +175,7 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
       validate_weights(weight_vec);
       histograms.push_back(unique_histogram);
       weights.push_back(weight_vec);
-      sorted_dists.push_back(build_sorted_distances(histograms[turn_idx], ochs_matrix));
+      sorted_dists.push_back(build_sorted_distances(unique_histogram, ochs_matrix));
     }
 
     Logger::log("Building EMD matrix...");
