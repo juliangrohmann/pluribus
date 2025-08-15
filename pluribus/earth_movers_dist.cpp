@@ -167,6 +167,7 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     Logger::log("Preprocessing...");
     std::vector<std::vector<int>> histograms;
     std::vector<std::vector<double>> weights;
+    std::vector<std::vector<std::vector<std::pair<double, int>>>> sorted_dists;
     for(const hand_index_t turn_idx : turn_indexes) {
       auto full_histogram = build_histogram(turn_idx, cluster_map);
       auto [unique_histogram, weight_vec] = preprocess(full_histogram);
@@ -174,19 +175,20 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
       validate_weights(weight_vec);
       histograms.push_back(unique_histogram);
       weights.push_back(weight_vec);
+      sorted_dists.push_back(build_sorted_distances(histograms[turn_idx], ochs_matrix));
     }
 
     Logger::log("Building EMD matrix...");
     auto matrix = std::vector(turn_indexes.size(), std::vector(turn_indexes.size(), 0.0));
     const unsigned long total_iter = (turn_indexes.size() * turn_indexes.size() - 1) / 2;
-    const unsigned long log_interval = total_iter / 1000UL;
+    const unsigned long log_interval = total_iter / 100UL;
     const auto t_0 = std::chrono::high_resolution_clock::now();
     unsigned long iter = 0;
     #pragma omp parallel for schedule(dynamic, 1)
     for(hand_index_t idx1 = 0; idx1 < turn_indexes.size(); ++idx1) {
       for(hand_index_t idx2 = 0; idx2 < turn_indexes.size(); ++idx2) {
         if(iter > 0 && iter % log_interval == 0) Logger::log(progress_str(iter, total_iter, t_0));
-        matrix[idx1][idx2] = emd_heuristic(histograms[idx1], weights[idx1], weights[idx2], build_sorted_distances(histograms[idx2], ochs_matrix));
+        matrix[idx1][idx2] = emd_heuristic(histograms[idx1], weights[idx1], weights[idx2], sorted_dists[idx2]);
         ++iter;
       }
     }
