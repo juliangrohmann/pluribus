@@ -8,6 +8,49 @@
 
 namespace pluribus {
 
+double emd_heuristic(const std::vector<int>& x, const size_t Q, const std::vector<std::vector<std::pair<double, int>>>& sorted_distances) {
+  const size_t C = sorted_distances.size();
+  const size_t N = x.size();
+
+  for(const int c : x) if(c >= C) Logger::error("Cluster in x is too large: " + std::to_string(c));
+  for(const auto& vec : sorted_distances) {
+    if(vec.size() != Q) Logger::error("Sorted distances vector size mismatch.");
+    for(int idx = 0; idx < Q; ++idx) {
+      if(idx > 0 && vec[idx - 1].first > vec[idx].first) {
+        Logger::error("Distances are not sorted: " + std::to_string(vec[idx - 1].first) + " > " + std::to_string(vec[idx].first));
+      }
+      if(vec[idx].second >= Q) Logger::error("Ordered cluster index is out of bounds.");
+    }
+  }
+
+  std::vector targets(N, 1.0 / N);
+  std::vector mean_remaining(Q, 1.0 / Q);
+  std::vector done(N, false);
+  double tot_cost = 0.0;
+  for(int i = 0; i < Q; ++i) {
+    for(int j = 0; j < N; ++j) {
+      if(done[j]) continue;
+      const int point_cluster = x[j];
+      const int mean_cluster = sorted_distances[point_cluster][i].second;
+      const double amt_remaining = mean_remaining[mean_cluster];
+      if(amt_remaining == 0) continue;
+      const double d = sorted_distances[point_cluster][i].first;
+      if(amt_remaining < targets[j]) {
+        tot_cost += amt_remaining * d;
+        targets[j] -= amt_remaining;
+        mean_remaining[mean_cluster] = 0;
+      }
+      else {
+        tot_cost += targets[j] * d;
+        mean_remaining[mean_cluster] -= targets[j];
+        targets[j] = 0;
+        done[j] = true;
+      }
+    }
+  }
+  return tot_cost;
+}
+
 std::vector<std::vector<double>> build_ochs_matrix(const hand_index_t flop_idx, const int n_clusters, const std::filesystem::path& dir) {
   constexpr int n_features = 8;
   const std::vector<float> centroids = cnpy::npy_load(
@@ -41,7 +84,7 @@ std::unordered_map<hand_index_t, int> build_cluster_map(const std::vector<hand_i
   return cluster_map;
 }
 
-std::vector<int> build_histogram(const hand_index_t turn_idx, const std::unordered_map<hand_index_t, int>& clusters) {
+std::vector<int> build_histogram(const hand_index_t turn_idx, const std::unordered_map<hand_index_t, int>& cluster_map) {
   constexpr int round = 2;
   uint8_t cards[7];
   HandIndexer::get_instance()->unindex(turn_idx, cards, round);
@@ -51,33 +94,26 @@ std::vector<int> build_histogram(const hand_index_t turn_idx, const std::unorder
     if(!(mask && card_mask(card))) {
       cards[6] = card;
       const hand_index_t river_idx = HandIndexer::get_instance()->index(cards, round + 1);
-      histogram.push_back(clusters.at(river_idx));
+      histogram.push_back(cluster_map.at(river_idx));
     }
   }
   std::ranges::sort(histogram);
   return histogram;
 }
 
-double compute_emd(const std::vector<int>& histogram1, const std::vector<int>& histogram2, const std::vector<std::vector<double>>& ochs_matrix) {
+std::vector<std::vector<std::pair<double, int>>> build_sorted_distances(const std::vector<int>& mean_histogram, const std::vector<std::vector<double>>& ochs_matrix) {
   constexpr int n_clusters = 500;
-  std::array<std::vector<std::pair<double, int>>, n_clusters> sorted_distances;
+  std::vector<std::vector<std::pair<double, int>>> sorted_distances;
   for(int c = 0; c < n_clusters; ++c) {
-    for(int h_idx = 0; h_idx < histogram2.size(); ++h_idx) {
-      sorted_distances[c].emplace_back(ochs_matrix[c][histogram2[h_idx]], h_idx);
+    for(int h_idx = 0; h_idx < mean_histogram.size(); ++h_idx) {
+      sorted_distances[c].emplace_back(ochs_matrix[c][mean_histogram[h_idx]], h_idx);
     }
+    std::ranges::sort(sorted_distances[c], [](const auto& e1, const auto& e2) { return e1.first < e2.first; });
   }
-  std::vector m(histogram2.size(), 1.0 / static_cast<double>(histogram2.size()));
-  return emd_heuristic(histogram1, m, sorted_distances);
+  return sorted_distances;
 }
 
-double symmetric_emd(const hand_index_t idx1, const hand_index_t idx2, const std::unordered_map<hand_index_t, int>& cluster_map,
-    const std::vector<std::vector<double>>& ochs_matrix) {
-  const auto histogram1 = build_histogram(idx1, cluster_map);
-  const auto histogram2 = build_histogram(idx2, cluster_map);
-  return 0.5 * (compute_emd(histogram1, histogram2, ochs_matrix) + compute_emd(histogram2, histogram1, ochs_matrix));
-}
-
-void build_emd_matrix(const std::filesystem::path& dir) {
+void build_emd_preproc_cache(const std::filesystem::path& dir) {
   constexpr int n_clusters = 500;
   Logger::log("Building EMD matrices...");
   for(hand_index_t flop_idx = 0; flop_idx < NUM_DISTINCT_FLOPS; ++flop_idx) {
@@ -90,23 +126,16 @@ void build_emd_matrix(const std::filesystem::path& dir) {
     const std::vector<int> clusters = cnpy::npy_load(
       dir / ("clusters_r3_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".npy")).as_vec<int>();
     auto cluster_map = build_cluster_map(indexes, clusters);
-    auto ochs_matrix = build_ochs_matrix(flop_idx, n_clusters, dir);
-    auto emd_matrix = std::vector(indexes.size(), std::vector(indexes.size(), 0.0));
+    EMDPreprocCache cache;
+    cache.ochs_matrix = build_ochs_matrix(flop_idx, n_clusters, dir);
     Logger::log("Indexes: " + std::to_string(indexes.size()));
-    const long total_iters = indexes.size() * (indexes.size() - 1) / 2;
-    const long log_interval = total_iters / 100;
-    Logger::log("Iterations: " + std::to_string(total_iters));
-    long iter = 0;
+    const long log_interval = indexes.size() / 10;
     const auto t_0 = std::chrono::high_resolution_clock::now();
     for(hand_index_t i = 0; i < indexes.size(); ++i) {
-      for(hand_index_t j = i + 1; j < indexes.size(); ++j) {
-        if(i > 0 && i % log_interval == 0) progress_str(i, total_iters, t_0);
-        const double symm_emd = symmetric_emd(indexes[i], indexes[j], cluster_map, ochs_matrix);
-        emd_matrix[i][j] = symm_emd;
-        emd_matrix[j][i] = symm_emd;
-        ++iter;
-      }
+      if(i > 0 && i % log_interval == 0) progress_str(i, indexes.size(), t_0);
+      cache.histograms.push_back(build_histogram(indexes[i], cluster_map));
     }
+    cereal_save(cache, dir / ("emd_preproc_cache_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin"));
   }
 }
 
