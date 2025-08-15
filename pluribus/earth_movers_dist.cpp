@@ -132,17 +132,14 @@ std::pair<std::vector<int>, std::vector<double>> preprocess(const std::vector<in
 }
 
 std::vector<std::vector<std::pair<double, int>>> build_sorted_distances(const std::vector<int>& mean_histogram, const std::vector<std::vector<double>>& ochs_matrix) {
-  std::cout << "building sorted dists...\n";
   constexpr int n_clusters = 500;
-  std::vector<std::vector<std::pair<double, int>>> sorted_distances;
+  std::vector sorted_distances(n_clusters, std::vector<std::pair<double, int>>{});
   for(int c = 0; c < n_clusters; ++c) {
     for(int h_idx = 0; h_idx < mean_histogram.size(); ++h_idx) {
-      std::cout << "ochs matrix: " << ochs_matrix.size() << " x " << ochs_matrix[c].size() << "\n";
       sorted_distances[c].emplace_back(ochs_matrix[c][mean_histogram[h_idx]], h_idx);
     }
     std::ranges::sort(sorted_distances[c], [](const auto& e1, const auto& e2) { return e1.first < e2.first; });
   }
-  std::cout << "sorted done.\n";
   return sorted_distances;
 }
 
@@ -188,9 +185,7 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     for(hand_index_t idx1 = 0; idx1 < turn_indexes.size(); ++idx1) {
       for(hand_index_t idx2 = 0; idx2 < turn_indexes.size(); ++idx2) {
         if(iter > 0 && iter % log_interval == 0) Logger::log(progress_str(iter, total_iter, t_0));
-        std::cout << "emd heuristic: " << idx1 << " x " << idx2 << "\n";
         matrix[idx1][idx2] = emd_heuristic(histograms[idx1], weights[idx1], weights[idx2], build_sorted_distances(histograms[idx2], ochs_matrix));
-        std::cout << "Done.\n";
         ++iter;
       }
     }
