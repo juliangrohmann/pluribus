@@ -182,6 +182,7 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     const unsigned long log_interval = total_iter / 1000UL;
     const auto t_0 = std::chrono::high_resolution_clock::now();
     unsigned long iter = 0;
+    #pragma omp parallel for schedule(dynamic, 1)
     for(hand_index_t idx1 = 0; idx1 < turn_indexes.size(); ++idx1) {
       for(hand_index_t idx2 = 0; idx2 < turn_indexes.size(); ++idx2) {
         if(iter > 0 && iter % log_interval == 0) Logger::log(progress_str(iter, total_iter, t_0));
