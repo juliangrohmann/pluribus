@@ -91,17 +91,11 @@ std::unordered_map<hand_index_t, int> build_cluster_map(const std::vector<hand_i
 std::vector<int> build_histogram(const hand_index_t turn_idx, const std::unordered_map<hand_index_t, int>& cluster_map) {
   constexpr int round = 2;
   uint8_t cards[7];
-  std::cout << "Turn index: " << turn_idx << "\n";
   HandIndexer::get_instance()->unindex(turn_idx, cards, round);
-  std::cout << "Hand: " << cards_to_str(cards, 6) << "\n";
   const uint64_t mask = card_mask(cards, n_board_cards(round) + 2);
-  std::cout << "Hand mask: " << mask << "\n";
   std::vector<int> histogram;
   for(uint8_t card = 0; card < MAX_CARDS; ++card) {
-    std::cout << "Card mask: " << card_mask(card) << "\n";
-    std::cout << "Match: " << (mask && card_mask(card)) << "\n";
-    if(!(mask && card_mask(card))) {
-      std::cout << "River: " << static_cast<int>(card);
+    if(!(mask & card_mask(card))) {
       cards[6] = card;
       const hand_index_t river_idx = HandIndexer::get_instance()->index(cards, round + 1);
       histogram.push_back(cluster_map.at(river_idx));
