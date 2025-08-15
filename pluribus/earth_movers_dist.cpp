@@ -24,18 +24,18 @@ double emd_heuristic(const std::vector<int>& x, const std::vector<double>& x_w, 
   const size_t N = x.size();
   const size_t Q = m_w.size();
 
-  validate_clusters(x, static_cast<int>(C));
-  validate_weights(x_w);
-  validate_weights(m_w);
-  for(const auto& vec : sorted_distances) {
-    if(vec.size() != Q) Logger::error("Sorted distances vector size mismatch.");
-    for(int idx = 0; idx < Q; ++idx) {
-      if(idx > 0 && vec[idx - 1].first > vec[idx].first) {
-        Logger::error("Distances are not sorted: " + std::to_string(vec[idx - 1].first) + " > " + std::to_string(vec[idx].first));
-      }
-      if(vec[idx].second >= Q) Logger::error("Ordered cluster index is out of bounds.");
-    }
-  }
+  // validate_clusters(x, static_cast<int>(C));
+  // validate_weights(x_w);
+  // validate_weights(m_w);
+  // for(const auto& vec : sorted_distances) {
+  //   if(vec.size() != Q) Logger::error("Sorted distances vector size mismatch.");
+  //   for(int idx = 0; idx < Q; ++idx) {
+  //     if(idx > 0 && vec[idx - 1].first > vec[idx].first) {
+  //       Logger::error("Distances are not sorted: " + std::to_string(vec[idx - 1].first) + " > " + std::to_string(vec[idx].first));
+  //     }
+  //     if(vec[idx].second >= Q) Logger::error("Ordered cluster index is out of bounds.");
+  //   }
+  // }
 
   std::vector targets = x_w;
   std::vector mean_remaining = m_w;
