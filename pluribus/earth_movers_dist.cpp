@@ -6,6 +6,8 @@
 #include <pluribus/logging.hpp>
 #include <pluribus/poker.hpp>
 
+#include "cluster.hpp"
+
 namespace pluribus {
 
 double emd_heuristic(const std::vector<int>& x, const std::vector<double>& x_w, const std::vector<double>& m_w,
@@ -138,25 +140,28 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
   constexpr int n_clusters = 500;
   Logger::log("Building EMD matrices...");
   for(hand_index_t flop_idx = 0; flop_idx < NUM_DISTINCT_FLOPS; ++flop_idx) {
-    uint8_t cards[3];
-    FlopIndexer::get_instance()->unindex(flop_idx, cards);
-    Logger::log("Flop: " + cards_to_str(cards, 3));
+    uint8_t cards[7];
+    FlopIndexer::get_instance()->unindex(flop_idx, cards + 2);
+    Logger::log("Flop: " + cards_to_str(cards + 2, 3));
 
-    std::vector<hand_index_t> indexes;
-    cereal_load(indexes, dir / ("indexes_r3_f" + std::to_string(flop_idx) + ".bin"));
+    std::vector<hand_index_t> river_indexes;
+    cereal_load(river_indexes, dir / ("indexes_r3_f" + std::to_string(flop_idx) + ".bin"));
     const std::vector<int> clusters = cnpy::npy_load(
       dir / ("clusters_r3_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".npy")).as_vec<int>();
     Logger::log("Building cluster map...");
-    auto cluster_map = build_cluster_map(indexes, clusters);
+    auto cluster_map = build_cluster_map(river_indexes, clusters);
     EMDPreprocCache cache;
     Logger::log("Building OCHS matrix...");
     cache.ochs_matrix = build_ochs_matrix(flop_idx, n_clusters, dir);
-    Logger::log("Indexes: " + std::to_string(indexes.size()));
-    const unsigned long log_interval = indexes.size() / 10UL;
+    auto turn_index_set = collect_filtered_indexes(2, cards);
+    auto turn_indexes = std::vector(turn_index_set.begin(), turn_index_set.end());
+    cereal_save(turn_indexes, dir / ("indexes_r2_f" + std::to_string(flop_idx) + ".bin"));
+    Logger::log("Indexes: " + std::to_string(turn_indexes.size()));
+    const unsigned long log_interval = turn_indexes.size() / 10UL;
     const auto t_0 = std::chrono::high_resolution_clock::now();
-    for(hand_index_t i = 0; i < indexes.size(); ++i) {
-      if(i > 0 && i % log_interval == 0) progress_str(i, indexes.size(), t_0);
-      auto [unique_histogram, weights] = preprocess(build_histogram(indexes[i], cluster_map));
+    for(hand_index_t i = 0; i < turn_indexes.size(); ++i) {
+      if(i > 0 && i % log_interval == 0) progress_str(i, turn_indexes.size(), t_0);
+      auto [unique_histogram, weights] = preprocess(build_histogram(turn_indexes[i], cluster_map));
       std::cout << "Unique histogram: [" << join_as_strs(unique_histogram, " ") << "]\n";
       std::cout << std::fixed << std::setprecision(2) << "Weights: [" << join_as_strs(weights, " ") << "]\n";
       cache.histograms.push_back(unique_histogram);

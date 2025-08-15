@@ -25,9 +25,10 @@ const std::array<std::string, 8> ochs_categories = {
 
 void assign_features(const std::string& hand, const std::string& board, float* data);
 double equity(const omp::Hand& hero, const omp::CardRange &villain, const omp::Hand& board);
+std::unordered_set<hand_index_t> collect_filtered_indexes(int round, uint8_t cards[7]);
 void build_ochs_features(int round, const std::string& dir);
 void build_ochs_features_filtered(int round, const std::string& dir);
-void build_emd_preproc_cache(const std::filesystem::path& dir);
+
 std::string cluster_filename(int round, int n_clusters, int split);
 std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(int n_clusters);
 [[noreturn]] void print_clusters(bool blueprint);

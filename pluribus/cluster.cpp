@@ -145,7 +145,7 @@ void collect_indexes_rec(const int i, const int round, const int max_cards, cons
   }
 }
 
-std::unordered_set<hand_index_t> collect_indexes(const int round, uint8_t cards[7]) {
+std::unordered_set<hand_index_t> collect_filtered_indexes(const int round, uint8_t cards[7]) {
   std::unordered_set<hand_index_t> index_set;
   const int card_sum = n_board_cards(round) + 2;
   if(card_sum > 7) Logger::error("Invalid card sum.");
@@ -161,7 +161,7 @@ void build_ochs_features_filtered(const int round, const std::string& dir) {
     FlopIndexer::get_instance()->unindex(flop_idx, cards.data() + 2);
     std::string flop = cards_to_str(cards.data() + 2, 3);
     Logger::log("Collecting indexes for flop: " + flop);
-    auto index_set = collect_indexes(round, cards.data());
+    auto index_set = collect_filtered_indexes(round, cards.data());
     std::vector<hand_index_t> indexes{index_set.begin(), index_set.end()};
     std::string infix = "r" + std::to_string(round) + "_f" + std::to_string(flop_idx);
     cereal_save(indexes, std::filesystem::path{dir} / ("indexes_" + infix + ".bin"));
