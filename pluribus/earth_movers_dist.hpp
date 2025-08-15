@@ -20,7 +20,7 @@ struct EMDPreprocCache {
   }
 };
 
-double emd_heuristic(const std::vector<int>& x, const std::vector<double>& targets, const std::vector<double>& m,
+double emd_heuristic(const std::vector<int>& x, const std::vector<double>& x_w, const std::vector<double>& m_w,
     const std::vector<std::vector<std::pair<double, int>>>& sorted_distances);
 void build_emd_preproc_cache(const std::filesystem::path& dir);
 
