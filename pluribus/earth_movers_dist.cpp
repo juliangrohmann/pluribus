@@ -111,7 +111,7 @@ std::pair<std::vector<int>, std::vector<double>> preprocess(const std::vector<in
   const double unit = 1.0 / static_cast<double>(histogram.size());
   for(int i = 0; i < histogram.size(); ++i) {
     if(i > 0 && histogram[i] == histogram[i - 1]) {
-      weights[weights.size() - 1] == unit;
+      weights[weights.size() - 1] += unit;
     }
     else {
       weights.push_back(unit);
