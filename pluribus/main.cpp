@@ -1,6 +1,7 @@
 #include <iostream>
 #include <pluribus/blueprint.hpp>
 #include <pluribus/cluster.hpp>
+#include <pluribus/earth_movers_dist.hpp>
 #include <pluribus/poker.hpp>
 #include <pluribus/range_viewer.hpp>
 #include <pluribus/traverse.hpp>
@@ -52,6 +53,15 @@ int main(int argc, char* argv[]) {
       else {
         fun(atoi(argv[3]), argv[4]);
       }
+    }
+  }
+  else if(command == "emd-matrix") {
+    // ./Pluribus emd-matrix dir
+    if(argc < 3) {
+      std::cout << "Missing arguments to build EMD matrix.\n";
+    }
+    else {
+      build_emd_matrix(argv[2]);
     }
   }
   else if(command == "print-clusters") {

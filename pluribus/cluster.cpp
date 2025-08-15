@@ -13,6 +13,7 @@
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/cluster.hpp>
 #include <pluribus/constants.hpp>
+#include <pluribus/earth_movers_dist.hpp>
 #include <pluribus/logging.hpp>
 #include <pluribus/util.hpp>
 #include <tqdm/tqdm.hpp>
@@ -70,17 +71,6 @@ double equity(const omp::Hand& hero, const omp::CardRange& villain, const omp::H
   return results[0] / (results[0] + results[1]);
 }
 
-std::string progress_str(const hand_index_t idx, const hand_index_t total, const std::chrono::steady_clock::time_point& t_0) {
-  const auto dt = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - t_0).count();
-  const double percent = static_cast<double>(idx) / total;
-  std::ostringstream oss;
-  oss << std::setw(11) << std::to_string(idx) << ":   "
-      << std::fixed << std::setprecision(1) << std::setw(5) << (percent * 100) << "%"
-      << "    Elapsed: " << std::setw(7) << std::setprecision(0) << dt << " s"
-      << "    Remaining: " << std::setw(7) << 1 / percent * dt - dt << " s";
-  return oss.str();
-}
-
 void map_index_to_features(const hand_index_t idx, const int round, const int card_sum, float* data) {
   uint8_t cards[7] = {};
   HandIndexer::get_instance()->unindex(idx, cards, round);
@@ -96,7 +86,7 @@ void solve_features(const int round, const hand_index_t total, const std::functi
   const hand_index_t chunk_size = std::max(total / omp_get_max_threads(), 1ul);
   const hand_index_t log_interval = std::max(chunk_size / 100, 1ul);
   std::vector<float> feature_map(total * 8);
-  const std::chrono::steady_clock::time_point t_0 = std::chrono::steady_clock::now();
+  const auto t_0 = std::chrono::high_resolution_clock::now();
 
   #pragma omp parallel for schedule(static)
   for(hand_index_t i = 0; i < total; ++i) {
@@ -124,7 +114,7 @@ void solve_features(const int round, const std::vector<hand_index_t>& indexes, c
 }
 
 void build_ochs_features(const int round, const std::string& dir) {
-  if(round < 1 || round > 3) Logger::error("Cannot build filtered OCHS features for round " + std::to_string(round) + ".");
+  if(round < 1 || round > 3) Logger::error("Cannot build OCHS features for round " + std::to_string(round) + ".");
   Logger::log("Building OCHS features: " + round_to_str(round));
   const size_t n_idx = HandIndexer::get_instance()->size(round);
   if(round == 3) {
