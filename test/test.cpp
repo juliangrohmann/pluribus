@@ -495,14 +495,15 @@ TEST_CASE("Serialize TreeBlueprintSolver", "[serialize][blueprint][slow]") {
 TEST_CASE("EMD heuristic - partial mass", "[emd]") {
     constexpr int C = 2;
     const std::vector x = {0, 0}; // both points in cluster 0
-    const std::vector m = {0.75, 0.25};
+    const std::vector x_w = {1.00, 0.00};
+    const std::vector m_w = {0.75, 0.25};
 
-    const std::array<std::vector<std::pair<double, int>>, C> sorted_distances = {{
+    const std::vector<std::vector<std::pair<double, int>>> sorted_distances = {{
         {{0.0, 0}, {1.0, 1}}, // sorted ascending
         {{0.0, 1}, {1.0, 0}}
     }};
 
-    double cost = emd_heuristic(x, m, sorted_distances);
+    double cost = emd_heuristic(x, x_w, m_w, sorted_distances);
     // First point gets all from mean 0 (0 cost)
     // Second point gets 0.25 from mean 0 (0 cost) + 0.25 from mean 1 (cost 0.25)
     REQUIRE_THAT(cost, WithinAbs(0.25, 1e-12));
@@ -511,34 +512,34 @@ TEST_CASE("EMD heuristic - partial mass", "[emd]") {
 TEST_CASE("EMD heuristic - zero distances", "[emd]") {
     constexpr int C = 3;
     const std::vector x = {0, 1, 2};
-    const std::vector m = {1.0/3, 1.0/3, 1.0/3};
+    const std::vector w = {1.0/3, 1.0/3, 1.0/3};
 
-    std::array<std::vector<std::pair<double, int>>, C> sorted_distances;
+    std::vector<std::vector<std::pair<double, int>>> sorted_distances;
     for (int pc = 0; pc < C; ++pc) {
         sorted_distances[pc] = {{0.0, pc}, {0.0, (pc+1)%C}, {0.0, (pc+2)%C}}; // all zero distances
     }
 
-    double cost = emd_heuristic(x, m, sorted_distances);
+    double cost = emd_heuristic(x, w, w, sorted_distances);
     REQUIRE_THAT(cost, WithinAbs(0.0, 1e-12));
 }
 
 TEST_CASE("EMD heuristic - mismatched sizes logs error", "[emd]") {
     constexpr int C = 2;
     const std::vector x = {0, 1};
-    const std::vector m = {0.5, 0.5};
+    const std::vector w = {0.5, 0.5};
 
     // Wrong length in sorted_distances[0]
-    const std::array<std::vector<std::pair<double, int>>, C> sorted_distances = {{
+    const std::vector<std::vector<std::pair<double, int>>> sorted_distances = {{
         {{0.0, 0}}, // invalid
         {{0.0, 1}, {1.0, 0}}
     }};
-    REQUIRE_THROWS(emd_heuristic(x, m, sorted_distances));
+    REQUIRE_THROWS(emd_heuristic(x, w, w, sorted_distances));
 }
 
 TEST_CASE("EMD heuristic - closest cluster is not self", "[emd]") {
   constexpr int C = 3;
   const std::vector x = {0, 1, 2};
-  const std::vector m = {1.0/3, 1.0/3, 1.0/3};
+  const std::vector w = {1.0/3, 1.0/3, 1.0/3};
 
   // Distances are sorted ascending per point cluster
   const std::array<std::vector<std::pair<double, int>>, C> sorted_distances = {{
@@ -546,7 +547,7 @@ TEST_CASE("EMD heuristic - closest cluster is not self", "[emd]") {
     {{0.2, 0}, {0.7, 2}, {1.5, 1}}, // from cluster 1: closest mean cluster is #0 (0.2 away)
     {{0.1, 1}, {0.3, 0}, {1.0, 2}}  // from cluster 2: closest mean cluster is #1 (0.1 away)
   }};
-  double cost = emd_heuristic(x, m, sorted_distances);
+  double cost = emd_heuristic(x, w, w, sorted_distances);
   REQUIRE_THAT(cost, WithinAbs(1.0/6.0 + 1.0/15.0 + 1.0/30.0, 1e-12));
 }
 
