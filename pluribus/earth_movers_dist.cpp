@@ -95,8 +95,11 @@ std::vector<int> build_histogram(const hand_index_t turn_idx, const std::unorder
   HandIndexer::get_instance()->unindex(turn_idx, cards, round);
   std::cout << "Hand: " << cards_to_str(cards, 6) << "\n";
   const uint64_t mask = card_mask(cards, n_board_cards(round) + 2);
+  std::cout << "Hand mask: " << mask << "\n";
   std::vector<int> histogram;
   for(uint8_t card = 0; card < MAX_CARDS; ++card) {
+    std::cout << "Card mask: " << card_mask(card) << "\n";
+    std::cout << "Match: " << (mask && card_mask(card)) << "\n";
     if(!(mask && card_mask(card))) {
       std::cout << "River: " << static_cast<int>(card);
       cards[6] = card;
