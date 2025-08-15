@@ -132,6 +132,7 @@ std::pair<std::vector<int>, std::vector<double>> preprocess(const std::vector<in
 }
 
 std::vector<std::vector<std::pair<double, int>>> build_sorted_distances(const std::vector<int>& mean_histogram, const std::vector<std::vector<double>>& ochs_matrix) {
+  std::cout << "building sorted dists...\n";
   constexpr int n_clusters = 500;
   std::vector<std::vector<std::pair<double, int>>> sorted_distances;
   for(int c = 0; c < n_clusters; ++c) {
@@ -140,6 +141,7 @@ std::vector<std::vector<std::pair<double, int>>> build_sorted_distances(const st
     }
     std::ranges::sort(sorted_distances[c], [](const auto& e1, const auto& e2) { return e1.first < e2.first; });
   }
+  std::cout << "sorted done.\n";
   return sorted_distances;
 }
 
