@@ -55,13 +55,13 @@ int main(int argc, char* argv[]) {
       }
     }
   }
-  else if(command == "emd-matrix") {
-    // ./Pluribus emd-matrix dir
+  else if(command == "emd-preproc") {
+    // ./Pluribus emd-preproc dir
     if(argc < 3) {
       std::cout << "Missing arguments to build EMD matrix.\n";
     }
     else {
-      build_emd_matrix(argv[2]);
+      build_emd_preproc_cache(argv[2]);
     }
   }
   else if(command == "print-clusters") {
