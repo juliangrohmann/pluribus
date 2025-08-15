@@ -62,7 +62,7 @@ std::vector<std::vector<double>> build_ochs_matrix(const hand_index_t flop_idx, 
   }
   auto matrix = std::vector(n_clusters, std::vector(n_clusters, 0.0));
   for(int c1 = 0; c1 < n_clusters; ++c1) {
-    for(int c2 = c1 + 1; c1 < n_clusters; ++c2) {
+    for(int c2 = c1 + 1; c2 < n_clusters; ++c2) {
       double dist = 0.0f;
       for(int i = 0; i < n_features; ++i) {
         dist += pow(centroids[c1 * n_features + i] - centroids[c2 * n_features + i], 2.0f);
@@ -143,8 +143,10 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     cereal_load(indexes, dir / ("indexes_r3_f" + std::to_string(flop_idx) + ".bin"));
     const std::vector<int> clusters = cnpy::npy_load(
       dir / ("clusters_r3_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".npy")).as_vec<int>();
+    Logger::log("Building cluster map...");
     auto cluster_map = build_cluster_map(indexes, clusters);
     EMDPreprocCache cache;
+    Logger::log("Building OCHS matrix...");
     cache.ochs_matrix = build_ochs_matrix(flop_idx, n_clusters, dir);
     Logger::log("Indexes: " + std::to_string(indexes.size()));
     const unsigned long log_interval = indexes.size() / 10UL;
