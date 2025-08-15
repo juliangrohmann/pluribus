@@ -542,7 +542,7 @@ TEST_CASE("EMD heuristic - closest cluster is not self", "[emd]") {
   const std::vector w = {1.0/3, 1.0/3, 1.0/3};
 
   // Distances are sorted ascending per point cluster
-  const std::array<std::vector<std::pair<double, int>>, C> sorted_distances = {{
+  const std::vector<std::vector<std::pair<double, int>>> sorted_distances = {{
     {{0.5, 2}, {1.0, 0}, {2.0, 1}}, // from cluster 0: closest mean cluster is #2 (0.5 away)
     {{0.2, 0}, {0.7, 2}, {1.5, 1}}, // from cluster 1: closest mean cluster is #0 (0.2 away)
     {{0.1, 1}, {0.3, 0}, {1.0, 2}}  // from cluster 2: closest mean cluster is #1 (0.1 away)
