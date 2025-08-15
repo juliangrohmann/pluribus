@@ -179,7 +179,7 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     Logger::log("Building EMD matrix...");
     auto matrix = std::vector(turn_indexes.size(), std::vector(turn_indexes.size(), 0.0));
     const unsigned long total_iter = (turn_indexes.size() * turn_indexes.size() - 1) / 2;
-    const unsigned long log_interval = turn_indexes.size() / 100UL;
+    const unsigned long log_interval = total_iter / 100UL;
     const auto t_0 = std::chrono::high_resolution_clock::now();
     unsigned long iter = 0;
     for(hand_index_t idx1 = 0; idx1 < turn_indexes.size(); ++idx1) {
