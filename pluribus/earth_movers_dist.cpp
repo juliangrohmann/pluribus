@@ -8,9 +8,11 @@
 
 namespace pluribus {
 
-double emd_heuristic(const std::vector<int>& x, const size_t Q, const std::vector<std::vector<std::pair<double, int>>>& sorted_distances) {
+double emd_heuristic(const std::vector<int>& x, const std::vector<double>& targets, const std::vector<double>& m,
+    const std::vector<std::vector<std::pair<double, int>>>& sorted_distances) {
   const size_t C = sorted_distances.size();
   const size_t N = x.size();
+  const size_t Q = m.size();
 
   for(const int c : x) if(c >= C) Logger::error("Cluster in x is too large: " + std::to_string(c));
   for(const auto& vec : sorted_distances) {
@@ -23,8 +25,8 @@ double emd_heuristic(const std::vector<int>& x, const size_t Q, const std::vecto
     }
   }
 
-  std::vector targets(N, 1.0 / N);
-  std::vector mean_remaining(Q, 1.0 / Q);
+  std::vector targets(N, 1.0 / static_cast<double>(N));
+  std::vector mean_remaining(Q, 1.0 / static_cast<double>(Q));
   std::vector done(N, false);
   double tot_cost = 0.0;
   for(int i = 0; i < Q; ++i) {
@@ -101,6 +103,22 @@ std::vector<int> build_histogram(const hand_index_t turn_idx, const std::unorder
   return histogram;
 }
 
+std::pair<std::vector<int>, std::vector<double>> preprocess(const std::vector<int>& histogram) {
+  std::vector<int> unique_histogram;
+  std::vector<double> weights;
+  const double unit = 1.0 / static_cast<double>(histogram.size());
+  for(int i = 0; i < histogram.size(); ++i) {
+    if(i > 0 && histogram[i] == histogram[i - 1]) {
+      weights[weights.size() - 1] == unit;
+    }
+    else {
+      weights.push_back(unit);
+      unique_histogram.push_back(histogram[i]);
+    }
+  }
+  return {unique_histogram, weights};
+}
+
 std::vector<std::vector<std::pair<double, int>>> build_sorted_distances(const std::vector<int>& mean_histogram, const std::vector<std::vector<double>>& ochs_matrix) {
   constexpr int n_clusters = 500;
   std::vector<std::vector<std::pair<double, int>>> sorted_distances;
@@ -129,11 +147,15 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     EMDPreprocCache cache;
     cache.ochs_matrix = build_ochs_matrix(flop_idx, n_clusters, dir);
     Logger::log("Indexes: " + std::to_string(indexes.size()));
-    const long log_interval = indexes.size() / 10;
+    const unsigned long log_interval = indexes.size() / 10UL;
     const auto t_0 = std::chrono::high_resolution_clock::now();
     for(hand_index_t i = 0; i < indexes.size(); ++i) {
       if(i > 0 && i % log_interval == 0) progress_str(i, indexes.size(), t_0);
-      cache.histograms.push_back(build_histogram(indexes[i], cluster_map));
+      auto [unique_histogram, weights] = preprocess(build_histogram(indexes[i], cluster_map));
+      std::cout << "Unique histogram: [" << join_as_strs(unique_histogram, " ") << "]\n";
+      std::cout << std::fixed << std::setprecision(2) << "Weights: [" << join_as_strs(weights, " ") << "]\n";
+      cache.histograms.push_back(unique_histogram);
+      cache.weights.push_back(weights);
     }
     cereal_save(cache, dir / ("emd_preproc_cache_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin"));
   }
