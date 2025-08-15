@@ -155,27 +155,41 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     cereal_load(river_indexes, dir / ("indexes_r3_f" + std::to_string(flop_idx) + ".bin"));
     const std::vector<int> clusters = cnpy::npy_load(
       dir / ("clusters_r3_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".npy")).as_vec<int>();
-    Logger::log("Building cluster map...");
     auto cluster_map = build_cluster_map(river_indexes, clusters);
-    EMDPreprocCache cache;
-    Logger::log("Building OCHS matrix...");
-    cache.ochs_matrix = build_ochs_matrix(flop_idx, n_clusters, dir);
+
     auto turn_index_set = collect_filtered_indexes(2, cards);
     auto turn_indexes = std::vector(turn_index_set.begin(), turn_index_set.end());
     cereal_save(turn_indexes, dir / ("indexes_r2_f" + std::to_string(flop_idx) + ".bin"));
-    Logger::log("Indexes: " + std::to_string(turn_indexes.size()));
-    const unsigned long log_interval = turn_indexes.size() / 10UL;
-    const auto t_0 = std::chrono::high_resolution_clock::now();
-    for(hand_index_t i = 0; i < turn_indexes.size(); ++i) {
-      if(i > 0 && i % log_interval == 0) progress_str(i, turn_indexes.size(), t_0);
-      auto full_histogram = build_histogram(turn_indexes[i], cluster_map);
-      auto [unique_histogram, weights] = preprocess(full_histogram);
+
+    Logger::log("Building OCHS matrix...");
+    auto ochs_matrix = build_ochs_matrix(flop_idx, n_clusters, dir);
+
+    Logger::log("Preprocessing...");
+    std::vector<std::vector<int>> histograms;
+    std::vector<std::vector<double>> weights;
+    for(const hand_index_t turn_idx : turn_indexes) {
+      auto full_histogram = build_histogram(turn_idx, cluster_map);
+      auto [unique_histogram, weight_vec] = preprocess(full_histogram);
       validate_clusters(unique_histogram, n_clusters);
-      validate_weights(weights);
-      cache.histograms.push_back(unique_histogram);
-      cache.weights.push_back(weights);
+      validate_weights(weight_vec);
+      histograms.push_back(unique_histogram);
+      weights.push_back(weight_vec);
     }
-    cereal_save(cache, dir / ("emd_preproc_cache_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin"));
+
+    Logger::log("Building EMD matrix...");
+    auto matrix = std::vector(turn_indexes.size(), std::vector(turn_indexes.size(), 0.0));
+    const unsigned long total_iter = (turn_indexes.size() * turn_indexes.size() - 1) / 2;
+    const unsigned long log_interval = turn_indexes.size() / 100UL;
+    const auto t_0 = std::chrono::high_resolution_clock::now();
+    unsigned long iter = 0;
+    for(hand_index_t idx1 = 0; idx1 < turn_indexes.size(); ++idx1) {
+      for(hand_index_t idx2 = 0; idx2 < turn_indexes.size(); ++idx2) {
+        if(iter > 0 && iter % log_interval == 0) Logger::log(progress_str(iter, total_iter, t_0));
+        matrix[idx1][idx2] = emd_heuristic(histograms[idx1], weights[idx1], weights[idx2], build_sorted_distances(histograms[idx2], ochs_matrix));
+        ++iter;
+      }
+    }
+    cereal_save(matrix, dir / ("emd_matrix_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin"));
   }
 }
 
