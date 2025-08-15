@@ -10,13 +10,23 @@
 
 namespace pluribus {
 
+void validate_clusters(const std::vector<int>& c_vec, const int C) {
+  for(const int c : c_vec) if(c >= C) Logger::error("Cluster is too large: " + std::to_string(c));
+}
+
+void validate_weights(const std::vector<double>& w) {
+  if(abs(std::accumulate(w.begin(), w.end(), 0.0) - 1.0) > 1e-6) Logger::error("Weights do not sum to 1.0.");
+}
+
 double emd_heuristic(const std::vector<int>& x, const std::vector<double>& x_w, const std::vector<double>& m_w,
     const std::vector<std::vector<std::pair<double, int>>>& sorted_distances) {
   const size_t C = sorted_distances.size();
   const size_t N = x.size();
   const size_t Q = m_w.size();
 
-  for(const int c : x) if(c >= C) Logger::error("Cluster in x is too large: " + std::to_string(c));
+  validate_clusters(x, static_cast<int>(C));
+  validate_weights(x_w);
+  validate_weights(m_w);
   for(const auto& vec : sorted_distances) {
     if(vec.size() != Q) Logger::error("Sorted distances vector size mismatch.");
     for(int idx = 0; idx < Q; ++idx) {
@@ -159,10 +169,9 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     for(hand_index_t i = 0; i < turn_indexes.size(); ++i) {
       if(i > 0 && i % log_interval == 0) progress_str(i, turn_indexes.size(), t_0);
       auto full_histogram = build_histogram(turn_indexes[i], cluster_map);
-      std::cout << "Full histogram: [" << join_as_strs(full_histogram, " ") << "]\n";
       auto [unique_histogram, weights] = preprocess(full_histogram);
-      std::cout << "Unique histogram: [" << join_as_strs(unique_histogram, " ") << "]\n";
-      std::cout << std::fixed << std::setprecision(2) << "Weights: [" << join_as_strs(weights, " ") << "]\n";
+      validate_clusters(unique_histogram, n_clusters);
+      validate_weights(weights);
       cache.histograms.push_back(unique_histogram);
       cache.weights.push_back(weights);
     }
