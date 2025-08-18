@@ -37,9 +37,14 @@ class PokerTable:
     r = win32gui.GetWindowRect(self.handle)
     return r[0] + win_default_offset, r[1] + win_header_offset, r[2] - r[0] - 2 * win_default_offset, r[3] - r[1] - win_default_offset - win_header_offset
 
+  def active_pos(self, img: Image=None):
+    if img is None: img = self.screenshot()
+    for pos in range(self.config.n_players):
+      if self._apply_color_filter(pos, img, self.config.active, self.config.is_active): return pos
+    return -1
+
   def is_seat_open(self, pos: int, img: Image=None): return self._apply_color_filter(pos, img, self.config.seats, self.config.is_seat_open)
   def has_cards(self, pos: int, img: Image=None): return self._apply_color_filter(pos, img, self.config.cards, self.config.has_cards)
-  def is_active(self, pos: int, img: Image = None): return self._apply_color_filter(pos, img, self.config.active, self.config.is_active)
   def screenshot(self): return pyautogui.screenshot(region=self.rect())
   def title(self) -> str: return win32gui.GetWindowText(self.handle)
   def move(self, x, y, w, h) -> None: win32gui.SetWindowPos(self.handle, win32con.HWND_TOP, x, y, w, h, 0)
@@ -197,11 +202,6 @@ def current_street(img: Image) -> str:
     return 'flop'
   else:
     return 'preflop'
-
-def is_active(pos: int, img: Image) -> bool:
-  assert_player_pos(pos)
-  pos -= 1
-  return img.getpixel(cc['active'][pos]) != cc['active_not_pix'] if pos != -1 else is_hero_turn(img)
 
 def is_hero_turn(img: Image): # TODO: Remove
   if cc['site'] == 'gp':
@@ -453,8 +453,9 @@ def debug() -> None:
       pass
       # print(table_img.getpixel((cc['waiting'][testing][0], cc['waiting'][testing][1])))
     elif action == 'active':
-      for i in range(table.config.n_players):
-        print(f"Seat {i}: {'Active' if table.is_active(i, table_img) else 'Inactive'}")
+      active = table.active_pos(table_img)
+      if active != -1: print(f"Seat {active} is active.")
+      else: print("No one is active.")
     elif action == 'cards':
       for i in range(6):
         print("Player", i, ("has cards." if table.has_cards(i, table_img) else "folded."))
