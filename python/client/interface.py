@@ -18,9 +18,15 @@ import config
 random.seed()
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-win_default_offset = 7
+win_default_offset = 8
 win_header_offset = 1
 win_header_h = 30
+
+def assert_player_pos(i: int) -> None:
+  assert 0 <= i <= 5, f"Invalid Player Position: {player_pos}"
+
+def frac_to_pix(x: float, y: float, img_w: int, img_h: int) -> Tuple[int, int]:
+  return int(round(x * img_w)), int(round(y * (img_h - win_header_h) + win_header_h))
 
 class PokerTable:
   def __init__(self, wnd_handle: int, conf: dict) -> None:
@@ -31,11 +37,21 @@ class PokerTable:
     r = win32gui.GetWindowRect(self.handle)
     return r[0] + win_default_offset, r[1] + win_header_offset, r[2] - r[0] - 2 * win_default_offset, r[3] - r[1] - win_default_offset - win_header_offset
 
+  def is_seat_open(self, pos: int, img: Image=None):
+    assert_player_pos(pos)
+    if img is None: img = self.screenshot()
+    return self.config.is_seat_open(img.getpixel(frac_to_pix(*self.config.seats[pos], img.width, img.height)))
+
+  def has_cards(self, pos: int, img: Image=None):
+    assert_player_pos(pos)
+    if img is None: img = self.screenshot()
+    return self.config.has_cards(img.getpixel(frac_to_pix(*self.config.cards[pos], img.width, img.height)))
+
   def screenshot(self): return pyautogui.screenshot(region=self.rect())
   def title(self) -> str: return win32gui.GetWindowText(self.handle)
   def move(self, x, y, w, h) -> None: win32gui.SetWindowPos(self.handle, win32con.HWND_TOP, x, y, w, h, 0)
   def __str__(self) -> str: return self.__repr__()
-  def __repr__(self) -> str: return f"<PokerTable title=\"{self.title()}\", config=\"{self.config["name"]}\", handle={self.handle}>"
+  def __repr__(self) -> str: return f"<PokerTable title=\"{self.title()}\", config=\"{self.config.name}\", handle={self.handle}>"
 
 def is_real_window(h_wnd) -> bool:
   if not win32gui.IsWindowVisible(h_wnd) or win32gui.GetParent(h_wnd) != 0:
@@ -65,11 +81,8 @@ def get_table_list(window_list=None) -> List[PokerTable]:
 def get_config(handle) -> Optional[dict]:
   title = win32gui.GetWindowText(handle)
   for c in config.configs:
-    if c['table_title'] in title: return c
+    if c.table_title in title: return c
   return None
-
-def assert_player_pos(i: int) -> None:
-  assert 0 <= i <= 5, f"Invalid Player Position: {player_pos}"
 
 def position_tables(poker_tables: list):
   """
@@ -81,20 +94,6 @@ def position_tables(poker_tables: list):
   positions = [((i // 3) * table_h, (i % 3) * table_w) for i in range(len(poker_tables))]
   for pos, table in zip(positions, poker_tables):
     table.move(pos[0], pos[1], table_w, table_h)
-
-def seat_open(pos: int, img: Image) -> bool:
-  assert_player_pos(pos)
-
-  pos -= 1
-  if pos == -1: return False
-
-  rgb_val = img.getpixel((cc['seat'][pos][0], cc['seat'][pos][1]))
-  if cc['site'] == 'gp':
-    return (cc['seat'][pos][2] < rgb_val[0] < cc['seat'][pos][3] and
-            cc['seat'][pos][2] < rgb_val[1] < cc['seat'][pos][3] and
-            cc['seat'][pos][2] < rgb_val[2] < cc['seat'][pos][3])
-  elif cc['site'] == 'bovada':
-    return True if rgb_val == cc['seat_pix'][pos] else False
 
 def has_cards(pos, img) -> bool:
   assert_player_pos(pos)
@@ -432,8 +431,9 @@ def debug() -> None:
   table_index = 0
   playing = True
   while playing:
-    action = input("Action: ")
-    table_img = poker_tables[table_index].screenshot()
+    action = input("\nAction: ")
+    table = poker_tables[table_index]
+    table_img = table.screenshot()
     table_img.save('img_debug/table.png')
 
     if action == 'update':
@@ -441,10 +441,10 @@ def debug() -> None:
       for table in poker_tables: print(table)
     elif action == 'screenshot':
       table = poker_tables[table_index]
-      table.screenshot().save(f"img_debug/{table.config['name']}_{table.handle}.png")
-    elif action == 'seat':
+      table.screenshot().save(f"img_debug/{table.config.name}_{table.handle}.png")
+    elif action == 'seats':
       for i in range(6):
-        if seat_open(i, table_img):
+        if table.is_seat_open(i, table_img):
           print("Seat", i, "is open.")
         else:
           print("Seat", i, "is taken.")
@@ -457,9 +457,9 @@ def debug() -> None:
     elif action == 'active':
       for i in range(6):
         print("Seat {num}: {active}".format(num=i, active="Active" if is_active(i, table_img) else "Inactive"))
-    elif action == 'card':
+    elif action == 'cards':
       for i in range(6):
-        print("Player", i, ("has cards." if has_cards(i, table_img) else "folded."))
+        print("Player", i, ("has cards." if table.has_cards(i, table_img) else "folded."))
     elif action == 'invested':
       for i in range(1, 6):
         if has_bet(i, table_img):

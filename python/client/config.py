@@ -1,18 +1,25 @@
 from typing import Tuple, Callable
 from dataclasses import dataclass
 
+def is_color(rgb: Tuple[int, int, int], idx: int, tol: int) -> bool:
+  return sum([rgb[idx] - rgb[i] < tol for i in range(len(rgb)) if i != idx]) == 0
+
 @dataclass(frozen=True)
 class PokerConfig:
   name: str
   table_title: str
   seats: Tuple[Tuple[float, float], ...]
-  is_seat_open: Callable[[int, int, int], bool]
+  cards: Tuple[Tuple[float, float], ...]
+  is_seat_open: Callable[[Tuple[int, int, int]], bool]
+  has_cards: Callable[[Tuple[int, int, int]], bool]
 
 pokerstars = PokerConfig(
   name="PokerStars",
   table_title="No Limit Hold'em",
-  seats=((0, 0), (0.0597, 0.0597), (0.17715, 0.2838), ),
-  is_seat_open=lambda r, g, b: b - g > 8 and b - r > 8,
+  seats=((0.5252, 0.7301), (0.0924, 0.5457), (0.1302, 0.2348), (0.4737, 0.1372), (0.8728, 0.2348), (0.9033, 0.5457)),
+  cards=((0.4821, 0.6616), (0.1008, 0.4771), (0.1996, 0.1676), (0.5472, 0.0686), (0.8939, 0.1676), (0.8624, 0.4771)),
+  is_seat_open=lambda rgb: is_color(rgb, 2, 8),
+  has_cards=lambda rgb: is_color(rgb, 0, 30),
 )
 
 # pokerstars = {
@@ -22,8 +29,8 @@ pokerstars = PokerConfig(
 # club_wpt = {
 #   "name": "Club WPT Gold",
 #   "table_title": "ClubWPT GOLD"
-}
+# }
 # img: 2733 x 1092
 #      3483 x 1393
 
-configs = (pokerstars)
+configs = (pokerstars, )
