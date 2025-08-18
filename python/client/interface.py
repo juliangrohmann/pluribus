@@ -8,7 +8,7 @@ import pyautogui
 import win32gui
 import win32con
 import pytesseract
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Callable, Optional
 from PIL import ImageOps, ImageEnhance
 from PIL.Image import Image
 from termcolor import colored
@@ -37,21 +37,19 @@ class PokerTable:
     r = win32gui.GetWindowRect(self.handle)
     return r[0] + win_default_offset, r[1] + win_header_offset, r[2] - r[0] - 2 * win_default_offset, r[3] - r[1] - win_default_offset - win_header_offset
 
-  def is_seat_open(self, pos: int, img: Image=None):
-    assert_player_pos(pos)
-    if img is None: img = self.screenshot()
-    return self.config.is_seat_open(img.getpixel(frac_to_pix(*self.config.seats[pos], img.width, img.height)))
-
-  def has_cards(self, pos: int, img: Image=None):
-    assert_player_pos(pos)
-    if img is None: img = self.screenshot()
-    return self.config.has_cards(img.getpixel(frac_to_pix(*self.config.cards[pos], img.width, img.height)))
-
+  def is_seat_open(self, pos: int, img: Image=None): return self._apply_color_filter(pos, img, self.config.seats, self.config.is_seat_open)
+  def has_cards(self, pos: int, img: Image=None): return self._apply_color_filter(pos, img, self.config.cards, self.config.has_cards)
+  def is_active(self, pos: int, img: Image = None): return self._apply_color_filter(pos, img, self.config.active, self.config.is_active)
   def screenshot(self): return pyautogui.screenshot(region=self.rect())
   def title(self) -> str: return win32gui.GetWindowText(self.handle)
   def move(self, x, y, w, h) -> None: win32gui.SetWindowPos(self.handle, win32con.HWND_TOP, x, y, w, h, 0)
   def __str__(self) -> str: return self.__repr__()
   def __repr__(self) -> str: return f"<PokerTable title=\"{self.title()}\", config=\"{self.config.name}\", handle={self.handle}>"
+
+  def _apply_color_filter(self, pos: int, img: Image, coords: Tuple[Tuple[float, float], ...], fun: Callable[[Tuple[int, int, int]], bool]):
+    assert_player_pos(pos)
+    if img is None: img = self.screenshot()
+    return fun(img.getpixel(frac_to_pix(*coords[pos], img.width, img.height)))
 
 def is_real_window(h_wnd) -> bool:
   if not win32gui.IsWindowVisible(h_wnd) or win32gui.GetParent(h_wnd) != 0:
@@ -454,9 +452,9 @@ def debug() -> None:
     elif action == 'waiting': # TODO
       pass
       # print(table_img.getpixel((cc['waiting'][testing][0], cc['waiting'][testing][1])))
-    elif action == 'active': # TODO
-      for i in range(6):
-        print("Seat {num}: {active}".format(num=i, active="Active" if is_active(i, table_img) else "Inactive"))
+    elif action == 'active':
+      for i in range(table.config.n_players):
+        print(f"Seat {i}: {'Active' if table.is_active(i, table_img) else 'Inactive'}")
     elif action == 'cards':
       for i in range(6):
         print("Player", i, ("has cards." if table.has_cards(i, table_img) else "folded."))
