@@ -1,6 +1,5 @@
 pyautogui
 pywin32
-pytesseract
 pillow
 termcolor
 requests
