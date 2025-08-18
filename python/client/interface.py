@@ -37,12 +37,8 @@ class PokerTable:
     r = win32gui.GetWindowRect(self.handle)
     return r[0] + win_default_offset, r[1] + win_header_offset, r[2] - r[0] - 2 * win_default_offset, r[3] - r[1] - win_default_offset - win_header_offset
 
-  def active_pos(self, img: Image=None):
-    if img is None: img = self.screenshot()
-    for pos in range(self.config.n_players):
-      if self._apply_color_filter(pos, img, self.config.active, self.config.is_active): return pos
-    return -1
-
+  def active_pos(self, img: Image=None): return self._find_pos(img, self.config.active, self.config.is_active)
+  def button_pos(self, img: Image = None): return self._find_pos(img, self.config.button, self.config.has_button)
   def is_seat_open(self, pos: int, img: Image=None): return self._apply_color_filter(pos, img, self.config.seats, self.config.is_seat_open)
   def has_cards(self, pos: int, img: Image=None): return self._apply_color_filter(pos, img, self.config.cards, self.config.has_cards)
   def screenshot(self): return pyautogui.screenshot(region=self.rect())
@@ -55,6 +51,12 @@ class PokerTable:
     assert_player_pos(pos)
     if img is None: img = self.screenshot()
     return fun(img.getpixel(frac_to_pix(*coords[pos], img.width, img.height)))
+
+  def _find_pos(self, img: Image, coords: Tuple[Tuple[float, float], ...], fun: Callable[[Tuple[int, int, int]], bool]):
+    if img is None: img = self.screenshot()
+    for pos in range(self.config.n_players):
+      if self._apply_color_filter(pos, img, coords, fun): return pos
+    return -1
 
 def is_real_window(h_wnd) -> bool:
   if not win32gui.IsWindowVisible(h_wnd) or win32gui.GetParent(h_wnd) != 0:
@@ -464,8 +466,10 @@ def debug() -> None:
         if has_bet(i, table_img):
           amount = read_betsize(i, table_index)
           print("Seat", i, "Bet:", amount)
-    elif action == 'button': # TODO
-      print("Seat", button_pos(table_img), "has the button.")
+    elif action == 'button':
+      active = table.button_pos(table_img)
+      if active != -1: print(f"Seat {active} has the button.")
+      else: print("No one has the button.")
     elif action == 'hero': # TODO
       print("Hero", ("has cards." if hero_has_cards(table_img) else "does not have cards."))
       print("Hero has", ("bet." if hero_has_bet(table_img) else "not bet."))
