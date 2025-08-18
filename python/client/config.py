@@ -1,8 +1,8 @@
 from typing import Tuple, Callable
 from dataclasses import dataclass
 
-def is_color(rgb: Tuple[int, int, int], idx: int, tol: int) -> bool:
-  return sum([rgb[idx] - rgb[i] < tol for i in range(len(rgb)) if i != idx]) == 0
+def is_color(rgb: Tuple[int, int, int], idx: int, tol: int) -> bool: return sum(rgb[idx] - rgb[i] < tol for i in range(len(rgb)) if i != idx) == 0
+def is_white(rgb: Tuple[int, int, int], min_val: int) -> bool: return sum(v < min_val for v in rgb) == 0
 
 @dataclass(frozen=True)
 class PokerConfig:
