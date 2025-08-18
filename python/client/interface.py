@@ -424,23 +424,23 @@ def is_number(inp_str: str) -> bool:
   return pre_digit >= 1 >= dot and (dot == 0 or post_digit > 0)
 
 def debug() -> None:
-  poker_tables = get_table_list()
-  for table in poker_tables: print(table)
-  # position_tables(poker_tables)
+  tables = get_table_list()
+  for table in tables: print(table)
+  # position_tables(tables)
 
   table_index = 0
   playing = True
   while playing:
     action = input("\nAction: ")
-    table = poker_tables[table_index]
+    table = tables[table_index]
     table_img = table.screenshot()
     table_img.save('img_debug/table.png')
 
     if action == 'update':
-      poker_tables = get_table_list()
-      for table in poker_tables: print(table)
+      tables = get_table_list()
+      for table in tables: print(table)
     elif action == 'screenshot':
-      table = poker_tables[table_index]
+      table = tables[table_index]
       table.screenshot().save(f"img_debug/{table.config.name}_{table.handle}.png")
     elif action == 'seats':
       for i in range(6):
@@ -448,49 +448,49 @@ def debug() -> None:
           print("Seat", i, "is open.")
         else:
           print("Seat", i, "is taken.")
-    elif action == 'sitout':
+    elif action == 'sitout': # TODO
       for i in range(5):
         print("Seat", i, "is", ("sitting out." if sitting_out(i, table_img) else "not sitting out."))
-    elif action == 'waiting':
+    elif action == 'waiting': # TODO
       pass
       # print(table_img.getpixel((cc['waiting'][testing][0], cc['waiting'][testing][1])))
-    elif action == 'active':
+    elif action == 'active': # TODO
       for i in range(6):
         print("Seat {num}: {active}".format(num=i, active="Active" if is_active(i, table_img) else "Inactive"))
     elif action == 'cards':
       for i in range(6):
         print("Player", i, ("has cards." if table.has_cards(i, table_img) else "folded."))
-    elif action == 'invested':
+    elif action == 'invested': # TODO
       for i in range(1, 6):
         if has_bet(i, table_img):
           amount = read_betsize(i, table_index)
           print("Seat", i, "Bet:", amount)
-    elif action == 'button':
+    elif action == 'button': # TODO
       print("Seat", button_pos(table_img), "has the button.")
-    elif action == 'hero':
+    elif action == 'hero': # TODO
       print("Hero", ("has cards." if hero_has_cards(table_img) else "does not have cards."))
       print("Hero has", ("bet." if hero_has_bet(table_img) else "not bet."))
       print("Hero is", ("active." if is_hero_turn(table_img) else "inactive."))
-    elif action == 'hand':
+    elif action == 'hand': # TODO
       if hero_has_cards(table_img):
         print('Hero Hand:', hero_hand(table_img, table_index))
       else:
         print("Hero does not have cards.")
-    elif action == 'board':
+    elif action == 'board': # TODO
       print("Board:", read_board(table_img, table_index))
-    elif action == 'stacksize':
+    elif action == 'stacksize': # TODO
       for i in range(6):
         print("Seat", i, "Stack:", player_stacksize(i, table_index))
-    elif action == 'pot':
+    elif action == 'pot': # TODO
       print("Potsize:", read_potsize(table_index, table_img))
     elif action == 'option':
       print("Bet Option:", read_bet_option(table_index))
-    elif action == 'street':
+    elif action == 'street': # TODO
       print("Street:", current_street(table_img))
-    elif action == 'stakes':
-      stakes = get_stakes(poker_tables[0][1])
+    elif action == 'stakes': # TODO
+      stakes = get_stakes(tables[0][1])
       print("Stakes:", str(stakes[0]) + '/' + str(stakes[1]))
-    elif action == 'end':
+    elif action == 'end': # TODO
       playing = False
     else:
       print("Invalid. Try again.")
