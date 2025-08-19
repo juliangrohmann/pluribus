@@ -210,7 +210,7 @@ class BlueprintSolver : virtual public MCCFRSolver<StorageT> {
 public:
   BlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config);
 
-  const BlueprintSolverConfig& get_blueprint_config() const { return _bp_config; }
+  BlueprintSolverConfig& get_blueprint_config() { return _bp_config; }
   void set_avg_metrics_config(const MetricsConfig& metrics_config) { _avg_metrics_config = metrics_config; }
 
   bool operator==(const BlueprintSolver& other) const { return MCCFRSolver<StorageT>::operator==(other) && _bp_config == other._bp_config; }
