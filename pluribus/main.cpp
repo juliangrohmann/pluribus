@@ -55,8 +55,8 @@ int main(int argc, char* argv[]) {
       }
     }
   }
-  else if(command == "emd-preproc") {
-    // ./Pluribus emd-preproc dir
+  else if(command == "emd-matrix") {
+    // ./Pluribus emd-matrix dir
     if(argc < 3) {
       std::cout << "Missing arguments to build EMD matrix.\n";
     }
