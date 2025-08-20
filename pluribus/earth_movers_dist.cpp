@@ -155,7 +155,7 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
 
     std::vector<hand_index_t> river_indexes;
     cereal_load(river_indexes, dir / ("indexes_r3_f" + std::to_string(flop_idx) + ".bin"));
-    const std::vector<int> clusters = cnpy::npy_load( 
+    const std::vector<int> clusters = cnpy::npy_load(
       dir / ("clusters_r3_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".npy")).as_vec<int>();
     auto cluster_map = build_cluster_map(river_indexes, clusters);
 

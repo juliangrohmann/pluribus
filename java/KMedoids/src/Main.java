@@ -22,8 +22,7 @@ import elki.utilities.random.RandomFactory;
 public class Main {
 	static int readIndexCount(Path path) throws IOException {
 		try (var channel = FileChannel.open(path)) {
-			long have = channel.size();
-			return (int)Math.sqrt((double)have / Float.BYTES);
+			return (int)Math.sqrt((double)channel.size() / Float.BYTES);
 		}
 	}
 	
