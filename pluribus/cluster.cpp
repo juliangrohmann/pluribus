@@ -170,13 +170,69 @@ void build_ochs_features_filtered(const int round, const std::string& dir) {
   }
 }
 
-std::string cluster_filename(const int round, const int n_clusters, const int split) {
+std::unordered_map<hand_index_t, uint16_t> build_cluster_map(const std::vector<hand_index_t>& indexes, const std::vector<int>& clusters) {
+  if(indexes.size() != clusters.size()) {
+    Logger::error("Indexes to clusters size mismatch: Indexes size=" + std::to_string(indexes.size()) + ", Clusters size=" + std::to_string(clusters.size()));
+  }
+  std::unordered_map<hand_index_t, uint16_t> cluster_map;
+  for(int i = 0; i < indexes.size(); ++i) {
+    cluster_map[indexes[i]] = clusters[i];
+  }
+  return cluster_map;
+}
+
+std::vector<int> read_int_array(const std::string& filename) {
+  std::ifstream file(filename, std::ios::binary);
+  if (!file) throw std::runtime_error("Could not open file");
+
+  file.seekg(0, std::ios::end);
+  const std::streamsize size = file.tellg();
+  file.seekg(0, std::ios::beg);
+
+  if (size % sizeof(int) != 0) {
+    throw std::runtime_error("File size is not a multiple of int size");
+  }
+  std::vector<int> data(size / sizeof(int));
+  file.read(reinterpret_cast<char*>(data.data()), size);
+  return data;
+}
+
+void build_real_time_cluster_map(const int n_clusters, const std::filesystem::path& dir) {
+  RealTimeClusterMapStorage _cluster_map;
+  for(int round = 3; round < 4; ++round) {
+    Logger::log("Round: " + round);
+    for(int flop_idx = 0; flop_idx < NUM_DISTINCT_FLOPS; ++flop_idx) {
+      Logger::log("Flop idx: " + std::to_string(flop_idx));
+      std::vector<hand_index_t> indexes;
+      cereal_load(indexes, dir / ("indexes_r" + std::to_string(round) + "_f" + std::to_string(flop_idx) + ".bin"));
+      std::vector<int> clusters;
+      std::string clusters_stem = dir / ("clusters_r" + std::to_string(round) + "_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters));
+      if(round == 2) {
+        clusters = read_int_array(clusters_stem + ".bin");
+      }
+      else {
+        auto clusters_half = cnpy::npy_load(clusters_stem + ".npy").as_vec<uint16_t>();
+        clusters = cnpy::npy_load(clusters_stem + ".npy").as_vec<int>();
+        std::cout << "Clusters (half): ";
+        for(int i = 0; i < 20; ++i) std::cout << clusters_half[i] << " ";
+        std::cout << "\n";
+        std::cout << "Clusters (full): ";
+        for(int i = 0; i < 20; ++i) std::cout << clusters[i] << " ";
+        std::cout << "\n";
+      }
+      _cluster_map[flop_idx][round] = build_cluster_map(indexes, clusters);
+    }
+  }
+  cereal_save(_cluster_map, "real_time_cluster_map.bin");
+}
+
+std::string bp_cluster_filename(const int round, const int n_clusters, const int split) {
   const std::string base = "clusters_r" + std::to_string(round) + "_c" + std::to_string(n_clusters);
   return base + (round == 3 ? "_p" + std::to_string(split) + ".npy": ".npy");
 }
 
 std::vector<uint16_t> load_clusters(const int round, const int n_clusters, const int split) {
-  return cnpy::npy_load(cluster_filename(round, n_clusters, split)).as_vec<uint16_t>();
+  return cnpy::npy_load(bp_cluster_filename(round, n_clusters, split)).as_vec<uint16_t>();
 }
 
 std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(const int n_clusters) {
@@ -188,7 +244,7 @@ std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(const int n_clusters)
     std::cout << "(Flat: " << n_clusters << " clusters) Loading round " << i << "...\n";
     cluster_map[i] = load_clusters(i, n_clusters, 1);
   }
-  auto s2 = cnpy::npy_load(cluster_filename(3, n_clusters, 2)).as_vec<uint16_t>();
+  auto s2 = cnpy::npy_load(bp_cluster_filename(3, n_clusters, 2)).as_vec<uint16_t>();
   const size_t s1_size = cluster_map[3].size();
   cluster_map[3].resize(cluster_map[3].size() + s2.size());
   std::ranges::copy(s2, cluster_map[3].data() + s1_size);
