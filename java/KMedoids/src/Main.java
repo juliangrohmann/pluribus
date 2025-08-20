@@ -74,8 +74,7 @@ public class Main {
 			System.out.println("Clustering...");
 			long t0 = System.nanoTime();
 			Clustering<MedoidModel> result = algo.run(rel);
-			double dt = t0 - System.nanoTime() / 1000.0 / 1000.0 / 1000.0;
-			System.out.println("Clustered in " + dt + " s");
+			System.out.printf("Clustered in %.2f s\n", (System.nanoTime() - t0) / 1000.0 / 1000.0 / 1000.0);
 			
 			int[] labels = new int[N];
 			int cid = 0;
