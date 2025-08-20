@@ -1,0 +1,97 @@
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+import elki.clustering.kmedoids.FasterPAM;
+import elki.clustering.kmedoids.initialization.GreedyG;
+import elki.data.Clustering;
+import elki.data.model.MedoidModel;
+import elki.data.type.TypeUtil;
+import elki.database.Database;
+import elki.database.StaticArrayDatabase;
+import elki.database.ids.*;
+import elki.database.relation.Relation;
+import elki.datasource.ArrayAdapterDatabaseConnection;
+import elki.utilities.random.RandomFactory;
+
+public class Main {
+	// Load N×N float matrix (little-endian) as a FloatBuffer
+	static FloatBuffer mapFloatMatrix(Path path, int n) throws IOException {
+		try (var channel = FileChannel.open(path)) {
+			long need = (long)n * n * Float.BYTES;
+			long have = channel.size();
+			if (have != need) throw new IllegalArgumentException("File size mismatch: need " + need + " bytes, have " + have);
+			var mb = channel.map(FileChannel.MapMode.READ_ONLY, 0, have);
+			return mb.order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
+		}
+	}
+	
+	static Database buildDB(int n) {
+		// Trivial 1D data; values are ignored because we use a DBID-based distance.
+		double[][] data = new double[n][1];
+		for (int i = 0; i < n; i++) {
+			data[i][0] = 0.0;
+		}
+		var conn = new ArrayAdapterDatabaseConnection(data);
+		Database db = new StaticArrayDatabase(conn, null);
+		db.initialize();
+		return db;
+	}
+	
+	public static void main(String[] args) throws Exception {
+		if (args.length < 3) {
+			System.err.println("Usage: java -jar KMedoids.jar <path/to/emd.bin> <N> <k>");
+			System.exit(2);
+		}
+		final Path binPath = Path.of(args[0]);
+		final int N = Integer.parseInt(args[1]);
+		final int K = Integer.parseInt(args[2]);
+		
+		// 1) Load precomputed distances
+		FloatBuffer fb = mapFloatMatrix(binPath, N);
+		
+		// 2) Build DB with N objects
+		Database db = buildDB(N);
+		
+		// 3) Use the DBID relation (0..N-1)
+		Relation<DBID> rel = db.getRelation(TypeUtil.DBID);
+		
+		// 4) Distance function backed by your matrix
+		var dist = new BufferDistance(fb, N);
+		
+		// 5) Run FasterPAM (exact k-medoids, fast build+swap)
+		// RandomFactory only matters for ties; choose a seed if you want determinism.
+		var algo = new FasterPAM<>(dist, K, 1000, new GreedyG<>());
+		Clustering<MedoidModel> result = algo.run(rel);
+		
+		// 6) Extract medoids (as 0-based indices) and labels (cluster IDs)
+		// Medoids:
+		List<Integer> medoids = new ArrayList<>(K);
+		for (var c : result.getAllClusters()) {
+			DBID med = c.getModel().getMedoid();
+			medoids.add(((DBIDRef) med).internalGetIndex()); // 0..N-1
+		}
+		
+		// Labels: cluster id per point (0..K-1)
+		int[] labels = new int[N];
+		int cid = 0;
+		for (var c : result.getAllClusters()) {
+			for (DBIDIter it = c.getIDs().iter(); it.valid(); it.advance()) {
+				labels[it.internalGetIndex()] = cid;
+			}
+			cid++;
+		}
+		
+		// 7) Print (or write to file)
+		System.out.println("Medoids (0-based):");
+		for (int m : medoids) System.out.println(m);
+		
+		System.out.println("Labels (first 500):");
+		for (int i = 0; i < Math.min(500, N); i++) System.out.println(labels[i]);
+		
+	}
+}
