@@ -5,9 +5,12 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+import java.util.logging.Level;
 
 import elki.clustering.kmedoids.FasterPAM;
 import elki.clustering.kmedoids.initialization.GreedyG;
+import elki.clustering.kmedoids.initialization.LAB;
 import elki.data.Clustering;
 import elki.data.model.MedoidModel;
 import elki.data.type.TypeUtil;
@@ -16,6 +19,7 @@ import elki.database.StaticArrayDatabase;
 import elki.database.ids.*;
 import elki.database.relation.Relation;
 import elki.datasource.ArrayAdapterDatabaseConnection;
+import elki.logging.LoggingConfiguration;
 import elki.utilities.random.RandomFactory;
 
 public class Main {
@@ -51,6 +55,8 @@ public class Main {
 		final int N = Integer.parseInt(args[1]);
 		final int K = Integer.parseInt(args[2]);
 		
+		LoggingConfiguration.setVerbose(Level.ALL);
+		LoggingConfiguration.setDefaultLevel(Level.ALL);
 		System.out.println("1) Load precomputed distances");
 		FloatBuffer fb = mapFloatMatrix(binPath, N);
 		
@@ -59,27 +65,26 @@ public class Main {
 		
 		System.out.println("3) Use the DBID relation (0..N-1)");
 		Relation<DBID> rel = db.getRelation(TypeUtil.DBID);
+		DBIDRange ids = elki.database.ids.DBIDUtil.assertRange(rel.getDBIDs());
 		
-		System.out.println("4) Distance function backed by your matrix");
+		System.out.println("4) Distance function backed by precomputed matrix");
 		var dist = new BufferDistance(fb, N);
 		
 		System.out.println("5) Run FasterPAM (exact k-medoids, fast build+swap)");
-		var algo = new FasterPAM<>(dist, K, 1000, new GreedyG<>());
+		var algo = new FasterPAM<>(dist, K, 5, new LAB<>(RandomFactory.DEFAULT));
 		Clustering<MedoidModel> result = algo.run(rel);
 		
 		System.out.println("6) Extract medoids (as 0-based indices) and labels (cluster IDs)");
 		List<Integer> medoids = new ArrayList<>(K);
 		for (var c : result.getAllClusters()) {
 			DBID med = c.getModel().getMedoid();
-			medoids.add(((DBIDRef) med).internalGetIndex()); // 0..N-1
+			medoids.add(ids.getOffset(med));
 		}
-		
-		// Labels: cluster id per point (0..K-1)
 		int[] labels = new int[N];
 		int cid = 0;
 		for (var c : result.getAllClusters()) {
 			for (DBIDIter it = c.getIDs().iter(); it.valid(); it.advance()) {
-				labels[it.internalGetIndex()] = cid;
+				labels[ids.getOffset(it)] = cid;
 			}
 			cid++;
 		}
@@ -87,7 +92,6 @@ public class Main {
 		System.out.println("7) Print (or write to file)");
 		System.out.println("Medoids (0-based):");
 		for (int m : medoids) System.out.println(m);
-		
 		System.out.println("Labels (first 500):");
 		for (int i = 0; i < Math.min(500, N); i++) System.out.println(labels[i]);
 		
