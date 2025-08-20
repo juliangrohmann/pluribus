@@ -21,9 +21,4 @@ public class BufferDistance extends AbstractDBIDRangeDistance {
 	public void checkRange(DBIDRange dbidRange) {
 	
 	}
-	
-	@Override
-	public boolean isSymmetric() {
-		return false;
-	}
 }
