@@ -64,6 +64,15 @@ int main(int argc, char* argv[]) {
       build_emd_preproc_cache(argv[2]);
     }
   }
+  else if(command == "build-rt-cluster-map") {
+    // ./Pluribus build-rt-cluster-map n_clusters dir
+    if(argc < 4) {
+      std::cout << "Missing arguments to build real time cluster map.\n";
+    }
+    else {
+      build_real_time_cluster_map(atoi(argv[2]), argv[3]);
+    }
+  }
   else if(command == "print-clusters") {
     // ./Pluribus print-clusters --blueprint/--real-time
     if(argc < 3) {
