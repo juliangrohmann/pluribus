@@ -69,5 +69,6 @@ if __name__ == "__main__":
       np.save(clusters_fn := to_output_fn(fn, "clusters_", args), labels)
       print(f"clusters written to {clusters_fn}")
       if args.flops:
+        print(centroids_fn.dtype)
         np.save(centroids_fn := to_output_fn(fn, "centroids_", args), centroids)
         print(f"centroids written to {centroids_fn}")
