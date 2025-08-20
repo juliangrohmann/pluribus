@@ -32,7 +32,7 @@ std::unordered_set<hand_index_t> collect_filtered_indexes(int round, uint8_t car
 void build_ochs_features(int round, const std::string& dir);
 void build_ochs_features_filtered(int round, const std::string& dir);
 std::unordered_map<hand_index_t, uint16_t> build_cluster_map(const std::vector<hand_index_t>& indexes, const std::vector<int>& clusters);
-void build_real_time_cluster_map(int n_clusters, const std::string& dir);
+void build_real_time_cluster_map(int n_clusters, const std::filesystem::path& dir);
 
 std::string bp_cluster_filename(int round, int n_clusters, int split);
 std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(int n_clusters);
