@@ -143,6 +143,18 @@ std::vector<std::vector<std::pair<double, int>>> build_sorted_distances(const st
   return sorted_distances;
 }
 
+void write_bytes(const std::vector<std::vector<float>>& matrix,
+                     const std::string& filename) {
+  std::ofstream out(filename, std::ios::binary);
+  if(!out) Logger::error("Cannot open file: " + filename);
+  for(const auto& row : matrix) {
+    if(!row.empty()) {
+      out.write(reinterpret_cast<const char*>(row.data()), row.size() * sizeof(float));
+    }
+  }
+  out.close();
+}
+
 void build_emd_preproc_cache(const std::filesystem::path& dir) {
   constexpr int n_clusters = 500;
   Logger::log("Building EMD matrices...");
@@ -190,7 +202,7 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
         matrix[idx1][idx2] = static_cast<float>(emd_heuristic(histograms[idx1], weights[idx1], weights[idx2], sorted_dists[idx2]));
       }
     }
-    cereal_save(matrix, dir / ("emd_matrix_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin"));
+    write_bytes(matrix, dir / ("emd_matrix_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin"));
   }
 }
 
