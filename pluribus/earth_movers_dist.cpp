@@ -198,8 +198,13 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     #pragma omp parallel for schedule(static, 1)
     for(hand_index_t idx1 = 0; idx1 < turn_indexes.size(); ++idx1) {
       if(idx1 > 0 && idx1 % log_interval == 0) Logger::log(progress_str(idx1, turn_indexes.size(), t_0));
-      for(hand_index_t idx2 = 0; idx2 < turn_indexes.size(); ++idx2) {
-        matrix[idx1][idx2] = static_cast<float>(emd_heuristic(histograms[idx1], weights[idx1], weights[idx2], sorted_dists[idx2]));
+      for(hand_index_t idx2 = idx1 + 1; idx2 < turn_indexes.size(); ++idx2) {
+        float emd = static_cast<float>(
+          0.5 * emd_heuristic(histograms[idx1], weights[idx1], weights[idx2], sorted_dists[idx2]) +
+          0.5 * emd_heuristic(histograms[idx2], weights[idx2], weights[idx1], sorted_dists[idx1])
+        );
+        matrix[idx1][idx2] = emd;
+        matrix[idx2][idx1] = emd;
       }
     }
     write_bytes(matrix, dir / ("emd_matrix_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin"));

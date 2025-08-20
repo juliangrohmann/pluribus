@@ -51,25 +51,23 @@ public class Main {
 		final int N = Integer.parseInt(args[1]);
 		final int K = Integer.parseInt(args[2]);
 		
-		// 1) Load precomputed distances
+		System.out.println("1) Load precomputed distances");
 		FloatBuffer fb = mapFloatMatrix(binPath, N);
 		
-		// 2) Build DB with N objects
+		System.out.println("2) Build DB with N objects");
 		Database db = buildDB(N);
 		
-		// 3) Use the DBID relation (0..N-1)
+		System.out.println("3) Use the DBID relation (0..N-1)");
 		Relation<DBID> rel = db.getRelation(TypeUtil.DBID);
 		
-		// 4) Distance function backed by your matrix
+		System.out.println("4) Distance function backed by your matrix");
 		var dist = new BufferDistance(fb, N);
 		
-		// 5) Run FasterPAM (exact k-medoids, fast build+swap)
-		// RandomFactory only matters for ties; choose a seed if you want determinism.
+		System.out.println("5) Run FasterPAM (exact k-medoids, fast build+swap)");
 		var algo = new FasterPAM<>(dist, K, 1000, new GreedyG<>());
 		Clustering<MedoidModel> result = algo.run(rel);
 		
-		// 6) Extract medoids (as 0-based indices) and labels (cluster IDs)
-		// Medoids:
+		System.out.println("6) Extract medoids (as 0-based indices) and labels (cluster IDs)");
 		List<Integer> medoids = new ArrayList<>(K);
 		for (var c : result.getAllClusters()) {
 			DBID med = c.getModel().getMedoid();
@@ -86,7 +84,7 @@ public class Main {
 			cid++;
 		}
 		
-		// 7) Print (or write to file)
+		System.out.println("7) Print (or write to file)");
 		System.out.println("Medoids (0-based):");
 		for (int m : medoids) System.out.println(m);
 		
