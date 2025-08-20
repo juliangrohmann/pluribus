@@ -1,20 +1,22 @@
 import elki.database.ids.DBIDRange;
 import elki.distance.AbstractDBIDRangeDistance;
 
-import java.nio.FloatBuffer;
+import java.io.IOException;
 
 public class BufferDistance extends AbstractDBIDRangeDistance {
-	private final FloatBuffer fb;
-	private final int n;
+	private final RowStripeMapper map;
 	
-	public BufferDistance(FloatBuffer fb, int n) {
-		this.fb = fb;
-		this.n = n;
+	public BufferDistance(RowStripeMapper map) {
+		this.map = map;
 	}
 	
 	@Override
 	public double distance(int i, int j) {
-		return fb.get(i * n + j);
+		try {
+			return map.get(i, j);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 	
 	@Override

@@ -4,8 +4,11 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cereal/types/array.hpp>
+#include <cereal/types/unordered_map.hpp>
 #include <omp/EquityCalculator.h>
 #include <omp/Hand.h>
+#include <pluribus/cereal_ext.hpp>
 #include <pluribus/indexing.hpp>
 #include <pluribus/poker.hpp>
 
@@ -28,8 +31,10 @@ double equity(const omp::Hand& hero, const omp::CardRange &villain, const omp::H
 std::unordered_set<hand_index_t> collect_filtered_indexes(int round, uint8_t cards[7]);
 void build_ochs_features(int round, const std::string& dir);
 void build_ochs_features_filtered(int round, const std::string& dir);
+std::unordered_map<hand_index_t, uint16_t> build_cluster_map(const std::vector<hand_index_t>& indexes, const std::vector<int>& clusters);
+void build_real_time_cluster_map(int n_clusters, const std::string& dir);
 
-std::string cluster_filename(int round, int n_clusters, int split);
+std::string bp_cluster_filename(int round, int n_clusters, int split);
 std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(int n_clusters);
 [[noreturn]] void print_clusters(bool blueprint);
 
@@ -58,6 +63,8 @@ private:
   static std::unique_ptr<BlueprintClusterMap> _instance;
 };
 
+using RealTimeClusterMapStorage = std::array<std::array<std::unordered_map<hand_index_t, uint16_t>, 4>, NUM_DISTINCT_FLOPS>;
+
 class RealTimeClusterMap {
 public:
   uint16_t cluster(int round, hand_index_t flop_index, hand_index_t hand_index) const;
@@ -72,6 +79,11 @@ public:
 
   RealTimeClusterMap(const RealTimeClusterMap&) = delete;
   RealTimeClusterMap& operator=(const RealTimeClusterMap&) = delete;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_cluster_map);
+  }
 
 private:
   RealTimeClusterMap();

@@ -87,18 +87,7 @@ std::vector<std::vector<double>> build_ochs_matrix(const hand_index_t flop_idx, 
   return matrix;
 }
 
-std::unordered_map<hand_index_t, int> build_cluster_map(const std::vector<hand_index_t>& indexes, const std::vector<int>& clusters) {
-  if(indexes.size() != clusters.size()) {
-    Logger::error("Indexes to clusters size mismatch: Indexes size=" + std::to_string(indexes.size()) + ", Clusters size=" + std::to_string(clusters.size()));
-  }
-  std::unordered_map<hand_index_t, int> cluster_map;
-  for(int i = 0; i < indexes.size(); ++i) {
-    cluster_map[indexes[i]] = clusters[i];
-  }
-  return cluster_map;
-}
-
-std::vector<int> build_histogram(const hand_index_t turn_idx, const std::unordered_map<hand_index_t, int>& cluster_map) {
+std::vector<int> build_histogram(const hand_index_t turn_idx, const std::unordered_map<hand_index_t, uint16_t>& cluster_map) {
   constexpr int round = 2;
   uint8_t cards[7];
   HandIndexer::get_instance()->unindex(turn_idx, cards, round);
@@ -143,7 +132,7 @@ std::vector<std::vector<std::pair<double, int>>> build_sorted_distances(const st
   return sorted_distances;
 }
 
-void write_bytes(const std::vector<std::vector<float>>& matrix,
+void write_matrix(const std::vector<std::vector<float>>& matrix,
                      const std::string& filename) {
   std::ofstream out(filename, std::ios::binary);
   if(!out) Logger::error("Cannot open file: " + filename);
@@ -207,7 +196,9 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
         matrix[idx2][idx1] = emd;
       }
     }
-    write_bytes(matrix, dir / ("emd_matrix_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin"));
+    std::string matrix_fn = dir / ("emd_matrix_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin");
+    Logger::log("Saving to " + matrix_fn);
+    write_matrix(matrix, matrix_fn);
   }
 }
 
