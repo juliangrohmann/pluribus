@@ -56,12 +56,12 @@ int main(int argc, char* argv[]) {
     }
   }
   else if(command == "emd-matrix") {
-    // ./Pluribus emd-matrix dir
-    if(argc < 3) {
+    // ./Pluribus emd-matrix start end dir
+    if(argc < 5) {
       std::cout << "Missing arguments to build EMD matrix.\n";
     }
     else {
-      build_emd_preproc_cache(argv[2]);
+      build_emd_preproc_cache(atoi(argv[2]), atoi(argv[3]), argv[4]);
     }
   }
   else if(command == "build-rt-cluster-map") {
