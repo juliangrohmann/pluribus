@@ -145,10 +145,10 @@ void write_matrix(const std::vector<std::vector<float>>& matrix, const std::stri
   Logger::log("Saved successfully.");
 }
 
-void build_emd_preproc_cache(const std::filesystem::path& dir) {
+void build_emd_preproc_cache(const int start, const int end, const std::filesystem::path& dir) {
   constexpr int n_clusters = 500;
   Logger::log("Building EMD matrices...");
-  for(hand_index_t flop_idx = 0; flop_idx < NUM_DISTINCT_FLOPS; ++flop_idx) {
+  for(hand_index_t flop_idx = std::max(start, 0); flop_idx < std::min(end, NUM_DISTINCT_FLOPS); ++flop_idx) {
     uint8_t cards[7];
     FlopIndexer::get_instance()->unindex(flop_idx, cards + 2);
     Logger::log("Flop: " + cards_to_str(cards + 2, 3));
