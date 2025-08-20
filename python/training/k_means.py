@@ -66,9 +66,8 @@ if __name__ == "__main__":
     files = [f"features_r{r}_f{flop_idx}.npy" for flop_idx in range(1755)] if args.flops else [f"features_{r}.npy"]
     for fn in files:
       labels, centroids = cluster_batched(r, args.clusters) if r == 3 and not args.flops else cluster(np.load(Path(args.src) / fn), args.clusters)
-      # np.save(clusters_fn := to_output_fn(fn, "clusters_", args), labels)
-      # print(f"clusters written to {clusters_fn}")
+      np.save(clusters_fn := to_output_fn(fn, "clusters_", args), labels)
+      print(f"clusters written to {clusters_fn}")
       if args.flops:
-        print(centroids.dtype)
-        # np.save(centroids_fn := to_output_fn(fn, "centroids_", args), centroids)
-        # print(f"centroids written to {centroids_fn}")
+        np.save(centroids_fn := to_output_fn(fn, "centroids_", args), centroids)
+        print(f"centroids written to {centroids_fn}")
