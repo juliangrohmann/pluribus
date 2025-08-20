@@ -181,19 +181,19 @@ std::unordered_map<hand_index_t, uint16_t> build_cluster_map(const std::vector<h
   return cluster_map;
 }
 
-std::vector<int> read_int_array(const std::string& filename) {
-  std::ifstream file(filename, std::ios::binary);
-  if (!file) throw std::runtime_error("Could not open file");
+std::vector<int> read_int_array(const std::string& fn) {
+  Logger::log("Loading from " + fn);
+  std::ifstream file(fn, std::ios::binary);
+  if(!file) Logger::error("Could not open file");
 
   file.seekg(0, std::ios::end);
   const std::streamsize size = file.tellg();
   file.seekg(0, std::ios::beg);
 
-  if (size % sizeof(int) != 0) {
-    throw std::runtime_error("File size is not a multiple of int size");
-  }
+  if(size % sizeof(int) != 0) Logger::error("File size is not a multiple of int size");
   std::vector<int> data(size / sizeof(int));
   file.read(reinterpret_cast<char*>(data.data()), size);
+  Logger::log("Loaded successfully.");
   return data;
 }
 
@@ -205,14 +205,8 @@ void build_real_time_cluster_map(const int n_clusters, const std::filesystem::pa
       Logger::log("Flop idx: " + std::to_string(flop_idx));
       std::vector<hand_index_t> indexes;
       cereal_load(indexes, dir / ("indexes_r" + std::to_string(round) + "_f" + std::to_string(flop_idx) + ".bin"));
-      std::vector<int> clusters;
       std::string clusters_stem = dir / ("clusters_r" + std::to_string(round) + "_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters));
-      if(round == 2) {
-        clusters = read_int_array(clusters_stem + ".bin");
-      }
-      else {
-        clusters = cnpy::npy_load(clusters_stem + ".npy").as_vec<int>();
-      }
+      std::vector<int> clusters = round == 2 ? read_int_array(clusters_stem + ".bin") : clusters = cnpy::npy_load(clusters_stem + ".npy").as_vec<int>();
       _cluster_map[flop_idx][round] = build_cluster_map(indexes, clusters);
     }
   }

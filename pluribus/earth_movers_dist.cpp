@@ -132,16 +132,17 @@ std::vector<std::vector<std::pair<double, int>>> build_sorted_distances(const st
   return sorted_distances;
 }
 
-void write_matrix(const std::vector<std::vector<float>>& matrix,
-                     const std::string& filename) {
-  std::ofstream out(filename, std::ios::binary);
-  if(!out) Logger::error("Cannot open file: " + filename);
+void write_matrix(const std::vector<std::vector<float>>& matrix, const std::string& fn) {
+  Logger::log("Saving to " + fn);
+  std::ofstream out(fn, std::ios::binary);
+  if(!out) Logger::error("Cannot open file: " + fn);
   for(const auto& row : matrix) {
     if(!row.empty()) {
       out.write(reinterpret_cast<const char*>(row.data()), row.size() * sizeof(float));
     }
   }
   out.close();
+  Logger::log("Saved successfully.");
 }
 
 void build_emd_preproc_cache(const std::filesystem::path& dir) {
@@ -154,7 +155,7 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
 
     std::vector<hand_index_t> river_indexes;
     cereal_load(river_indexes, dir / ("indexes_r3_f" + std::to_string(flop_idx) + ".bin"));
-    const std::vector<int> clusters = cnpy::npy_load(
+    const std::vector<int> clusters = cnpy::npy_load( 
       dir / ("clusters_r3_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".npy")).as_vec<int>();
     auto cluster_map = build_cluster_map(river_indexes, clusters);
 
@@ -197,7 +198,6 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
       }
     }
     std::string matrix_fn = dir / ("emd_matrix_r2_f" + std::to_string(flop_idx) + "_c" + std::to_string(n_clusters) + ".bin");
-    Logger::log("Saving to " + matrix_fn);
     write_matrix(matrix, matrix_fn);
   }
 }
