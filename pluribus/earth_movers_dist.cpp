@@ -179,8 +179,9 @@ void build_emd_preproc_cache(const std::filesystem::path& dir) {
     }
 
     Logger::log("Building EMD matrix...");
+    Logger::log("Indexes: " + std::to_string(turn_indexes.size()));
     auto matrix = std::vector(turn_indexes.size(), std::vector(turn_indexes.size(), 0.0f));
-    const unsigned long log_interval = turn_indexes.size() / 100UL;
+    const unsigned long log_interval = turn_indexes.size() / 10UL;
     const auto t_0 = std::chrono::high_resolution_clock::now();
     #pragma omp parallel for schedule(static, 1)
     for(hand_index_t idx1 = 0; idx1 < turn_indexes.size(); ++idx1) {
