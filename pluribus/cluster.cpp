@@ -199,7 +199,7 @@ std::vector<int> read_int_array(const std::string& filename) {
 
 void build_real_time_cluster_map(const int n_clusters, const std::filesystem::path& dir) {
   RealTimeClusterMapStorage _cluster_map;
-  for(int round = 3; round < 4; ++round) {
+  for(int round = 2; round < 4; ++round) {
     Logger::log("Round: " + round);
     for(int flop_idx = 0; flop_idx < NUM_DISTINCT_FLOPS; ++flop_idx) {
       Logger::log("Flop idx: " + std::to_string(flop_idx));
