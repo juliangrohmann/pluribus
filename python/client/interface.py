@@ -7,13 +7,16 @@ import time
 import pyautogui
 import win32gui
 import win32con
-import pytesseract
-from typing import Tuple, List, Callable, Optional
-from PIL import ImageOps, ImageEnhance
+import PIL
+from typing import Tuple, List, Callable
+from PIL import ImageOps, ImageEnhance, Image
 from PIL.Image import Image
 from termcolor import colored
-
+from collections import Counter
+import numpy as np
+import pytesseract
 import config
+import ocr
 
 random.seed()
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
@@ -22,478 +25,178 @@ win_default_offset = 8
 win_header_offset = 1
 win_header_h = 30
 
-def assert_player_pos(i: int) -> None:
+def build_card_mask() -> np.ndarray:
+  with open(ocr.charset_path, "r", encoding="utf-8") as f:
+    charset = [line.rstrip("\n") for line in f]
+  return np.array([i == 0 or c in "1234567890JKQA" for i,c in enumerate(charset)])
+
+card_mask = build_card_mask()
+
+def assert_player_pos(i:int) -> None:
   assert 0 <= i <= 5, f"Invalid Player Position: {player_pos}"
 
-def frac_to_pix(x: float, y: float, img_w: int, img_h: int) -> Tuple[int, int]:
+def frac_to_pix(x:float, y:float, img_w:int, img_h:int) -> Tuple[int,int]:
   return int(round(x * img_w)), int(round(y * (img_h - win_header_h) + win_header_h))
 
+def crop(img:Image, box:Tuple[int,int,int,int]) -> Image:
+  return img.crop((*frac_to_pix(box[0], box[1], img.width, img.height), *frac_to_pix(box[2], box[3], img.width, img.height)))
+
 class PokerTable:
-  def __init__(self, wnd_handle: int, conf: dict) -> None:
+  def __init__(self, wnd_handle:int, conf:dict) -> None:
     self.handle = wnd_handle
     self.config = conf
 
-  def rect(self) -> Tuple[int, int, int ,int]:
+  def hand(self, pos:int, img:Image) -> str|None:
+    assert_player_pos(pos)
+    return hand_str if (hand_str := self._parse_cards(img, self.config.hole_cards_ranks[pos], self.config.hole_cards_suits[pos], debug_label=f"hole_cards_{pos}_rank")) else None
+
+  def username(self, img:Image, pos:int) -> str|None:
+    assert_player_pos(pos)
+    name = self._parse_ocr(img, self.config.usernames[pos], tuple(), debug_label=f"username_{pos}")
+    return name if name not in ["Bet", "Raise", "Check", "Call", "Fold"] else None
+
+  def street(self, img:Image) -> str|None: return {0:"Preflop",3:"Flop",4:"Turn",5:"River"}.get(sum(bool(self._parse_suit(img,self.config.board_suits[i])) for i in range(5)), None)
+  def board(self, img:Image) -> str|None: return self._parse_cards(img, self.config.board_ranks, self.config.board_suits, debug_label=f"board_rank")
+  def stack_size(self, img:Image, pos:int, blinds:bool=False) -> float|None: return self._cash_amount_by_pos(pos, img, self.config.stacks, blinds=blinds, debug_label=f"stack_size_{pos}")
+  def bet_size(self, img:Image, pos:int, blinds:bool=False) -> float|None: return self._cash_amount_by_pos(pos, img, self.config.bet_size, blinds=blinds, debug_label=f"bet_size_{pos}")
+  def pot_size(self, img:Image, blinds:bool=False) -> float|None: return self._cash_amount(img, self.config.pot, ("Pot", " ", ":"), blinds, debug_label="pot_size")
+  def active_pos(self, img:Image) -> int|None: return self._find_pos(img, self.config.active, self.config.is_active)
+  def button_pos(self, img:Image) -> int|None: return self._find_pos(img, self.config.button, self.config.has_button)
+  def is_seat_open(self, img:Image, pos:int) -> bool: return self._apply_color_filter(pos, img, self.config.seats, self.config.is_seat_open)
+  def is_sitting_out(self, img:Image, pos:int) -> bool: return self._parse_ocr(img, self.config.stacks[pos], debug_label=f"sitout_{pos}") == "Sitting Out"
+  def has_cards(self, img:Image, pos:int) -> bool: return self._apply_color_filter(pos, img, self.config.cards, self.config.has_cards)
+  def has_bet(self, img:Image, pos:int) -> bool: return self._apply_color_filter(pos, img, self.config.bet_chips, self.config.has_bet)
+  def screenshot(self) -> Image: return pyautogui.screenshot(region=self.rect())
+  def title(self) -> str: return win32gui.GetWindowText(self.handle)
+  def stakes(self) -> Tuple[float,float]: return self.config.get_stakes(self.title())
+  def move(self, x:int, y:int, w:int, h:int) -> None: win32gui.SetWindowPos(self.handle, win32con.HWND_TOP, x, y, w, h, 0)
+  def __repr__(self) -> str: return f"<PokerTable title=\"{self.title()}\", config=\"{self.config.name}\", handle={self.handle}>"
+  def __str__(self) -> str: return self.__repr__()
+
+  def rect(self) -> Tuple[int,int,int,int]:
     r = win32gui.GetWindowRect(self.handle)
     return r[0] + win_default_offset, r[1] + win_header_offset, r[2] - r[0] - 2 * win_default_offset, r[3] - r[1] - win_default_offset - win_header_offset
 
-  def active_pos(self, img: Image=None): return self._find_pos(img, self.config.active, self.config.is_active)
-  def button_pos(self, img: Image = None): return self._find_pos(img, self.config.button, self.config.has_button)
-  def is_seat_open(self, pos: int, img: Image=None): return self._apply_color_filter(pos, img, self.config.seats, self.config.is_seat_open)
-  def has_cards(self, pos: int, img: Image=None): return self._apply_color_filter(pos, img, self.config.cards, self.config.has_cards)
-  def screenshot(self): return pyautogui.screenshot(region=self.rect())
-  def title(self) -> str: return win32gui.GetWindowText(self.handle)
-  def move(self, x, y, w, h) -> None: win32gui.SetWindowPos(self.handle, win32con.HWND_TOP, x, y, w, h, 0)
-  def __str__(self) -> str: return self.__repr__()
-  def __repr__(self) -> str: return f"<PokerTable title=\"{self.title()}\", config=\"{self.config.name}\", handle={self.handle}>"
-
-  def _apply_color_filter(self, pos: int, img: Image, coords: Tuple[Tuple[float, float], ...], fun: Callable[[Tuple[int, int, int]], bool]):
+  def _apply_color_filter(self, pos:int, img:Image, coords:Tuple[Tuple[float,float], ...], fun:Callable[[Tuple[int,int,int]], bool]) -> bool:
     assert_player_pos(pos)
     if img is None: img = self.screenshot()
     return fun(img.getpixel(frac_to_pix(*coords[pos], img.width, img.height)))
 
-  def _find_pos(self, img: Image, coords: Tuple[Tuple[float, float], ...], fun: Callable[[Tuple[int, int, int]], bool]):
+  def _find_pos(self, img:Image, coords:Tuple[Tuple[float,float], ...], fun:Callable[[Tuple[int,int,int]], bool]) -> int|None:
     if img is None: img = self.screenshot()
     for pos in range(self.config.n_players):
       if self._apply_color_filter(pos, img, coords, fun): return pos
-    return -1
+    return None
 
-def is_real_window(h_wnd) -> bool:
-  if not win32gui.IsWindowVisible(h_wnd) or win32gui.GetParent(h_wnd) != 0:
-    return False
+  def _parse_ocr(self, img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), expand: int=4, mask:np.ndarray|None=None, debug_label:str=None) -> str:
+    if img is None: img = self.screenshot()
+    raw = ocr.pipeline.run(cropped := crop(img, coords), expand=expand, mask=mask)[0]
+    if debug_label:
+      cropped.save(f"img_debug\\{debug_label}.png")
+    for s in repl: raw = raw.replace(s, '')
+    return raw
+
+  def _parse_rank(self, img:Image, coords:Tuple[int,int,int,int], n:int=8, debug_label:str=None) -> str:
+    if img is None: img = self.screenshot()
+    cropped = crop(img, coords)
+    repeated = PIL.Image.new(cropped.mode, (cropped.width * n, cropped.height))
+    for i in range(n): repeated.paste(cropped, (i * cropped.width, 0))
+    counter = Counter(ocr.pipeline.run(repeated, expand=10, mask=card_mask)[0])
+    if debug_label:
+      repeated.save(f"img_debug\\{debug_label}.png")
+    return 'T' if set(e[0] for e in counter.most_common(2)) == set('10') else counter.most_common(1)[0][0]
+
+  def _cash_amount(self, img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), blinds:bool=False, debug_label:str=None) -> float|None:
+    raw = self._parse_ocr(img, coords, repl + ("$", ","), debug_label=debug_label)
+    if raw.lower() == "all in": return 0.0
+    try:
+      amount = float(raw)
+      return amount / self.get_stakes()[1] if blinds else amount
+    except ValueError:
+      return None
+
+  def _cash_amount_by_pos(self, pos:int, img:Image, coords_by_pos:Tuple[Tuple[int,int,int,int], ...], blinds:bool=False, debug_label:str=None) -> float|None:
+    assert_player_pos(pos)
+    return self._cash_amount(img, coords_by_pos[pos], blinds=blinds, debug_label=debug_label)
+
+  def _rgb_to_suit(self, rgb:Tuple[int,int,int]) -> str|None:
+    if self.config.is_heart(rgb): return 'h'
+    if self.config.is_club(rgb): return 'c'
+    if self.config.is_diamond(rgb): return 'd'
+    if self.config.is_spade(rgb): return 's'
+    return None
+
+  def _parse_suit(self, img:Image, coords:Tuple[int,int]) -> str|None:
+    return self._rgb_to_suit(img.getpixel(frac_to_pix(*coords, *img.size)))
+
+  def _parse_cards(self, img:Image, rank_coords:Tuple[Tuple[int, int, int, int], ...], suit_coords:Tuple[Tuple[int,int], ...], debug_label:str=None) -> str|None:
+    return ''.join(self._parse_rank(img, rank_coords[i], debug_label=f"{debug_label}_{i}") + suit for i in range(len(rank_coords))
+                   if (suit := self._parse_suit(img, suit_coords[i])) is not None)
+
+def is_real_window(h_wnd:int) -> bool:
   has_no_owner = win32gui.GetWindow(h_wnd, win32con.GW_OWNER) == 0
   l_ex_style = win32gui.GetWindowLong(h_wnd, win32con.GWL_EXSTYLE)
-  if (((l_ex_style & win32con.WS_EX_TOOLWINDOW) == 0 and has_no_owner) or
-      ((l_ex_style & win32con.WS_EX_APPWINDOW != 0) and not has_no_owner)):
-    return win32gui.GetWindowText(h_wnd)
-  return False
+  return ((l_ex_style & win32con.WS_EX_TOOLWINDOW) == 0) == has_no_owner and win32gui.GetWindowText(h_wnd) and win32gui.IsWindowVisible(h_wnd) and win32gui.GetParent(h_wnd) == 0
 
-def get_window_list() -> List[Tuple[int, str, Tuple[int, int, int, int]]]:
-  """
-  Return a list of tuples (handle, title, (x, y, width, height)) for each real window.
-  """
+def get_tables() -> List[PokerTable]:
   def callback(h_wnd, wnd_list):
     if is_real_window(h_wnd): wnd_list.append(h_wnd)
-
   windows = []
   win32gui.EnumWindows(callback, windows)
-  return windows
+  return [PokerTable(h_wnd, conf) for h_wnd in windows if (conf := get_config(h_wnd)) is not None]
 
-def get_table_list(window_list=None) -> List[PokerTable]:
-  if window_list is None: window_list = get_window_list()
-  return [PokerTable(h_wnd, conf) for h_wnd in window_list if (conf := get_config(h_wnd)) is not None]
-
-def get_config(handle) -> Optional[dict]:
+def get_config(handle:int) -> dict|None:
   title = win32gui.GetWindowText(handle)
   for c in config.configs:
-    if c.table_title in title: return c
+    if c.get_stakes(title) is not None: return c
   return None
 
-def position_tables(poker_tables: list):
-  """
-  Position the windows into the layout defined in the current profile.
-  """
-  assert len(poker_tables) <= 6, "Layout not implemented for > 6 tables."
-  _, _, screen_w, screen_h = win32gui.GetWindowRect(win32gui.GetDesktopWindow())
-  table_w, table_h = screen_w // 3, screen_h // 2
-  positions = [((i // 3) * table_h, (i % 3) * table_w) for i in range(len(poker_tables))]
-  for pos, table in zip(positions, poker_tables):
-    table.move(pos[0], pos[1], table_w, table_h)
-
-def has_cards(pos, img) -> bool:
-  assert_player_pos(pos)
-  pos -= 1
-  if pos == -1: return hero_has_cards(img)
-  return True if img.getpixel((cc['cards'][pos][0], cc['cards'][pos][1])) == cc['cards_pix'] else False
-
-def button_pos(img: Image):
-  for i in range(5):
-    rgb_val = img.getpixel((cc['button'][i][0], cc['button'][i][1]))
-    if rgb_val == cc['button_pix'][i]:
-      return i + 1
-  return 0
-
-def has_bet(pos: int, img: Image) -> bool:
-  assert_player_pos(pos)
-  pos -= 1
-  if pos == -1: return hero_has_bet(img)
-
-  if cc['site'] == 'gp':
-    return img.getpixel(cc['bet_chips'][pos]) == cc['bet_chips_pix']
-  elif cc['site'] == 'bovada':
-    return img.getpixel(cc['bet_chips'][pos]) != cc['bet_chips_not_pix']
-
-def hero_has_bet(img: Image) -> bool: # TODO: remove
-  if cc['site'] == 'bovada':
-    return img.getpixel(cc['hero_bet_chips']) != cc['bet_chips_not_pix']
-  assert False, "Unknown site"
-
-def read_betsize(pos: int, table_idx: int) -> int:
-  assert_player_pos(pos)
-  pos -= 1
-  img = pyautogui.screenshot(region=(
-    cc['bet_amount'][pos][0] + cc['table_window'][table_idx][0],
-    cc['bet_amount'][pos][1] + cc['table_window'][table_idx][1],
-    cc['bet_amount'][pos][2],
-    cc['bet_amount'][pos][3],
-  ))
-  img = ImageOps.grayscale(img)
-  img = ImageOps.invert(img)
-  contrast = ImageEnhance.Contrast(img)
-  img = contrast.enhance(2)
-  img.save('img_debug/betsize' + str(pos + 1) + '.png')
-
-  betsize = pytesseract.image_to_string(img, config='--psm 7')
-  if cc['site'] == 'bovada':
-    return extract_number(betsize)
-  elif cc['site'] == 'gp':
-    return betsize
-  assert False, "Unknown site"
-
-def read_bet_option(table_idx: int) -> str:
-  """
-  Returns the bet size currently entered in the bet size selector on the poker UI
-  on the i'th table.
-  """
-  img = pyautogui.screenshot(region=(
-    cc['bet_option'][0] + cc['table_window'][table_idx][0],
-    cc['bet_option'][1] + cc['table_window'][table_idx][1],
-    cc['bet_option'][2],
-    cc['bet_option'][3],
-  ))
-  img = ImageOps.grayscale(img)
-  img = ImageOps.invert(img)
-  contrast = ImageEnhance.Contrast(img)
-  img = contrast.enhance(2)
-  img.save('img_debug/bet_option.png')
-  bet_option = pytesseract.image_to_string(img, config='--psm 7')
-  return extract_number(bet_option)
-
-def read_potsize(table_idx: int, img: Image) -> int:
-  read_pos = cc['pot_size_pre'] if current_street(img) == 'preflop' else cc['pot_size_post']
-
-  img = pyautogui.screenshot(region=(
-    read_pos[0] + cc['table_window'][table_idx][0],
-    read_pos[1] + cc['table_window'][table_idx][1],
-    read_pos[2],
-    read_pos[3],
-  ))
-  img = ImageOps.grayscale(img)
-  img = ImageOps.invert(img)
-  contrast = ImageEnhance.Contrast(img)
-  img = contrast.enhance(2)
-  img.save('img_debug/potsize.png')
-  potsize = pytesseract.image_to_string(img, config='--psm 7')
-  return extract_number(potsize)
-
-def extract_number(inp_str: str) -> str:
-  i = 0
-  while i < len(inp_str):
-    if not (inp_str[i].isdigit() or inp_str[i] == '.'):
-      inp_str = inp_str[0:i] + inp_str[i + 1: len(inp_str)]
-    else:
-      i += 1
-  return inp_str if util.is_number(inp_str) else ''
-
-def current_street(img: Image) -> str:
-  if img.getpixel(cc['card_dealt'][2]) == cc['card_dealt_pix']:
-    return 'river'
-  elif img.getpixel(cc['card_dealt'][1]) == cc['card_dealt_pix']:
-    return 'turn'
-  elif img.getpixel(cc['card_dealt'][0]) == cc['card_dealt_pix']:
-    return 'flop'
-  else:
-    return 'preflop'
-
-def is_hero_turn(img: Image): # TODO: Remove
-  if cc['site'] == 'gp':
-    return img.getpixel(cc['hero_active']) == cc['hero_active_pix']
-  elif cc['site'] == 'bovada':
-    return img.getpixel(cc['hero_active']) != cc['hero_active_not_pix']
-
-def sitting_out(pos: int, img: Image) -> bool:
-  if not 0 <= pos <= 5:
-    print("ERROR in sitting_out(): Invalid Player Position:", pos)
-    return None
-  pos -= 1
-  if pos == -1: return False
-  rgb = img.getpixel((cc['sitting_out'][pos][0], cc['sitting_out'][pos][1]))
-  return (rgb[0] == cc['sitting_out'][pos][2] and
-          rgb[1] == cc['sitting_out'][pos][2] and
-          rgb[2] == cc['sitting_out'][pos][2])
-
-def color_to_suit(rgb: Tuple[int, int, int]) -> str:
-  if rgb[0] - 50 > rgb[1] and rgb[0] - 50 > rgb[2]:
-    return 'h'
-  elif rgb[1] - 50 > rgb[0] and rgb[1] - 50 > rgb[2]:
-    return 'c'
-  elif rgb[2] - 50 > rgb[1] and rgb[2] - 50 > rgb[0]:
-    return 'd'
-  elif rgb[0] < 70 and rgb[1] < 70 and rgb[2] < 70:
-    return 's'
-  else:
-    return '-'
-
-def img_to_inv_cont(img: Image) -> Image:
-  invert_img = ImageOps.invert(img)
-  contrast = ImageEnhance.Contrast(invert_img)
-  invert_img = contrast.enhance(2)
-  return invert_img
-
-def hero_has_cards(img: Image) -> bool:
-  return img.getpixel(cc['hero_cards']) == cc['hero_cards_pix']
-
-def hero_hand(img: Image, table_idx: int) -> str:
-  def hero_suits():
-    rgb_val_left = img.getpixel(cc['hero_suits'][0])
-    rgb_val_right = img.getpixel(cc['hero_suits'][1])
-    return color_to_suit(rgb_val_left) + color_to_suit(rgb_val_right)
-
-  def hero_ranks(inp_table_id):
-    if cc['site'] == 'gp':
-      curr_img = pyautogui.screenshot(region=cc['hero_ranks'])
-      curr_img = ImageOps.grayscale(curr_img)
-      contrast = ImageEnhance.Contrast(curr_img)
-      curr_img = contrast.enhance(2)
-      curr_img.save('img_debug/hero_ranks.png')
-      text = pytesseract.image_to_string(curr_img, config='--psm 10')
-    elif cc['site'] == 'bovada':
-      text = ''
-      for i in range(2):
-        curr_img = pyautogui.screenshot(region=(
-          cc['hero_ranks'][i][0] + cc['table_window'][inp_table_id][0],
-          cc['hero_ranks'][i][1] + cc['table_window'][inp_table_id][1],
-          cc['hero_ranks'][i][2],
-          cc['hero_ranks'][i][3],
-        ))
-        curr_img = ImageOps.grayscale(curr_img)
-        contrast = ImageEnhance.Contrast(curr_img)
-        curr_img = contrast.enhance(2)
-        curr_img.save('img_debug/hero_ranks' + str(i) + '.png')
-        text += pytesseract.image_to_string(curr_img, config='--psm 10')
-    else:
-      print("ERROR in hero_ranks(): Invalid Site Name:", cc['site'])
-      text = ""
-
-    text = text.replace(' ', '')
-    text = text.replace('10', 'T')
-    text = clean_card_str(text)
-    return text if len(text) == 2 else None
-
-  suits = hero_suits()
-  ranks = hero_ranks(table_idx)
-
-  # Invalid readings:
-  if not (suits and ranks):
-    return None
-
-  # Canonicalize
-  if card_to_index(ranks[0]) < card_to_index(ranks[1]):
-    ranks = (ranks[1], ranks[0])
-    suits = (suits[1], suits[0])
-  return ranks[0] + suits[0] + ranks[1] + suits[1]
-
-def clean_card_str(card_str: str) -> str:
-  return [c for c in card_str if c in ['AKQJT98765432']]
-
-def player_stacksize(pos: int, table_idx: int) -> str:
-  """
-  Takes an integer between 0 and 5, defining the seat (clockwise positions starting at the bottom).
-  Takes an integer specifying the table to read from.
-  Returns that seat's stacksize.
-  """
-  assert_player_pos(pos)
-  pos -= 1
-  if pos == -1: return hero_stacksize(table_idx) # TODO: remove
-  img = pyautogui.screenshot(region=(
-    cc['stack_size'][pos][0] + cc['table_window'][table_idx][0],
-    cc['stack_size'][pos][1] + cc['table_window'][table_idx][1],
-    cc['stack_size'][pos][2],
-    cc['stack_size'][pos][3],
-  ))
-  img.save('img_debug/stacksize' + str(pos + 1) + '.png')
-  if cc['site'] == 'gp':
-    img = img_to_inv_cont(img)
-  elif cc['site'] == 'bovada':
-    contrast = ImageEnhance.Contrast(img)
-    img = contrast.enhance(2)
-  else:
-    print("ERROR in player_stacksize(): Invalid Site Name:", cc['site'])
-  text = pytesseract.image_to_string(img, config='--psm 7')
-  text = extract_number(text)
-  return text if text else '-1'
-
-def hero_stacksize(i: int) -> int:
-  """
-  Returns hero's stacksize on the i'th table.
-  """
-  img = pyautogui.screenshot(region=(
-    cc['hero_stack_size'][0] + cc['table_window'][i][0],
-    cc['hero_stack_size'][1] + cc['table_window'][i][1],
-    cc['hero_stack_size'][2],
-    cc['hero_stack_size'][3],
-  ))
-  img.save('img_debug/stacksize0.png')
-  if cc['site'] == 'gp':
-    img = img_to_inv_cont(img)
-  elif cc['site'] == 'bovada':
-    contrast = ImageEnhance.Contrast(img)
-    img = contrast.enhance(2)
-  else:
-    print("ERROR in hero_stacksize(): Invalid Site Name:", cc['site'])
-  text = pytesseract.image_to_string(img, config='--psm 7')
-  text = extract_number(text)
-  return text if text else '-1'
-
-def read_board(img: Image, table_idx: int, start_street: Optional[str] = None) -> str:
-  """
-  Returns the entire board of the i'th poker table if street = None.
-  If a street is given, starts returning cards from that street from table i.
-  If start_street = 'recent', only reads the most recent street.
-  """
-  table_street = current_street(img)
-  if start_street == 'recent': start_street = table_street
-  cards = {'flop': 3, 'turn': 4, 'river': 5}.get(table_street, 0)
-  first_card = {'turn': 3, 'river': 4}.get(start_street, 0)
-  return ''.join(board_rank(i, table_idx) + board_suits(i, img) for i in range(first_card, cards))
-
-def board_rank(card_idx: int, table_idx: int) -> str:
-  """
-  Returns the rank of the i'th card on the board, where i = 0 is the first card.
-  """
-  img = pyautogui.screenshot(region=(
-    cc['board_ranks'][card_idx][0] + cc['table_window'][table_idx][0],
-    cc['board_ranks'][card_idx][1] + cc['table_window'][table_idx][1],
-    cc['board_ranks'][card_idx][2],
-    cc['board_ranks'][card_idx][3],
-  ))
-  img = ImageOps.grayscale(img)
-  contrast = ImageEnhance.Contrast(img)
-  img = contrast.enhance(2)
-  img.save('img_debug/board_rank' + str(card_idx) + '.png')
-  text = pytesseract.image_to_string(img, config='--psm 10')
-  text = text.replace(' ', '')
-  text = text.replace('10', 'T')
-  text = clean_card_str(text)
-  return text if (text.isalpha() or text.isdigit()) and len(text) <= 2 else ''
-
-def board_suits(card_idx: int, img: Image) -> str:
-  """
-  Returns the suit of the i'th board card as 'c', 'h', 'd', 's'
-  Returns '' if the i'th board card is not dealt.
-  """
-  img.save(r'img_debug\board_suits.png')
-  rgb_val = img.getpixel(cc['board_suits'][card_idx])
-
-  if rgb_val == cc['board_suits_pix'][0]:
-    return 's'
-  elif rgb_val == cc['board_suits_pix'][1]:
-    return 'h'
-  elif rgb_val == cc['board_suits_pix'][2]:
-    return 'd'
-  elif rgb_val == cc['board_suits_pix'][3]:
-    return 'c'
-  else:
-    print(colored("ERROR in board_suits(). Invalid pixel RGB value:", rgb_val, 'red'))
-    return ''
-
-def get_stakes(table_title: str) -> Tuple[int, int]:
-  bb_value = table_title[table_title.index('/') + 2:]
-  bb_value = bb_value[:bb_value.index(' ')]
-  sb_value = table_title[table_title.index('$') + 1:]
-  sb_value = sb_value[:sb_value.index('/')]
-  return float(sb_value), float(bb_value)
-
-def card_to_index(card: str) -> int:
-  return {'A': 12, 'K': 11, 'Q': 10, 'J': 9, 'T': 8}.get(card, int(card) - 2)
-
-def is_number(inp_str: str) -> bool:
-  pre_digit = 0
-  dot = 0
-  post_digit = 0
-  for char in inp_str:
-    if char == '.':
-      dot += 1
-    elif char.isdigit():
-      if dot == 0:
-        pre_digit += 1
-      else:
-        post_digit += 1
-    else:
-      return False
-  return pre_digit >= 1 >= dot and (dot == 0 or post_digit > 0)
-
 def debug() -> None:
-  tables = get_table_list()
+  tables = get_tables()
   for table in tables: print(table)
-  # position_tables(tables)
 
   table_index = 0
   playing = True
   while playing:
-    action = input("\nAction: ")
+    inp = input("\nAction: ").split(' ')
+    action, args = inp[0], tuple(inp[1:])
     table = tables[table_index]
-    table_img = table.screenshot()
+    table_img = table.screenshot() if len(args) == 0 else PIL.Image.open(args[0])
     table_img.save('img_debug/table.png')
 
     if action == 'update':
-      tables = get_table_list()
+      tables = get_tables()
       for table in tables: print(table)
-    elif action == 'screenshot':
-      table = tables[table_index]
-      table.screenshot().save(f"img_debug/{table.config.name}_{table.handle}.png")
     elif action == 'seats':
-      for i in range(6):
-        if table.is_seat_open(i, table_img):
-          print("Seat", i, "is open.")
-        else:
-          print("Seat", i, "is taken.")
-    elif action == 'sitout': # TODO
-      for i in range(5):
-        print("Seat", i, "is", ("sitting out." if sitting_out(i, table_img) else "not sitting out."))
-    elif action == 'waiting': # TODO
-      pass
-      # print(table_img.getpixel((cc['waiting'][testing][0], cc['waiting'][testing][1])))
+      for i in range(table.config.n_players): print("Seat", i, "is open." if table.is_seat_open(table_img, i) else "is taken.")
+    elif action == 'usernames':
+      for i in range(table.config.n_players): print(f"Seat {i}: {table.username(table_img, i)}")
+    elif action == 'sitout':
+      for i in range(5): print(f"Seat {i} is", "sitting out." if table.is_sitting_out(table_img, i) else "not sitting out.")
     elif action == 'active':
-      active = table.active_pos(table_img)
-      if active != -1: print(f"Seat {active} is active.")
-      else: print("No one is active.")
+      print(f"Seat {active} is active." if (active := table.active_pos(table_img)) else "No one is active.")
     elif action == 'cards':
-      for i in range(6):
-        print("Player", i, ("has cards." if table.has_cards(i, table_img) else "folded."))
-    elif action == 'invested': # TODO
-      for i in range(1, 6):
-        if has_bet(i, table_img):
-          amount = read_betsize(i, table_index)
-          print("Seat", i, "Bet:", amount)
+      for i in range(table.config.n_players): print(f"Player {i}", ("has cards." if table.has_cards(table_img, i) else "folded."))
+    elif action == 'invested':
+      for i in range(table.config.n_players):
+        if table.has_bet(table_img, i): print(f"Seat {i} bet: {table.bet_size(table_img, i)}")
     elif action == 'button':
-      active = table.button_pos(table_img)
-      if active != -1: print(f"Seat {active} has the button.")
-      else: print("No one has the button.")
-    elif action == 'hero': # TODO
-      print("Hero", ("has cards." if hero_has_cards(table_img) else "does not have cards."))
-      print("Hero has", ("bet." if hero_has_bet(table_img) else "not bet."))
-      print("Hero is", ("active." if is_hero_turn(table_img) else "inactive."))
-    elif action == 'hand': # TODO
-      if hero_has_cards(table_img):
-        print('Hero Hand:', hero_hand(table_img, table_index))
-      else:
-        print("Hero does not have cards.")
-    elif action == 'board': # TODO
-      print("Board:", read_board(table_img, table_index))
-    elif action == 'stacksize': # TODO
+      print(f"Seat {btn} has the button." if (btn := table.button_pos(table_img)) else "No one has the button.")
+    elif action == 'hand':
+      for i in range(table.config.n_players):
+        if (hand := table.hand(i, table_img)) is not None: print(f"Seat {i} hand: {hand}")
+    elif action == 'board':
+      print("Board:", table.board(table_img))
+    elif action == 'stacksize':
       for i in range(6):
-        print("Seat", i, "Stack:", player_stacksize(i, table_index))
-    elif action == 'pot': # TODO
-      print("Potsize:", read_potsize(table_index, table_img))
-    elif action == 'option':
-      print("Bet Option:", read_bet_option(table_index))
-    elif action == 'street': # TODO
-      print("Street:", current_street(table_img))
-    elif action == 'stakes': # TODO
-      stakes = get_stakes(tables[0][1])
-      print("Stakes:", str(stakes[0]) + '/' + str(stakes[1]))
-    elif action == 'end': # TODO
+        if not table.is_seat_open(table_img, i): print("Seat", i, "Stack:", table.stack_size(table_img, i))
+    elif action == 'pot':
+      print("Potsize:", table.pot_size(table_img))
+    elif action == 'street':
+      print("Street:", table.street(table_img))
+    elif action == 'stakes':
+      print("Stakes: $%.2f/$%.2f" % table.stakes())
+    elif action == 'end':
       playing = False
     else:
       print("Invalid. Try again.")
