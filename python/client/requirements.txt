@@ -3,3 +3,5 @@ pywin32
 pillow
 termcolor
 requests
+opencv-python
+onnxruntime-gpu
