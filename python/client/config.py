@@ -8,35 +8,58 @@ def is_exact_rgb(rgb: Tuple[int, int, int], target: Tuple[int, int, int], tol: i
 def is_uniform(rgb: Tuple[int, int, int], tol: int): max_v = max(rgb); return sum(abs(v - max_v) > tol for v in rgb) == 0
 
 @dataclass(frozen=True)
-class PokerConfig:
-  name: str
-  n_players: int
-  seats: Tuple[Tuple[float,float], ...]
-  cards: Tuple[Tuple[float,float], ...]
-  active: Tuple[Tuple[float,float], ...]
-  button: Tuple[Tuple[float,float], ...]
-  hole_cards_suits: Tuple[Tuple[Tuple[float,float], Tuple[float,float]], ...]
-  hole_cards_ranks: Tuple[Tuple[Tuple[float,float,float,float], Tuple[float,float,float,float]], ...]
+class SiteConfig:
   board_suits: Tuple[Tuple[float,float], ...]
   board_ranks: Tuple[Tuple[float,float, float,float], ...]
-  bet_chips: Tuple[Tuple[float,float], ...]
-  bet_size: Tuple[Tuple[float,float,float,float], ...]
-  stacks: Tuple[Tuple[float,float,float,float], ...]
-  usernames: Tuple[Tuple[float,float,float,float], ...]
-  pot: Tuple[int,int,int,int]
-  is_seat_open: Callable[[Tuple[int,int,int]], bool]
-  has_cards: Callable[[Tuple[int,int,int]], bool]
-  has_bet: Callable[[Tuple[int,int,int]], bool]
-  is_active: Callable[[Tuple[int,int,int]], bool]
-  has_button: Callable[[Tuple[int,int,int]], bool]
-  is_spade: Callable[[Tuple[int,int,int]], bool]
-  is_club: Callable[[Tuple[int,int,int]], bool]
-  is_heart: Callable[[Tuple[int,int,int]], bool]
-  is_diamond: Callable[[Tuple[int,int,int]], bool]
-  get_stakes: Callable[[str], Tuple[float,float]|None]
+  pot: Tuple[int, int, int, int]
+  is_seat_open: Callable[[Tuple[int, int, int]], bool]
+  has_cards: Callable[[Tuple[int, int, int]], bool]
+  has_bet: Callable[[Tuple[int, int, int]], bool]
+  is_active: Callable[[Tuple[int, int, int]], bool]
+  has_button: Callable[[Tuple[int, int, int]], bool]
+  is_spade: Callable[[Tuple[int, int, int]], bool]
+  is_club: Callable[[Tuple[int, int, int]], bool]
+  is_heart: Callable[[Tuple[int, int, int]], bool]
+  is_diamond: Callable[[Tuple[int, int, int]], bool]
+  get_stakes: Callable[[str], Tuple[float, float] | None]
+
+
+@dataclass(frozen=True)
+class PokerConfig:
+  name: str
+  site: SiteConfig
+  n_players: int
+  seats: Tuple[Tuple[float, float], ...]
+  cards: Tuple[Tuple[float, float], ...]
+  active: Tuple[Tuple[float, float], ...]
+  button: Tuple[Tuple[float, float], ...]
+  hole_cards_suits: Tuple[Tuple[Tuple[float, float], Tuple[float, float]], ...]
+  hole_cards_ranks: Tuple[Tuple[Tuple[float, float, float, float], Tuple[float, float, float, float]], ...]
+  bet_chips: Tuple[Tuple[float, float], ...]
+  bet_size: Tuple[Tuple[float, float, float, float], ...]
+  stacks: Tuple[Tuple[float, float, float, float], ...]
+  usernames: Tuple[Tuple[float, float, float, float], ...]
+
+pokerstars = SiteConfig(
+  board_suits=((0.3675, 0.3327), (0.4347, 0.3327), (0.5018, 0.3327), (0.5690, 0.3327), (0.6361, 0.3327)),
+  board_ranks=((0.3382, 0.3327, 0.3711, 0.3823), (0.4054, 0.3327, 0.4383, 0.3823), (0.4725, 0.3327, 0.5054, 0.3823),
+               (0.5397, 0.3327, 0.5725, 0.3823), (0.6068, 0.3327, 0.6397, 0.3823)),
+  pot=(0.3821, 0.2955, 0.5788, 0.3204),
+  is_seat_open=lambda rgb: is_color(rgb, 2, 8),
+  has_cards=lambda rgb: is_color(rgb, 0, 30),
+  has_bet=lambda rgb: not is_color(rgb, 1, 40) or rgb[1] >= 100,
+  is_active=lambda rgb: is_color(rgb, 0, 20),
+  has_button=lambda rgb: is_white(rgb, 190),
+  is_spade=lambda rgb: is_exact_rgb(rgb, (108, 109, 109), 10) or is_exact_rgb(rgb, (70, 71, 71), 10),
+  is_club=lambda rgb: is_exact_rgb(rgb, (112, 168, 76), 10) or is_exact_rgb(rgb, (73, 108, 51), 10),
+  is_heart=lambda rgb: is_exact_rgb(rgb, (157, 70, 70), 10) or is_exact_rgb(rgb, (102, 44, 44), 10),
+  is_diamond=lambda rgb: is_exact_rgb(rgb, (79, 136, 155), 10),
+  get_stakes=lambda title: tuple(float(v) for v in match.group(1, 2)) if (match := re.search(r"No Limit Hold'em \$([0-9.]+)/\$([0-9.]+)", title)) else None
+)
 
 pokerstars_6p = PokerConfig(
-  name="PokerStars",
+  name="PokerStars 6-max",
+  site=pokerstars,
   n_players=6,
   seats=((0.5252, 0.7301), (0.0924, 0.5457), (0.1302, 0.2348), (0.4737, 0.1372), (0.8728, 0.2348), (0.9033, 0.5457)),
   cards=((0.4821, 0.6616), (0.1008, 0.4771), (0.1996, 0.1676), (0.5472, 0.0686), (0.8939, 0.1676), (0.8624, 0.4771)),
@@ -54,9 +77,6 @@ pokerstars_6p = PokerConfig(
                     ((0.4406, 0.0244, 0.4706, 0.0871), (0.5042, 0.0244, 0.5342, 0.0871)),
                     ((0.7863, 0.1220, 0.8163, 0.1847), (0.8163, 0.1220, 0.8463, 0.1847)),
                     ((0.8188, 0.4338, 0.8488, 0.4965), (0.8824, 0.4338, 0.9124, 0.4965))),
-  board_suits=((0.3675, 0.3327), (0.4347, 0.3327), (0.5018, 0.3327), (0.5690, 0.3327), (0.6361, 0.3327)),
-  board_ranks=((0.3382, 0.3327, 0.3711, 0.3823), (0.4054, 0.3327, 0.4383, 0.3823), (0.4725, 0.3327, 0.5054, 0.3823),
-               (0.5397, 0.3327, 0.5725, 0.3823), (0.6068, 0.3327, 0.6397, 0.3823)),
   bet_chips=((0.4424, 0.5769), (0.2405, 0.5207), (0.2509, 0.3107), (0.5313, 0.2116), (0.7286, 0.2810), (0.7594, 0.5207)),
   bet_size=((0.4595, 0.5686, 0.6295, 0.5917), (0.2600, 0.5097, 0.4300, 0.5328), (0.2690, 0.2992, 0.4390, 0.3223),
             (0.5485, 0.2017, 0.7185, 0.2248), (0.5448, 0.2694, 0.7148, 0.2925), (0.5732, 0.5080, 0.7432, 0.5345)),
@@ -64,28 +84,6 @@ pokerstars_6p = PokerConfig(
           (0.4230, 0.1405, 0.5291, 0.1769), (0.8176, 0.2380, 0.9324, 0.2743), (0.8483, 0.5488, 0.9544, 0.5851)),
   usernames=((0.4621, 0.6852, 0.5924, 0.7216), (0.0245, 0.5018, 0.1605, 0.5381), (0.0575, 0.1910, 0.1924, 0.2290),
              (0.4030, 0.0935, 0.5391, 0.1299), (0.8076, 0.1910, 0.9424, 0.2290), (0.8383, 0.5018, 0.9744, 0.5381)),
-  pot=(0.3821, 0.2955, 0.5788, 0.3204),
-  is_seat_open=lambda rgb: is_color(rgb, 2, 8),
-  has_cards=lambda rgb: is_color(rgb, 0, 30),
-  has_bet=lambda rgb: not is_color(rgb, 1, 40) or rgb[1] >= 100,
-  is_active=lambda rgb: is_color(rgb, 0, 20),
-  has_button=lambda rgb: is_white(rgb, 190),
-  is_heart=lambda rgb: is_exact_rgb(rgb, (157, 70, 70), 10) or is_exact_rgb(rgb, (102, 44, 44), 10),
-  is_club=lambda rgb: is_exact_rgb(rgb, (112, 168, 76), 10) or is_exact_rgb(rgb, (73, 108, 51), 10),
-  is_diamond=lambda rgb: is_exact_rgb(rgb, (79, 136, 155), 10),
-  is_spade=lambda rgb: is_exact_rgb(rgb, (108, 109, 109), 10) or is_exact_rgb(rgb, (70, 71, 71), 10),
-  get_stakes=lambda title: tuple(float(v) for v in match.group(1, 2)) if (match := re.search(r"No Limit Hold'em \$([0-9.]+)/\$([0-9.]+)", title)) else None
 )
-
-# pokerstars = {
-#   "name": "PokerStars",
-#   "table_title": "No Limit Hold'em",
-# }
-# club_wpt = {
-#   "name": "Club WPT Gold",
-#   "table_title": "ClubWPT GOLD"
-# }
-# img: 2733 x 1092
-#      3483 x 1393
 
 configs = (pokerstars_6p, )
