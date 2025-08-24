@@ -21,7 +21,8 @@ class SiteConfig:
   is_club: Callable[[Tuple[int, int, int]], bool]
   is_heart: Callable[[Tuple[int, int, int]], bool]
   is_diamond: Callable[[Tuple[int, int, int]], bool]
-  get_stakes: Callable[[str], Tuple[float, float] | None]
+  get_blinds: Callable[[str], Tuple[float, ...] | None]
+  get_ante: Callable[[str], float]
 
 
 @dataclass(frozen=True)
@@ -54,7 +55,8 @@ pokerstars = SiteConfig(
   is_club=lambda rgb: is_exact_rgb(rgb, (112, 168, 76), 10) or is_exact_rgb(rgb, (73, 108, 51), 10),
   is_heart=lambda rgb: is_exact_rgb(rgb, (157, 70, 70), 10) or is_exact_rgb(rgb, (102, 44, 44), 10),
   is_diamond=lambda rgb: is_exact_rgb(rgb, (79, 136, 155), 10),
-  get_stakes=lambda title: tuple(float(v) for v in match.group(1, 2)) if (match := re.search(r"No Limit Hold'em \$([0-9.]+)/\$([0-9.]+)", title)) else None
+  get_blinds=lambda title: tuple(float(v) for v in match.group(1, 2)) if (match := re.search(r"No Limit Hold'em \$([0-9.]+)/\$([0-9.]+)", title)) else None,
+  get_ante=lambda title: 0.0
 )
 
 pokerstars_6p = PokerConfig(
@@ -75,7 +77,7 @@ pokerstars_6p = PokerConfig(
                     ((0.0612, 0.4338, 0.0912, 0.4965), (0.1248, 0.4338, 0.1548, 0.4965)),
                     ((0.0936, 0.1220, 0.1236, 0.1847), (0.1572, 0.1220, 0.1872, 0.1847)),
                     ((0.4406, 0.0244, 0.4706, 0.0871), (0.5042, 0.0244, 0.5342, 0.0871)),
-                    ((0.7863, 0.1220, 0.8163, 0.1847), (0.8163, 0.1220, 0.8463, 0.1847)),
+                    ((0.7863, 0.1220, 0.8163, 0.1847), (0.8499, 0.1220, 0.8799, 0.1847)),
                     ((0.8188, 0.4338, 0.8488, 0.4965), (0.8824, 0.4338, 0.9124, 0.4965))),
   bet_chips=((0.4424, 0.5769), (0.2405, 0.5207), (0.2509, 0.3107), (0.5313, 0.2116), (0.7286, 0.2810), (0.7594, 0.5207)),
   bet_size=((0.4595, 0.5686, 0.6295, 0.5917), (0.2600, 0.5097, 0.4300, 0.5328), (0.2690, 0.2992, 0.4390, 0.3223),
