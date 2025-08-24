@@ -44,7 +44,7 @@ class PokerState:
     self.active = 1 if len(self.players) == 2 else (0, 3)[len(self.players) > 3] if self.straddle else 2
 
   def bet(self, amount:float) -> None:
-    if self.verbose: print(colored(self._prefix_str(self.active, amount), "Bet" if self.bet_level == 0 else "Raise to", f"{amount + self.players[self.active].betsize:.2f} bb", "green"))
+    if self.verbose: print(colored(f"{self._prefix_str(self.active, amount)} {'Bet' if self.bet_level == 0 else 'Raise to'} {amount + self.players[self.active].betsize:.2f} bb", "green"))
     self._assert_act()
     self._assert_invest(amount)
     assert amount + self.players[self.active].betsize > self.max_bet, "Attempted to but the betsize does not exceed the existing maximum bet."
@@ -55,8 +55,8 @@ class PokerState:
     self._next_player()
 
   def call(self) -> None:
-    amount = self.max_bet - self.players[self.active].betsize
-    if self.verbose: print(colored(self._prefix_str(self.active, amount), f"Call {amount:.2f} bb", "green"))
+    amount = min(self.max_bet - self.players[self.active].betsize, self.players[self.active].chips)
+    if self.verbose: print(colored(f"{self._prefix_str(self.active, amount)} Call {amount:.2f} bb", "green"))
     self._assert_act()
     self._assert_facing_bet()
     self._assert_invest(amount)
@@ -66,13 +66,13 @@ class PokerState:
     self._next_player()
 
   def check(self) -> None:
-    if self.verbose: print(colored(self._prefix_str(self.active, 0.0), "Check", "green"))
+    if self.verbose: print(colored(f"{self._prefix_str(self.active, 0.0)} Check", "green"))
     self._assert_act()
     assert self.players[self.active].betsize == self.max_bet, "Attempted check but a unmatched bet exists."
     self._next_player()
 
   def fold(self) -> None:
-    if self.verbose: print(colored(self._prefix_str(self.active, 0.0), "Fold", "green"))
+    if self.verbose: print(colored(f"{self._prefix_str(self.active, 0.0)} Fold", "green"))
     self._assert_act()
     self._assert_facing_bet()
     assert self.players[self.active].betsize < self.max_bet, "Attempted to fold but player can check"
@@ -82,8 +82,8 @@ class PokerState:
     elif self.verbose: print(colored(f"Only player {self.winner} is remaining.", "green"))
 
   def __str__(self) -> str:
-    ret = f"PokerState:\nAnte={self.ante:.2f}, Straddle={self.straddle}\n{round_to_str(self.round)} (Pot: {self.pot:.2f} bb)\n"
-    for i,p in enumerate(self.players): ret += f"{self._prefix_str(i, 0.0):<17} {('Folded' if p.folded else 'Not folded' if not self.active == i else 'Active')}"
+    ret = f"Ante={self.ante:.2f} bb, Straddle={self.straddle}\n{round_to_str(self.round)} (Pot: {self.pot:.2f} bb)\n"
+    for i,p in enumerate(self.players): ret += f"{self._prefix_str(i, 0.0):<17} {('Folded' if p.folded else 'Not folded' if not self.active == i else 'Active')}\n"
     return ret
 
   def _prefix_str(self, pos:int, amount:float) -> str:
@@ -93,7 +93,7 @@ class PokerState:
     assert self.players[self.active].chips >= amount, "Not enough chips to invest."
 
   def _assert_facing_bet(self) -> None:
-    assert self.max_bet > 0, "Attempted face a bet but no bet exists."
+    assert self.max_bet > 0, "Attempted to face a bet but no bet exists."
 
   def _assert_act(self) -> None:
     assert not self.players[self.active].folded, "Attempted to act but player already folded."
