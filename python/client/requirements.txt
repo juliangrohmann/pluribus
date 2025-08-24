@@ -2,6 +2,7 @@ pyautogui
 pywin32
 pillow
 termcolor
+colorama
 requests
 opencv-python
 onnxruntime-gpu
