@@ -81,9 +81,13 @@ class PokerState:
     if self.winner is None: self._next_player()
     elif self.verbose: print(colored(f"Only player {self.winner} is remaining.", "green"))
 
+  def is_terminal(self):
+    return self.winner is not None or self.round > 3
+
   def __str__(self) -> str:
     ret = f"Ante={self.ante:.2f} bb, Straddle={self.straddle}\n{round_to_str(self.round)} (Pot: {self.pot:.2f} bb)\n"
-    for i,p in enumerate(self.players): ret += f"{self._prefix_str(i, 0.0):<17} {('Folded' if p.folded else 'Not folded' if not self.active == i else 'Active')}\n"
+    for i,p in enumerate(self.players):
+      ret += f"{self._prefix_str(i, 0.0):<17} {('Folded' if p.folded else 'Not folded' if not self.active == i else 'Active')}{'\n' if i != len(self.players) - 1 else ''}"
     return ret
 
   def _prefix_str(self, pos:int, amount:float) -> str:
