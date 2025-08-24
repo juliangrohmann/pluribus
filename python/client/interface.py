@@ -20,6 +20,7 @@ random.seed()
 win_default_offset = 8
 win_header_offset = 1
 win_header_h = 30
+false_usernames = ["Bet", "Raise", "Check", "Call", "Fold", "Post", "Post BB", "Post SB", "Muck", "Show", "Resume"]
 debug = False
 
 def _build_card_mask() -> np.ndarray:
@@ -84,7 +85,7 @@ class PokerInterface:
   def username(self, img:Image, pos:int) -> str|None:
     _assert_player_pos(pos)
     name = _parse_ocr(img, self.config.usernames[pos], tuple(), debug_label=f"username_{pos}")
-    return name if name not in ["Bet", "Raise", "Check", "Call", "Fold"] else None
+    return name if name not in false_usernames and not name.startswith("Won ") and not name.startswith("Time ") else None
 
   def round(self, img:Image) -> int: return sum(bool(self._parse_suit(img, self.config.site.board_suits[i])) for i in (0, 3, 4))
   def board(self, img:Image) -> str|None: return self._parse_cards(img, self.config.site.board_ranks, self.config.site.board_suits, debug_label=f"board_rank")
@@ -109,7 +110,7 @@ class PokerInterface:
     return None
 
   def _cash(self, img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), blinds:bool=False, debug_label:str=None) -> float|None:
-    val = m.group(1) if (m := re.match(r".*\$(\d+\.?\d{0,2}).*", raw := _parse_ocr(img, coords, repl + (",",), debug_label=debug_label))) is not None else None
+    val = m.group(1) if (m := re.match(r"(?:.*\$)?\D*(\d+\.?\d{0,2}).*", raw := _parse_ocr(img, coords, repl + (",",), debug_label=debug_label))) is not None else None
     return (float(val) / self.blinds()[1] if blinds else float(val)) if m is not None else 0.0 if raw.lower() == "all in" else None
 
   def _cash_by_pos(self, pos:int, img:Image, coords_by_pos:Tuple[Tuple[int,int,int,int], ...], blinds:bool=False, debug_label:str=None) -> float|None:
@@ -180,7 +181,7 @@ def run() -> None:
       for i in range(table.config.n_players): print(f"Player {i}", ("has cards." if table.has_cards(img, i) else "folded."))
     elif action == 'invested':
       for i in range(table.config.n_players):
-        if table.has_bet(img, i): print(f"Seat {i} bet: ${table.bet_size(img, i):.2f}")
+        if table.has_bet(img, i): print(f"Seat {i} bet: {f'${sz:.2f}' if (sz := table.bet_size(img, i) is not None) else None}")
     elif action == 'button':
       print(f"Seat {btn} has the button." if (btn := table.button_pos(img)) else "No one has the button.")
     elif action == 'hand':

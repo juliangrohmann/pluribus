@@ -22,25 +22,75 @@ def order_points_clockwise(pts: np.ndarray) -> np.ndarray:
   rect[3] = pts[np.argmax(diff)]  # bottom-left
   return rect
 
-def warp_quad(img: np.ndarray, quad: np.ndarray, out_h: int = 48) -> np.ndarray:
-  # quad: (4,2) float32, clockwise
-  tl, tr, br, bl = quad
-  wA = np.linalg.norm(br - bl)
-  wB = np.linalg.norm(tr - tl)
-  width = int(max(wA, wB))
-  height = out_h
-  dst = np.array([[0, 0],
-                  [width - 1, 0],
-                  [width - 1, height - 1],
-                  [0, height - 1]], dtype=np.float32)
-  # scale height proportionally
-  hA = np.linalg.norm(tr - br)
-  hB = np.linalg.norm(tl - bl)
-  est_h = max(int(max(hA, hB)), 1)
-  # keep output height fixed to recognizer height
-  M = cv2.getPerspectiveTransform(quad, dst)
-  warped = cv2.warpPerspective(img, M, (width, height), flags=cv2.INTER_LINEAR)
-  return warped
+import numpy as np
+
+def refine_crop_with_prob_segments(x0:int, y0:int, x1:int, y1:int,
+                                   prob_up: np.ndarray, sh: float, sw: float,
+                                   margin_px: int = 3,
+                                   gap_px_prob: int = 6,   # max gap in prob cols to merge runs
+                                   smooth_w: int = 5,      # 1D smoothing over columns
+                                   min_width_px: int = 12  # enforce a minimum width in orig px
+                                   ) -> tuple[int,int,int,int]:
+  # map crop → prob coords
+  xs0 = max(0, int(round(x0 * sw)));  xs1 = min(prob_up.shape[1], int(round(x1 * sw)))
+  ys0 = max(0, int(round(y0 * sh)));  ys1 = min(prob_up.shape[0], int(round(y1 * sh)))
+  if xs1 <= xs0 or ys1 <= ys0:
+    return x0, y0, x1, y1
+
+  region = prob_up[ys0:ys1, xs0:xs1]            # (h,w) in prob space
+  col = region.mean(axis=0).astype(np.float32)  # [w]
+
+  # smooth to bridge tiny dips between '$' and digits
+  if smooth_w > 1:
+    k = np.ones(smooth_w, dtype=np.float32) / smooth_w
+    col = np.convolve(col, k, mode='same')
+
+  # adaptive threshold; keep more columns for short strings
+  thr = max(np.percentile(col, 60) * 0.75, 0.25 * float(col.max()))
+  mask = col >= thr
+  if not mask.any():
+    return x0, y0, x1, y1
+
+  # find contiguous runs
+  runs = []
+  i = 0
+  Wp = mask.size
+  while i < Wp:
+    if mask[i]:
+      j = i
+      while j < Wp and mask[j]:
+        j += 1
+      runs.append([i, j])  # [start, end)
+      i = j
+    else:
+      i += 1
+
+  # merge runs separated by small gaps (<= gap_px_prob columns in prob space)
+  merged = []
+  for s, e in runs:
+    if not merged:
+      merged.append([s, e])
+    else:
+      if s - merged[-1][1] <= gap_px_prob:
+        merged[-1][1] = e
+      else:
+        merged.append([s, e])
+
+  # score runs by total mass (integral), choose the best
+  best = max(merged, key=lambda se: float(col[se[0]:se[1]].sum()))
+  i0, i1 = best
+
+  # map back to original pixels (+ margin) and enforce a minimum width
+  nx0 = x0 + int(round(i0 / sw))
+  nx1 = x0 + int(round(i1 / sw))
+  if nx1 - nx0 < min_width_px:
+    cx = (nx0 + nx1) // 2
+    nx0 = max(0, cx - min_width_px // 2)
+    nx1 = cx + (min_width_px - (cx - nx0))
+
+  nx0 = max(0, nx0 - margin_px)
+  nx1 = nx1 + margin_px
+  return nx0, y0, nx1, y1
 
 def quad_to_aabb(quad: np.ndarray, img_w: int, img_h: int, expand: int = 0) -> tuple[int,int,int,int]:
   """
@@ -128,7 +178,7 @@ class PPOCRv3Detector:
     for (h, w) in sizes:
       dummy = np.zeros((h, w, 3), dtype=np.uint8)  # BGR
       for _ in range(iters):
-        _ = self.infer_boxes(dummy)
+        _ = self.infer_boxes(*self.calc_metrics(dummy))
 
   @staticmethod
   def _normalize_imagenet(img_bgr: np.ndarray) -> np.ndarray:
@@ -181,12 +231,7 @@ class PPOCRv3Detector:
       boxes.append(box)
     return boxes
 
-
-  def infer_boxes(self, img_bgr: np.ndarray) -> list[np.ndarray]:
-    """
-    Run PP-OCRv3 DB detector on a BGR image and return a list of text quads.
-    Returns: [quad(np.float32, shape (4,2)), ...] in original image coords (clockwise).
-    """
+  def calc_metrics(self, img_bgr):
     H0, W0 = img_bgr.shape[:2]
 
     # ---- preprocess (BGR, keep ratio, pad to /32, ImageNet norm) ----
@@ -208,14 +253,14 @@ class PPOCRv3Detector:
     # resize to padded size, then CROP to unpadded (nh, nw)
     prob_full = cv2.resize(prob, (proc.shape[1], proc.shape[0]), interpolation=cv2.INTER_LINEAR)
     prob_up = prob_full[:nh, :nw]  # remove the padding explicitly
+    return prob_up, nh, nw, sh, sw
 
-    bin_threshs = (0.5, 0.3, 0.2)
-    box_threshs = (0.6, 0.3, 0.2)
-    dilates = ((0, 0), (3, 1), (4, 2))
-    for bin_thresh, box_thresh, dilate in zip(bin_threshs, box_threshs, dilates):
-      if boxes := self._find_boxes_from_prob(prob_up, nh, nw, bin_thresh=bin_thresh, box_thresh=box_thresh, dilate=dilate):
-        break
-
+  def infer_boxes(self, prob_up, nh, nw, bin_thresh=0.5, box_thresh=0.6, dilate=(0, 0)) -> list[np.ndarray]:
+    """
+    Run PP-OCRv3 DB detector on a BGR image and return a list of text quads.
+    Returns: [quad(np.float32, shape (4,2)), ...] in original image coords (clockwise).
+    """
+    boxes = self._find_boxes_from_prob(prob_up, nh, nw, bin_thresh=bin_thresh, box_thresh=box_thresh, dilate=dilate)
     # sort by area (largest first), then return
     if boxes:
       areas = [cv2.contourArea(b.astype(np.float32)) for b in boxes]
@@ -370,25 +415,34 @@ class DetectThenRecognize:
                           device_id=device_id, input_height=48, input_width=320,
                           mean=None, std=None, blank_idx=0)
 
-  def run(self, rough_crop: np.ndarray | Image.Image, expand: int = 4, mask: np.ndarray = None, debug: bool = False) -> tuple[str, float]:
+  def run(self, rough_crop: np.ndarray | Image.Image, expand: int = 4, mask: np.ndarray = None, min_confidence: float = 0.03, debug: bool = False) -> tuple[str, float]:
+    bin_threshs = (0.6, 0.5, 0.4, 0.3)
+    box_threshs = (0.7, 0.6, 0.45, 0.3)
+    dilates = ((0, 0), (0, 0), (3, 1), (4, 2))
+
     if isinstance(rough_crop, Image.Image):
       rough_crop = cv2.cvtColor(np.array(rough_crop), cv2.COLOR_RGB2BGR)
-    boxes = self.det.infer_boxes(rough_crop)  # list of 4-pt quads (clockwise)
-    if not boxes:
-      if debug: print("WARNING: No boxes detected. Recognizing whole image...")
-      return self.rec.recognize_bgr(rough_crop)
-
-    # choose the best region; for single word, the widest area generally works
-    H, W = rough_crop.shape[:2]
-    scored = []
-    if debug:
-      print(f"Image dimensions: {W=}, {H=}")
-      print("Boxes: ")
-    for q in boxes:
-      x0, y0, x1, y1 = quad_to_aabb(q, W, H, expand=expand)  # small expansion
-      scored.append(result := (*self.rec.recognize_bgr(rough_crop[y0:y1, x0:x1, :], mask=mask, debug=debug), (x0, y0, x1, y1)))
-      if debug: print(f"Box={f'({x0}, {y0}, {x1}, {y1})':<17}  Confidence={result[1]:.4f}  Text={result[0]}")
-    best = max(scored, key=lambda t: t[1])
+    prob_up, nh, nw, sh, sw = self.det.calc_metrics(rough_crop)
+    for bin_thresh, box_thresh, dilate in zip(bin_threshs, box_threshs, dilates):
+      boxes = self.det.infer_boxes(prob_up, nh, nw, bin_thresh=bin_thresh, box_thresh=box_thresh, dilate=dilate)
+      H, W = rough_crop.shape[:2]
+      scored = []
+      if debug:
+        print(f"Image dimensions: {W=}, {H=}")
+        print("Boxes: ")
+      if boxes:
+        for q in boxes:
+          x0, y0, x1, y1 = quad_to_aabb(q, W, H, expand=expand)  # small expansion
+          x0, y0, x1, y1 = refine_crop_with_prob_segments(x0, y0, x1, y1, prob_up, sh, sw, margin_px=8, gap_px_prob=6, smooth_w=5, min_width_px=12)
+          crop = rough_crop[y0:y1, x0:x1, :]
+          Image.fromarray(crop).save(r"img_debug\debug_trimmed.png")
+          scored.append(result := (*self.rec.recognize_bgr(crop, mask=mask, debug=debug), (x0, y0, x1, y1)))
+          if debug: print(f"Box={f'({x0}, {y0}, {x1}, {y1})':<17}  Confidence={result[1]:.4f}  Text={result[0]}")
+      else:
+        scored.append((*self.rec.recognize_bgr(rough_crop), (0, 0, *rough_crop.shape[:2])))
+      best = max(scored, key=lambda t: t[1])
+      if best[1] >= min_confidence:
+        break
     if debug:
       x0, y0, x1, y1 = best[2]
       Image.fromarray(rough_crop[y0:y1, x0:x1, :]).save(r"img_debug\debug_boxed.png")

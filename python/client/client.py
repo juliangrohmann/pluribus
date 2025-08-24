@@ -44,12 +44,21 @@ def update_tables(tables:List[PokerTable]) -> None:
       tables.append(PokerTable(None, inter, None))
       print(colored(f"New Table: {inter}", "yellow"))
 
+def print_showdown(showing:List[bool], hands:List[str|None], pot:float, board:str):
+  print(colored(f"Showdown (Pot: {pot:.2f} bb, Board: {board})", "yellow"))
+  for i in range(len(hands)):
+    if showing[i]:
+      print(colored(f"Player {i} shows", "yellow"), colorize_cards(hands[i]) if hands[i] is not None else "")
+
 def update_state(img:Image, table:PokerTable, debug:int=0):
   tol = 1e-3
   while True:
-    if table.state is None:
-      table.state, table.seat_map = init_new_hand(img, table.interface, verbose=debug >= 1)
-      if not table.state is None: print(colored(f"New hand:\n", "yellow") + str(table.state))
+    if table.state is None or table.state.is_terminal():
+      next_state, next_seat_map = init_new_hand(img, table.interface, verbose=debug >= 1)
+      if next_state is not None:
+        print(colored(f"New hand:\n", "yellow") + str(next_state))
+        table.state, table.seat_map = next_state, next_seat_map
+        table.round = 0
     state, inter = table.state, table.interface
     if state is None:
       return
@@ -62,14 +71,20 @@ def update_state(img:Image, table:PokerTable, debug:int=0):
         table.round = curr_round
       else:
         print(colored("Failed to read board.", "red"))
-    query_seat = table.seat_map[state.active]
-    if any(showing := [not p.folded and inter.is_showing_hand(img, table.seat_map[i]) for i,p in enumerate(state.players)]):
-      hands = [inter.hand(img, table.seat_map[i]) if s else None for i,s in enumerate(showing)]
-      if any(h is None for s,h in zip(showing, hands) if s):
-        if debug >= 2: print("\tFailed to read all showing hands.")
-        print(f"{showing=}")
-        print(f"{hands=}")
+    showing = [not p.folded and inter.is_showing_hand(img, table.seat_map[i]) for i,p in enumerate(state.players)]
+    hands = [inter.hand(img, table.seat_map[i]) if s else None for i,s in enumerate(showing)]
+    if any(showing) and any(h is None for s,h in zip(showing, hands) if s):
+      if debug >= 2: print("\tFailed to read all showing hands.")
+      return
+    if state.is_terminal():
+      if any(showing) and (pot := inter.pot_size(img, blinds=True)) is not None and (board := inter.board(img)) is not None:
+        print_showdown(showing, hands, pot, board)
+        if debug >= 2: print("Waiting for new hand...")
+        table.state = None
         return
+      elif debug >= 2: print("Waiting for showdown...")
+    query_seat = table.seat_map[state.active]
+    if any(showing):
       diff = state.players[state.active].chips - (chips := inter.stack_size(img, query_seat, blinds=True))
       if debug >= 2:
         print(f"\tSeat {query_seat} is showing a hand.")
@@ -80,13 +95,8 @@ def update_state(img:Image, table:PokerTable, debug:int=0):
         state.call()
       else:
         state.fold()
-      if debug >= 0 and (pot := inter.pot_size(img, blinds=True)) is not None and (board := inter.board(img)) is not None:
-        print(colored(f"Showdown (Pot: {pot:.2f} bb, Board: {board})", "yellow"))
-        for i,p in enumerate(state.players):
-          if showing[i]:
-            hand = inter.hand(img, table.seat_map[i])
-            print(colored(f"Player {i} shows ", "yellow"), colorize_cards(hand) if hand is not None else "")
     elif not inter.has_cards(img, query_seat):
+      if debug >= 2: print(f"\tSeat {query_seat} does not have cards.")
       state.fold()
     elif (active_seat := inter.active_seat(img)) is None:
       return
@@ -115,8 +125,9 @@ def update_state(img:Image, table:PokerTable, debug:int=0):
             state.check()
       else:
         if (bet_size := inter.bet_size(img, query_seat, blinds=True)) is None:
-          if debug >= 2: print(f"Failed to read bet size {query_seat}.")
-          img.save(f"img_debug\\fail_bet_size_{query_seat}.png")
+          if debug >= 0:
+            print(colored(f"Failed to read bet size {query_seat}.", "red"))
+            img.save(f"img_debug\\fail_bet_size_{query_seat}.png")
           return
         if debug >= 2:
           print(f"\tSeat {query_seat} has bet {bet_size:.2f} bb\n\tPreviously invested: {state.players[state.active].betsize:.2f} bb\n\tMax bet: {state.max_bet:.2f} bb")
@@ -129,7 +140,9 @@ def update_state(img:Image, table:PokerTable, debug:int=0):
         else:
           if debug >= 2: print(f"\tRound has changed: {state.round} -> {curr_round}")
           if (chips := inter.stack_size(img, query_seat, blinds=True)) is None:
-            if debug >= 2: print(f"Failed to read stack size {query_seat}.")
+            if debug >= 0:
+              print(colored(f"Failed to read stack size {query_seat}.", "red"))
+              img.save(f"img_debug\\fail_stack_size_{query_seat}.png")
             return
           diff = state.players[state.active].chips - chips - bet_size
           if debug >= 2:
@@ -141,22 +154,24 @@ def update_state(img:Image, table:PokerTable, debug:int=0):
               state.call()
           else:
             state.check()
-    if state.winner is not None or state.round > 3:
-      if debug >= 2: print("Waiting for new hand...")
-      table.state = None
-      table.round = 0
 
 def run(log_level:int=0) -> None:
   just_fix_windows_console()
+  cycles = []
   tables: List[PokerTable] = []
   while True:
-    t_0 = time.time()
+    if log_level >= 1: t_0 = time.time()
     screen = screenshot_all()
     update_tables(tables)
     for table in tables:
       update_state(screen.crop(table.interface.rect()), table, debug=log_level)
-
-    # print(f"Cycle time: {time.time() - t_0:.2f} s")
+    if log_level >= 1:
+      cycles.append(time.time() - t_0)
+      if len(cycles) == 1000:
+        print(colored(f"Avg cycle time: {sum(cycles) / len(cycles):.3f} s", "red"))
+        print(colored(f"Max cycle time: {max(cycles):.3f} s", "red"))
+        print(colored(f"Min cycle time: {min(cycles):.3f} s", "red"))
+        cycles.clear()
 
 if __name__ == "__main__":
   print("Running...")
