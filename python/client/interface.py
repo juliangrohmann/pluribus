@@ -1,35 +1,30 @@
-"""
-Implements functionality to interact with the poker UI.
-"""
-
 import random
+import re
 import time
 import pyautogui
 import win32gui
 import win32con
 import PIL
-from typing import Tuple, List, Callable
-from PIL import ImageOps, ImageEnhance, Image
-from PIL.Image import Image
-from termcolor import colored
-from collections import Counter
 import numpy as np
-import pytesseract
 import config
 import ocr
+from typing import Tuple, List, Callable
+from collections import Counter
+from colorama import just_fix_windows_console
+from PIL import ImageOps, ImageEnhance, Image
+from PIL.Image import Image
+from util import round_to_str, colorize_board
 
 random.seed()
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
 win_default_offset = 8
 win_header_offset = 1
 win_header_h = 30
+debug = False
 
 def _build_card_mask() -> np.ndarray:
   with open(ocr.charset_path, "r", encoding="utf-8") as f:
     charset = [line.rstrip("\n") for line in f]
   return np.array([i == 0 or c in "1234567890JKQA" for i,c in enumerate(charset)])
-
 card_mask = _build_card_mask()
 
 def _assert_player_pos(i:int) -> None:
@@ -45,9 +40,9 @@ def _apply_color_filter(pos:int, img:Image, coords:Tuple[Tuple[float,float], ...
   _assert_player_pos(pos)
   return fun(img.getpixel(_frac_to_pix(*coords[pos], img.width, img.height)))
 
-def _parse_ocr(img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), expand: int=4, mask:np.ndarray|None=None, debug_label:str=None) -> str:
+def _parse_ocr(img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), expand:int=4, mask:np.ndarray|None=None, debug_label:str=None) -> str:
   raw = ocr.pipeline.run(cropped := _crop(img, coords), expand=expand, mask=mask)[0]
-  if debug_label:
+  if debug and debug_label is not None:
     cropped.save(f"img_debug\\{debug_label}.png")
   for s in repl: raw = raw.replace(s, '')
   return raw
@@ -57,18 +52,27 @@ def _parse_rank(img:Image, coords:Tuple[int,int,int,int], n:int=8, debug_label:s
   repeated = PIL.Image.new(cropped.mode, (cropped.width * n, cropped.height))
   for i in range(n): repeated.paste(cropped, (i * cropped.width, 0))
   counter = Counter(ocr.pipeline.run(repeated, expand=10, mask=card_mask)[0])
-  if debug_label:
+  if debug and debug_label is not None:
     repeated.save(f"img_debug\\{debug_label}.png")
   return 'T' if set(e[0] for e in counter.most_common(2)) == set('10') else counter.most_common(1)[0][0]
 
-class PokerTable:
-  def __init__(self, wnd_handle:int, conf:dict) -> None:
+class PokerInterface:
+  def __init__(self, wnd_handle:int, conf:dict, debug:bool=False) -> None:
     self.handle = wnd_handle
     self.config = conf
+    self.debug = debug
 
   def rect(self) -> Tuple[int,int,int,int]:
     r = win32gui.GetWindowRect(self.handle)
-    return r[0] + win_default_offset, r[1] + win_header_offset, r[2] - r[0] - 2 * win_default_offset, r[3] - r[1] - win_default_offset - win_header_offset
+    return r[0] + win_default_offset, r[1] + win_header_offset, r[2] - win_default_offset, r[3] - win_default_offset
+
+  def screenshot(self) -> Image:
+    r = self.rect()
+    return pyautogui.screenshot(region=(r[0], r[1], r[2]-r[0], r[3]-r[1]))
+
+  def blinds(self, blinds:bool=False) -> Tuple[float, ...]:
+    stakes = self.config.site.get_blinds(self.title())
+    return tuple(v / stakes[1] for v in stakes) if blinds else stakes
 
   def hand(self, pos:int, img:Image) -> str|None:
     _assert_player_pos(pos)
@@ -79,22 +83,19 @@ class PokerTable:
     name = _parse_ocr(img, self.config.usernames[pos], tuple(), debug_label=f"username_{pos}")
     return name if name not in ["Bet", "Raise", "Check", "Call", "Fold"] else None
 
-  def street(self, img:Image) -> str|None:
-    return {0: "Preflop", 3: "Flop", 4: "Turn", 5: "River"}.get(sum(bool(self._parse_suit(img, self.config.site.board_suits[i])) for i in range(5)), None)
-
+  def round(self, img:Image) -> int: return sum(bool(self._parse_suit(img, self.config.site.board_suits[i])) for i in (0, 3, 4))
   def board(self, img:Image) -> str|None: return self._parse_cards(img, self.config.site.board_ranks, self.config.site.board_suits, debug_label=f"board_rank")
-  def stack_size(self, img:Image, pos:int, blinds:bool=False) -> float|None: return self._cash_amount_by_pos(pos, img, self.config.stacks, blinds=blinds, debug_label=f"stack_size_{pos}")
-  def bet_size(self, img:Image, pos:int, blinds:bool=False) -> float|None: return self._cash_amount_by_pos(pos, img, self.config.bet_size, blinds=blinds, debug_label=f"bet_size_{pos}")
-  def pot_size(self, img:Image, blinds:bool=False) -> float|None: return self._cash_amount(img, self.config.site.pot, ("Pot", " ", ":"), blinds, debug_label="pot_size")
-  def active_pos(self, img:Image) -> int|None: return self._find_pos(img, self.config.active, self.config.site.is_active)
+  def stack_size(self, img:Image, pos:int, blinds:bool=False) -> float|None: return self._cash_by_pos(pos, img, self.config.stacks, blinds=blinds, debug_label=f"stack_size_{pos}")
+  def bet_size(self, img:Image, pos:int, blinds:bool=False) -> float|None: return self._cash_by_pos(pos, img, self.config.bet_size, blinds=blinds, debug_label=f"bet_size_{pos}")
+  def pot_size(self, img:Image, blinds:bool=False) -> float|None: return self._cash(img, self.config.site.pot, ("Pot", " ", ":"), blinds, debug_label="pot_size")
+  def active_seat(self, img:Image) -> int|None: return self._find_pos(img, self.config.active, self.config.site.is_active)
   def button_pos(self, img:Image) -> int|None: return self._find_pos(img, self.config.button, self.config.site.has_button)
   def is_seat_open(self, img:Image, pos:int) -> bool: return _apply_color_filter(pos, img, self.config.seats, self.config.site.is_seat_open)
-  def is_sitting_out(self, img:Image, pos:int) -> bool: return _parse_ocr(img, self.config.stacks[pos], debug_label=f"sitout_{pos}") == "Sitting Out"
+  def is_sitting_out(self, img:Image, pos:int) -> bool: return (label:=_parse_ocr(img, self.config.stacks[pos], debug_label=f"sitout_{pos}")) == "Sitting Out" or label == "Waiting"
   def has_cards(self, img:Image, pos:int) -> bool: return _apply_color_filter(pos, img, self.config.cards, self.config.site.has_cards)
   def has_bet(self, img:Image, pos:int) -> bool: return _apply_color_filter(pos, img, self.config.bet_chips, self.config.site.has_bet)
-  def screenshot(self) -> Image: return pyautogui.screenshot(region=self.rect())
   def title(self) -> str: return win32gui.GetWindowText(self.handle)
-  def stakes(self) -> Tuple[float,float]: return self.config.site.get_stakes(self.title())
+  def ante(self, blinds:bool=False) -> float: return self.config.site.get_ante(self.title()) / (self.blinds()[1] if blinds else 1.0)
   def move(self, x:int, y:int, w:int, h:int) -> None: win32gui.SetWindowPos(self.handle, win32con.HWND_TOP, x, y, w, h, 0)
   def __repr__(self) -> str: return f"<PokerTable title=\"{self.title()}\", config=\"{self.config.name}\", handle={self.handle}>"
   def __str__(self) -> str: return self.__repr__()
@@ -104,18 +105,13 @@ class PokerTable:
       if _apply_color_filter(pos, img, coords, fun): return pos
     return None
 
-  def _cash_amount(self, img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), blinds:bool=False, debug_label:str=None) -> float|None:
-    raw = _parse_ocr(img, coords, repl + ("$", ","), debug_label=debug_label)
-    if raw.lower() == "all in": return 0.0
-    try:
-      amount = float(raw)
-      return amount / self.stakes()[1] if blinds else amount
-    except ValueError:
-      return None
+  def _cash(self, img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), blinds:bool=False, debug_label:str=None) -> float|None:
+    val = m.group(1) if (m := re.match(r".*\$([0-9]+\.[0-9]{2}).*", raw := _parse_ocr(img, coords, repl + (",",), debug_label=debug_label))) is not None else None
+    return (float(val) / self.blinds()[1] if blinds else float(val)) if m is not None else 0.0 if raw.lower() == "all in" else None
 
-  def _cash_amount_by_pos(self, pos:int, img:Image, coords_by_pos:Tuple[Tuple[int,int,int,int], ...], blinds:bool=False, debug_label:str=None) -> float|None:
+  def _cash_by_pos(self, pos:int, img:Image, coords_by_pos:Tuple[Tuple[int,int,int,int], ...], blinds:bool=False, debug_label:str=None) -> float|None:
     _assert_player_pos(pos)
-    return self._cash_amount(img, coords_by_pos[pos], blinds=blinds, debug_label=debug_label)
+    return self._cash(img, coords_by_pos[pos], blinds=blinds, debug_label=debug_label)
 
   def _rgb_to_suit(self, rgb:Tuple[int,int,int]) -> str|None:
     if self.config.site.is_heart(rgb): return 'h'
@@ -136,21 +132,24 @@ def is_real_window(h_wnd:int) -> bool:
   l_ex_style = win32gui.GetWindowLong(h_wnd, win32con.GWL_EXSTYLE)
   return ((l_ex_style & win32con.WS_EX_TOOLWINDOW) == 0) == has_no_owner and win32gui.GetWindowText(h_wnd) and win32gui.IsWindowVisible(h_wnd) and win32gui.GetParent(h_wnd) == 0
 
-def get_tables() -> List[PokerTable]:
+def get_interfaces() -> List[PokerInterface]:
   def callback(h_wnd, wnd_list):
     if is_real_window(h_wnd): wnd_list.append(h_wnd)
   windows = []
   win32gui.EnumWindows(callback, windows)
-  return [PokerTable(h_wnd, conf) for h_wnd in windows if (conf := get_config(h_wnd)) is not None]
+  return [PokerInterface(h_wnd, conf) for h_wnd in windows if (conf := get_config(h_wnd)) is not None]
 
 def get_config(handle:int) -> dict|None:
   title = win32gui.GetWindowText(handle)
   for c in config.configs:
-    if c.site.get_stakes(title) is not None: return c
+    if c.site.get_blinds(title) is not None: return c
   return None
 
-def debug() -> None:
-  tables = get_tables()
+def run() -> None:
+  just_fix_windows_console()
+  global debug
+  debug = True
+  tables = get_interfaces()
   for table in tables: print(table)
 
   table_index = 0
@@ -159,11 +158,12 @@ def debug() -> None:
     inp = input("\nAction: ").split(' ')
     action, args = inp[0], tuple(inp[1:])
     table = tables[table_index]
+    table.debug = True
     table_img = table.screenshot() if len(args) == 0 else PIL.Image.open(args[0])
     table_img.save('img_debug/table.png')
 
     if action == 'update':
-      tables = get_tables()
+      tables = get_interfaces()
       for table in tables: print(table)
     elif action == 'seats':
       for i in range(table.config.n_players): print("Seat", i, "is open." if table.is_seat_open(table_img, i) else "is taken.")
@@ -172,32 +172,32 @@ def debug() -> None:
     elif action == 'sitout':
       for i in range(5): print(f"Seat {i} is", "sitting out." if table.is_sitting_out(table_img, i) else "not sitting out.")
     elif action == 'active':
-      print(f"Seat {active} is active." if (active := table.active_pos(table_img)) else "No one is active.")
+      print(f"Seat {active} is active." if (active := table.active_seat(table_img)) else "No one is active.")
     elif action == 'cards':
       for i in range(table.config.n_players): print(f"Player {i}", ("has cards." if table.has_cards(table_img, i) else "folded."))
     elif action == 'invested':
       for i in range(table.config.n_players):
-        if table.has_bet(table_img, i): print(f"Seat {i} bet: {table.bet_size(table_img, i)}")
+        if table.has_bet(table_img, i): print(f"Seat {i} bet: ${table.bet_size(table_img, i):.2f}")
     elif action == 'button':
       print(f"Seat {btn} has the button." if (btn := table.button_pos(table_img)) else "No one has the button.")
     elif action == 'hand':
       for i in range(table.config.n_players):
         if (hand := table.hand(i, table_img)) is not None: print(f"Seat {i} hand: {hand}")
     elif action == 'board':
-      print("Board:", table.board(table_img))
+      print("Board:", colorize_board(table.board(table_img)))
     elif action == 'stacksize':
       for i in range(6):
         if not table.is_seat_open(table_img, i): print("Seat", i, "Stack:", table.stack_size(table_img, i))
     elif action == 'pot':
-      print("Potsize:", table.pot_size(table_img))
+      print(f"Potsize: ${table.pot_size(table_img):.2f}")
     elif action == 'street':
-      print("Street:", table.street(table_img))
-    elif action == 'stakes':
-      print("Stakes: $%.2f/$%.2f" % table.stakes())
+      print("Street:", round_to_str(table.round(table_img)))
+    elif action == 'blinds':
+      print("Blinds: $%.2f/$%.2f" % table.blinds())
     elif action == 'end':
       playing = False
     else:
       print("Invalid. Try again.")
 
 if __name__ == '__main__':
-  debug()
+  run()
