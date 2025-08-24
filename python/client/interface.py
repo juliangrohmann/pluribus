@@ -42,8 +42,8 @@ def _apply_color_filter(pos:int, img:Image, coords:Tuple[Tuple[float,float], ...
   _assert_player_pos(pos)
   return fun(img.getpixel(_frac_to_pix(*coords[pos], img.width, img.height)))
 
-def _parse_ocr(img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), expand:int=4, mask:np.ndarray|None=None, debug_label:str=None) -> str:
-  raw = ocr.pipeline.run(cropped := _crop(img, coords), expand=expand, mask=mask)[0]
+def _parse_ocr(img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), refine:bool=False, expand:int=4, mask:np.ndarray|None=None, debug_label:str=None) -> str:
+  raw = ocr.pipeline.run(cropped := _crop(img, coords), refine=refine, expand=expand, mask=mask)[0]
   if debug and debug_label is not None:
     cropped.save(f"img_debug\\{debug_label}.png")
   for s in repl: raw = raw.replace(s, '')
@@ -56,7 +56,7 @@ def _parse_rank(img:Image, coords:Tuple[int,int,int,int], n:int=8, debug_label:s
   counter = Counter(ocr.pipeline.run(repeated, expand=10, mask=card_mask)[0])
   if debug and debug_label is not None:
     repeated.save(f"img_debug\\{debug_label}.png")
-  return 'T' if set(e[0] for e in counter.most_common(2)) == set('10') else {'0':'T', '1':'T'}.get(most[0][0], most[0][0]) if len(most := counter.most_common(1)) else None
+  return 'T' if set(e[0] for e in counter.most_common(2)) == set('10') else {'0':'Q', '1':'T'}.get(most[0][0], most[0][0]) if len(most := counter.most_common(1)) else None
 
 class PokerInterface:
   def __init__(self, wnd_handle:int, conf:dict, debug:bool=False) -> None:
@@ -90,7 +90,7 @@ class PokerInterface:
   def round(self, img:Image) -> int: return sum(bool(self._parse_suit(img, self.config.site.board_suits[i])) for i in (0, 3, 4))
   def board(self, img:Image) -> str|None: return self._parse_cards(img, self.config.site.board_ranks, self.config.site.board_suits, debug_label=f"board_rank")
   def stack_size(self, img:Image, pos:int, blinds:bool=False) -> float|None: return self._cash_by_pos(pos, img, self.config.stacks, blinds=blinds, debug_label=f"stack_size_{pos}")
-  def bet_size(self, img:Image, pos:int, blinds:bool=False) -> float|None: return self._cash_by_pos(pos, img, self.config.bet_size, blinds=blinds, debug_label=f"bet_size_{pos}")
+  def bet_size(self, img:Image, pos:int, blinds:bool=False) -> float|None: return self._cash_by_pos(pos, img, self.config.bet_size, refine=True, blinds=blinds, debug_label=f"bet_size_{pos}")
   def pot_size(self, img:Image, blinds:bool=False) -> float|None: return self._cash(img, self.config.site.pot, ("Pot", " ", ":"), blinds, debug_label="pot_size")
   def active_seat(self, img:Image) -> int|None: return self._find_pos(img, self.config.active, self.config.site.is_active)
   def button_pos(self, img:Image) -> int|None: return self._find_pos(img, self.config.button, self.config.site.has_button)
@@ -109,13 +109,13 @@ class PokerInterface:
       if _apply_color_filter(pos, img, coords, fun): return pos
     return None
 
-  def _cash(self, img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), blinds:bool=False, debug_label:str=None) -> float|None:
-    val = m.group(1) if (m := re.match(r"(?:.*\$)?\D*(\d+\.?\d{0,2}).*", raw := _parse_ocr(img, coords, repl + (",",), debug_label=debug_label))) is not None else None
+  def _cash(self, img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), refine:bool=False, blinds:bool=False, debug_label:str=None) -> float|None:
+    val = m.group(1) if (m:=re.match(r"(?:.*\$)?\D*(\d+\.?\d{0,2}).*", raw := _parse_ocr(img, coords, repl + (",",), refine=refine, debug_label=debug_label))) is not None else None
     return (float(val) / self.blinds()[1] if blinds else float(val)) if m is not None else 0.0 if raw.lower() == "all in" else None
 
-  def _cash_by_pos(self, pos:int, img:Image, coords_by_pos:Tuple[Tuple[int,int,int,int], ...], blinds:bool=False, debug_label:str=None) -> float|None:
+  def _cash_by_pos(self, pos:int, img:Image, coords_by_pos:Tuple[Tuple[int,int,int,int], ...], refine:bool=False, blinds:bool=False, debug_label:str=None) -> float|None:
     _assert_player_pos(pos)
-    return self._cash(img, coords_by_pos[pos], blinds=blinds, debug_label=debug_label)
+    return self._cash(img, coords_by_pos[pos], refine=refine, blinds=blinds, debug_label=debug_label)
 
   def _rgb_to_suit(self, rgb:Tuple[int,int,int]) -> str|None:
     if self.config.site.is_heart(rgb): return 'h'

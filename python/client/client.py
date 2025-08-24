@@ -71,6 +71,7 @@ def update_state(img:Image, table:PokerTable, debug:int=0):
         table.round = curr_round
       else:
         print(colored("Failed to read board.", "red"))
+        img.save(r"img_debug\fail_board.png")
     showing = [not p.folded and inter.is_showing_hand(img, table.seat_map[i]) for i,p in enumerate(state.players)]
     hands = [inter.hand(img, table.seat_map[i]) if s else None for i,s in enumerate(showing)]
     if any(showing) and any(h is None for s,h in zip(showing, hands) if s):
@@ -111,7 +112,9 @@ def update_state(img:Image, table:PokerTable, debug:int=0):
         else:
           if debug >= 2: print(f"\tRound has changed: {state.round} -> {curr_round}")
           if (chips := inter.stack_size(img, query_seat, blinds=True)) is None:
-            if debug >= 0: print(colored(f"Failed to read stack size {query_seat}.", "red"))
+            if debug >= 0:
+              print(colored(f"Failed to read stack size {query_seat}.", "red"))
+              img.save(f"img_debug\\fail_stack_size_{query_seat}.png")
             return
           diff = state.players[state.active].chips - chips
           if debug >= 2:
