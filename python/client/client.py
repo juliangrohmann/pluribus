@@ -81,8 +81,8 @@ def update_state(img:Image, table:PokerTable, debug:int=0):
         print_showdown(showing, hands, pot, board)
         if debug >= 2: print("Waiting for new hand...")
         table.state = None
-        return
       elif debug >= 2: print("Waiting for showdown...")
+      return
     query_seat = table.seat_map[state.active]
     if any(showing):
       diff = state.players[state.active].chips - (chips := inter.stack_size(img, query_seat, blinds=True))
