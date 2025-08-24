@@ -415,7 +415,7 @@ class DetectThenRecognize:
                           device_id=device_id, input_height=48, input_width=320,
                           mean=None, std=None, blank_idx=0)
 
-  def run(self, rough_crop: np.ndarray | Image.Image, expand: int = 4, mask: np.ndarray = None, min_confidence: float = 0.03, debug: bool = False) -> tuple[str, float]:
+  def run(self, rough_crop: np.ndarray | Image.Image, refine: bool = False, expand: int = 4, mask: np.ndarray = None, min_confidence: float = 0.03, debug: bool = False) -> tuple[str, float]:
     bin_threshs = (0.6, 0.5, 0.4, 0.3)
     box_threshs = (0.7, 0.6, 0.45, 0.3)
     dilates = ((0, 0), (0, 0), (3, 1), (4, 2))
@@ -433,7 +433,8 @@ class DetectThenRecognize:
       if boxes:
         for q in boxes:
           x0, y0, x1, y1 = quad_to_aabb(q, W, H, expand=expand)  # small expansion
-          x0, y0, x1, y1 = refine_crop_with_prob_segments(x0, y0, x1, y1, prob_up, sh, sw, margin_px=8, gap_px_prob=6, smooth_w=5, min_width_px=12)
+          if refine:
+            x0, y0, x1, y1 = refine_crop_with_prob_segments(x0, y0, x1, y1, prob_up, sh, sw, margin_px=8, gap_px_prob=6, smooth_w=5, min_width_px=12)
           crop = rough_crop[y0:y1, x0:x1, :]
           Image.fromarray(crop).save(r"img_debug\debug_trimmed.png")
           scored.append(result := (*self.rec.recognize_bgr(crop, mask=mask, debug=debug), (x0, y0, x1, y1)))

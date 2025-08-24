@@ -44,6 +44,7 @@ class PokerState:
     self.active = 1 if len(self.players) == 2 else (0, 3)[len(self.players) > 3] if self.straddle else 2
 
   def bet(self, amount:float) -> None:
+    if -1e-3 < self.players[self.active].chips - amount < 0: amount = self.players[self.active].chips
     if self.verbose: print(colored(f"{self._prefix_str(self.active, amount)} {'Bet' if self.bet_level == 0 else 'Raise to'} {amount + self.players[self.active].betsize:.2f} bb", "green"))
     self._assert_act()
     self._assert_invest(amount)
