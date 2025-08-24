@@ -106,7 +106,7 @@ class PokerInterface:
     return None
 
   def _cash(self, img:Image, coords:Tuple[int,int,int,int], repl:Tuple[str, ...]=tuple(), blinds:bool=False, debug_label:str=None) -> float|None:
-    val = m.group(1) if (m := re.match(r".*\$([0-9]+\.[0-9]{2}).*", raw := _parse_ocr(img, coords, repl + (",",), debug_label=debug_label))) is not None else None
+    val = m.group(1) if (m := re.match(r".*\$(\d+\.?\d{0,2}).*", raw := _parse_ocr(img, coords, repl + (",",), debug_label=debug_label))) is not None else None
     return (float(val) / self.blinds()[1] if blinds else float(val)) if m is not None else 0.0 if raw.lower() == "all in" else None
 
   def _cash_by_pos(self, pos:int, img:Image, coords_by_pos:Tuple[Tuple[int,int,int,int], ...], blinds:bool=False, debug_label:str=None) -> float|None:
@@ -187,7 +187,7 @@ def run() -> None:
       print("Board:", colorize_board(table.board(table_img)))
     elif action == 'stacksize':
       for i in range(6):
-        if not table.is_seat_open(table_img, i): print("Seat", i, "Stack:", table.stack_size(table_img, i))
+        if not table.is_seat_open(table_img, i): print(f"Seat {i} Stack: ${table.stack_size(table_img, i):.2f}")
     elif action == 'pot':
       print(f"Potsize: ${table.pot_size(table_img):.2f}")
     elif action == 'street':
