@@ -17,7 +17,16 @@ namespace testlib {
 
     template <class Archive>
     void serialize(Archive& ar) {
-      ar(state, hands, board, actions, utilities);
+      // std::cout << "State:\n";
+      ar(state);
+      // std::cout << "Hands:\n";
+      ar(hands);
+      // std::cout << "Board:\n";
+      ar(board);
+      // std::cout << "Utilities:\n";
+      ar(utilities);
+      // std::cout << "Actions:\n";
+      ar(actions);
     }
   };
 

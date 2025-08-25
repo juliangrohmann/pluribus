@@ -33,9 +33,8 @@ void build_state_testset(const int n_players, const ActionProfile& profile, cons
   for(int p = 0; p < n_players; ++p) rng_agents.push_back(RandomAgent{profile});
   std::vector<Agent*> agents;
   for(int p = 0; p < n_players; ++p) agents.push_back(&rng_agents[p]);
-  UtilityTestSet test_set{profile};
+  UtilityTestSet test_set{profile, RakeStructure{0.0, 0}};
   test_set.cases.resize(n_iter);
-  test_set.rake = RakeStructure{0.0, 0};
   const auto t_0 = std::chrono::high_resolution_clock::now();
   const long log_interval = n_iter / 100L;
   #pragma omp parallel for schedule(dynamic, 1)

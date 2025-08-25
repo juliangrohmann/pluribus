@@ -246,14 +246,18 @@ TEST_CASE("Split pot", "[poker]") {
 }
 
 TEST_CASE("Utility test set", "[poker]") {
-  UtilityTestSet test_set;
-  cereal_load(test_set, "../resources/utility_no_sidepots.testset");
-  const omp::HandEvaluator eval;
-  for(const auto& test_case : test_set.cases) {
-    SlimPokerState terminal = test_case.state.apply_copy(test_case.actions);;
-    for(int i = 0; i < test_case.state.get_players().size(); ++i) {
-      const Player& p = test_case.state.get_players()[i];
-      REQUIRE(utility(terminal, i, test_case.board, test_case.hands, p.get_chips() + p.get_betsize(), test_set.rake, eval) == test_case.utilities[i]);
+  const std::filesystem::path dir = std::filesystem::path{".."} / "resources";
+  const std::vector<std::string> fns = {"utility_no_sidepots.testset", "utility_sidepots.testset"};
+  for(std::string fn : fns) {
+    UtilityTestSet test_set;
+    cereal_load(test_set, dir / fn);
+    const omp::HandEvaluator eval;
+    for(const auto& test_case : test_set.cases) {
+      SlimPokerState terminal = test_case.state.apply_copy(test_case.actions);;
+      for(int i = 0; i < test_case.state.get_players().size(); ++i) {
+        const Player& p = test_case.state.get_players()[i];
+        REQUIRE(utility(terminal, i, test_case.board, test_case.hands, p.get_chips() + p.get_betsize(), test_set.rake, eval) == test_case.utilities[i]);
+      }
     }
   }
 }
