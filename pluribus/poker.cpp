@@ -454,7 +454,12 @@ void SlimPokerState::update_side_pots() {
         amount = std::min(player.get_betsize(), amount);
       }
     }
-    if(!p_idxs.empty()) {
+    if(p_idxs.size() == 1) {
+      auto& player = _players[p_idxs[0]];
+      player.take_back(player.get_betsize());
+      p_idxs.clear();
+    }
+    else if(!p_idxs.empty()) {
       _pot.add_side_pot(amount, p_idxs, _players);
       for(const int p_idx : p_idxs) {
         _players[p_idx].set_betsize(_players[p_idx].get_betsize() - amount);
