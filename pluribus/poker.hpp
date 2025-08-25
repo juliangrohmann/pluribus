@@ -113,6 +113,11 @@ public:
   explicit Board(const std::string& card_str) : CardSet{card_str} {}
   explicit Board(Deck& deck, const std::vector<uint8_t>& init_cards = {}) : CardSet{deck, init_cards} {}
   bool operator==(const Board&) const = default;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(_cards, _mask);
+  }
 };
 
 class Hand : public CardSet<2> {
@@ -365,6 +370,7 @@ private:
 
 class RakeStructure {
 public:
+  RakeStructure() : _percent{0.0}, _cap{0} {}
   RakeStructure(const double percent, const double cap) : _percent{percent}, _cap{cap} {}
 
   int payoff(const int round, const int pot) const {
