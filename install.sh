@@ -36,10 +36,16 @@ cd build
 wget \
   https://pluribus-poker.s3.us-east-1.amazonaws.com/clusters_r{1,2}_c200.npy \
   https://pluribus-poker.s3.us-east-1.amazonaws.com/clusters_r3_c200_p{1,2}.npy \
-  https://pluribus-poker.s3.us-east-1.amazonaws.com/real_time_cluster_map.bin \
+  https://pluribus-poker.s3.us-east-1.amazonaws.com/real_time_cluster_map.bin
 
 cmake -DCMAKE_BUILD_TYPE=Release -DUNIT_TEST=ON ..
 cmake --build .
 
+cd ../resurces
+wget \
+  https://pluribus-poker.s3.us-east-1.amazonaws.com/utilities_no_sidepots.testset \
+  https://pluribus-poker.s3.us-east-1.amazonaws.com/utilities_sidepots.testset
+
+cd ../build
 ./Test
 ./Benchmark
