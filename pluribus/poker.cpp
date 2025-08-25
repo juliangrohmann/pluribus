@@ -378,6 +378,7 @@ uint8_t increment(uint8_t i, const uint8_t max_val) {
 
 
 void SlimPokerState::next_round() {
+  if(verbose) std::cout << std::fixed << std::setprecision(2) << round_to_str(_round) << ":\n";
   if(_pot.has_side_pots()) {
     update_side_pots();
   }
@@ -392,10 +393,7 @@ void SlimPokerState::next_round() {
   }
 
   ++_round;
-  if(verbose) std::cout << std::fixed << std::setprecision(2) << round_to_str(_round) << ":\n";
-  for(Player& p : _players) {
-    p.next_round();
-  }
+  for(Player& p : _players) p.next_round();
   _active = 0;
   _max_bet = 0;
   _bet_level = 0;
