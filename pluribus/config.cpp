@@ -4,9 +4,9 @@
 namespace pluribus {
 
 SolverConfig::SolverConfig(const PokerConfig& poker_, const ActionProfile& action_profile, const std::vector<int>& stacks)
-    : poker{poker_}, rake{0.0, 0.0}, action_profile{action_profile},
-      init_state{poker_.n_players, stacks.size() > 0 ? stacks : std::vector(poker_.n_players, 10'000), poker_.ante, poker_.straddle},
+    : poker{poker_}, rake{0.0, 0.0}, action_profile{action_profile}, init_chips{stacks.size() > 0 ? stacks : std::vector(poker_.n_players, 10'000)},
       restrict_players{poker_.n_players} {
+  init_state = PokerState{poker_.n_players, init_chips, poker_.ante, poker_.straddle};
   for(int i = 0; i < poker_.n_players; ++i) init_ranges.push_back(PokerRange::full());
 }
 

@@ -296,7 +296,7 @@ public:
 
 private:
   double _percent;
-  double _cap;
+  double _cap; // TODO: make int
 };
 
 inline std::string pos_to_str(const SlimPokerState& state) { return pos_to_str(state.get_active(), state.get_players().size(), state.is_straddle()); }

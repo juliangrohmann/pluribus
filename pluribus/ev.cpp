@@ -26,12 +26,12 @@ std::string ResultEV::to_string(const int precision) const {
 ResultEV MonteCarloEV::lossless(const LosslessBlueprint* bp, const PokerState& state, const int i, const std::vector<PokerRange>& ranges,
     const std::vector<uint8_t>& board) {
   const LosslessActionProvider action_provider;
-  return _monte_carlo_ev(state, i, ranges, board, bp->get_config().stack_size(i), action_provider, bp);
+  return _monte_carlo_ev(state, i, ranges, board, bp->get_config().infer_stack_size(i), action_provider, bp);
 }
 ResultEV MonteCarloEV::sampled(const std::vector<Action>& biases, const SampledBlueprint* bp, const PokerState& state, const int i,
     const std::vector<PokerRange>& ranges, const std::vector<uint8_t>& board) {
   const SampledActionProvider action_provider;
-  return _monte_carlo_ev(state.apply_biases(biases), i, ranges, board, bp->get_config().stack_size(i), action_provider, bp);
+  return _monte_carlo_ev(state.apply_biases(biases), i, ranges, board, bp->get_config().infer_stack_size(i), action_provider, bp);
 }
 
 bool MonteCarloEV::_should_terminate(const long t, const double std_err, const Duration dt) const {
@@ -76,7 +76,7 @@ void _validate_ev_inputs(const PokerState& state, const int i, const std::vector
 double node_ev(const TreeStorageNode<float>* node, const SolverConfig& config, const PokerState& state, const int i, const std::vector<Hand>& hands, const Board& board,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) {
   if(state.is_terminal()) {
-    const int hu = utility(state, i, Board{board}, hands, config.stack_size(i), config.rake, eval);
+    const int hu = utility(state, i, Board{board}, hands, config.infer_stack_size(i), config.rake, eval);
     return hu;
   }
   const hand_index_t cached_idx = indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round());

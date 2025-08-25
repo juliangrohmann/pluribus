@@ -60,7 +60,7 @@ std::vector<long> simulate(const std::vector<Agent*>& agents, const PokerConfig&
     }
 
     while(state.get_round() <= 3 && state.get_winner() == -1) {
-      state = state.apply(agents[state.get_active()]->act(state, board, hands[state.get_active()], config));
+      state = state.apply(agents[state.get_active()]->act(state, board, hands[state.get_active()]));
     }
 
     std::vector<long> payoffs = get_payoffs(board, hands, state, eval);

@@ -10,13 +10,13 @@ class Agent {
 public:
   virtual ~Agent() = default;
 
-  virtual Action act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) = 0;
+  virtual Action act(const SlimPokerState& state, const Board& board, const Hand& hand) = 0;
 };
 
 class RandomAgent : public Agent {
 public:
   explicit RandomAgent(ActionProfile  action_profile) : _action_profile{std::move(action_profile)} {}
-  Action act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) override;
+  Action act(const SlimPokerState& state, const Board& board, const Hand& hand) override;
 private:
   ActionProfile _action_profile;
 };
