@@ -223,6 +223,7 @@ void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta, const
       ") Accumulating " + meta.buffer_fns[buf_idx] + ": " + std::to_string(buf.entries.size()) + " nodes");
     #pragma omp parallel for schedule(static)
     for(const auto& [history, values] : buf.entries) {
+      if(history == meta.config.init_state.get_action_history()) ++_n_snapshots;
       TreeStorageNode<float>* node = get_freq().get();
       PokerState state = meta.config.init_state;
       for(const Action a : history.get_history()) {
@@ -238,6 +239,7 @@ void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta, const
       }
     }
   }
+  Logger::log("Accumulated " + std::to_string(_n_snapshots) + " snapshots.");
 
   if(preflop) {
     Logger::log("Setting preflop strategy to phi...");
