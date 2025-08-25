@@ -247,11 +247,12 @@ TEST_CASE("Split pot", "[poker]") {
 TEST_CASE("Utility", "[poker]") {
   UtilityTestSet test_set;
   cereal_load(test_set, "../resources/utility_no_sidepots.testset");
+  const omp::HandEvaluator eval;
   for(UtilityTestCase test_case : test_set) {
     SlimPokerState terminal = test_case.state.apply_copy(test_case.actions);;
     for(int i = 0; i < test_case.state.get_players().size(); ++i) {
       const Player& p = test_case.state.get_players()[i];
-      REQUIRE(utility(terminal, i, test_case.board, test_case.hands[i], p.get_chips() + p.get_betsize(), test_set.rake) == test_case.utilities[i]);
+      REQUIRE(utility(terminal, i, test_case.board, test_case.hands, p.get_chips() + p.get_betsize(), test_set.rake, eval) == test_case.utilities[i]);
     }
   }
 }
