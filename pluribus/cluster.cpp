@@ -327,7 +327,7 @@ uint16_t RealTimeClusterMap::cluster(const int round, const Board& board, const 
 std::unique_ptr<RealTimeClusterMap> RealTimeClusterMap::_instance = nullptr;
 
 RealTimeClusterMap::RealTimeClusterMap() {
-
+  cereal_load(_cluster_map, "real_time_cluster_map.bin");
 }
 
 }

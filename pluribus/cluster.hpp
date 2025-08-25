@@ -25,7 +25,6 @@ const std::array<std::string, 8> ochs_categories = {
   "88,99,TT,JJ,QQ,KK,AA"
 };
 
-
 void assign_features(const std::string& hand, const std::string& board, float* data);
 double equity(const omp::Hand& hero, const omp::CardRange &villain, const omp::Hand& board);
 std::unordered_set<hand_index_t> collect_filtered_indexes(int round, uint8_t cards[7]);
@@ -88,7 +87,7 @@ public:
 private:
   RealTimeClusterMap();
 
-  std::array<std::array<std::unordered_map<hand_index_t, uint16_t>, 4>, NUM_DISTINCT_FLOPS> _cluster_map;
+  RealTimeClusterMapStorage _cluster_map;
 
   static std::unique_ptr<RealTimeClusterMap> _instance;
 };
