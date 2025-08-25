@@ -8,24 +8,27 @@
 using namespace pluribus;
 
 namespace testlib {
-  struct ShowdownTestCase {
+  struct UtilityTestCase {
     SlimPokerState state;
+    std::vector<Hand> hands;
+    Board board;
     ActionHistory actions;
     std::vector<int> utilities;
 
     template <class Archive>
     void serialize(Archive& ar) {
-      ar(state, actions, utilities);
+      ar(state, hands, board, actions, utilities);
     }
   };
 
-  struct ShowdownTestSet {
+  struct UtilityTestSet {
     ActionProfile profile;
-    std::vector<ShowdownTestCase> cases;
+    RakeStructure rake;
+    std::vector<UtilityTestCase> cases;
 
     template <class Archive>
     void serialize(Archive& ar) {
-      ar(cases, profile);
+      ar(profile, rake, cases);
     }
   };
 }
