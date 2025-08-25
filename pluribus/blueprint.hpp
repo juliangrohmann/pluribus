@@ -4,6 +4,7 @@
 #include <vector>
 #include <cereal/cereal.hpp>
 #include <cereal/types/memory.hpp>
+#include <cereal/types/polymorphic.hpp>
 #include <cereal/types/unordered_map.hpp>
 #include <pluribus/cereal_ext.hpp>
 #include <pluribus/config.hpp>
@@ -57,6 +58,14 @@ public:
   void build(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir, bool preflop, int max_gb = 5);
   void build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns, bool preflop);
   void build_from_meta_data(const LosslessMetadata& meta, bool preflop);
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(cereal::base_class<Blueprint>(this), _n_snapshots);
+  }
+
+private:
+  int _n_snapshots = 0;
 };
 
 std::vector<float> biased_freq(const std::vector<Action>& actions, const std::vector<float>& freq, Action bias, float factor);
