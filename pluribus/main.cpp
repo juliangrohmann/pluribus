@@ -104,7 +104,7 @@ int main(int argc, char* argv[]) {
     }
   }
   else if(command == "blueprint") {
-    // ./Pluribus blueprint final_snapshot_fn snapshot_dir buf_dir out_fn [--no-preflop]
+    // ./Pluribus blueprint preflop_snapshot_fn snapshot_dir buf_dir out_fn [--no-preflop]
     if(argc < 6) {
       std::cout << "Missing arguments to build blueprint.\n";
     }
