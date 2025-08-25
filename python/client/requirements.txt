@@ -1,6 +1,8 @@
 pyautogui
 pywin32
-pytesseract
 pillow
 termcolor
+colorama
 requests
+opencv-python
+onnxruntime-gpu
