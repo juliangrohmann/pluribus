@@ -499,7 +499,8 @@ int total_bet_size(const SlimPokerState& state, const Action action) {
   if(action.get_bet_type() > 0.0f) {
     const int missing = state.get_max_bet() - active_player.get_betsize();
     const int real_pot = state.get_pot().total() + missing;
-    return static_cast<int>(std::round(static_cast<float>(real_pot) * action.get_bet_type())) + missing + active_player.get_betsize();
+    // return static_cast<int>(std::round(static_cast<float>(real_pot) * action.get_bet_type())) + missing + active_player.get_betsize();
+    return real_pot * action.get_bet_type() + missing + active_player.get_betsize();
   }
   throw std::runtime_error("Invalid action bet size: " + std::to_string(action.get_bet_type()));
 }
