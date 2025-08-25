@@ -73,6 +73,8 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
   if(max_actions > MAX_ACTIONS) Logger::error("Action profile max actions is too large: " + std::to_string(max_actions) + " > " + std::to_string(MAX_ACTIONS));
 
   long T = _t + t_plus;
+  Logger::log("MCCFRSolver --- Initializing HoleCardIndexer...");
+  Logger::log(HoleCardIndexer::get_instance() ? "Success." : "Failure.");
   Logger::log("MCCFRSolver --- Initializing HandIndexer...");
   Logger::log(HandIndexer::get_instance() ? "Success." : "Failure.");
   Logger::log("MCCFRSolver --- Initializing FlatClusterMap...");

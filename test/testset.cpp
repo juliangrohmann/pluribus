@@ -27,8 +27,8 @@ std::vector<int> get_random_chips(const int n_players, const int min_stack, cons
 
 void build_state_testset(const int n_players, const ActionProfile& profile, const std::string& fn,
     const long n_iter = 100'000, const int min_chips = 2'000, const int max_chips = 20'000, const bool sidepots = true) {
-  Logger::log("Initializing HandIndexer...");
-  Logger::log(HandIndexer::get_instance() ? "Success." : "Failure.");
+  Logger::log("Initializing HoleCardIndexer...");
+  Logger::log(HoleCardIndexer::get_instance() ? "Success." : "Failure.");
   std::vector<RandomAgent> rng_agents;
   for(int p = 0; p < n_players; ++p) rng_agents.push_back(RandomAgent{profile});
   std::vector<Agent*> agents;
