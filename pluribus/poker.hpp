@@ -281,6 +281,7 @@ private:
 
 class RakeStructure {
 public:
+  RakeStructure() : _percent{0.0}, _cap{0} {}
   RakeStructure(const double percent, const double cap) : _percent{percent}, _cap{cap} {}
 
   int payoff(const SlimPokerState& state) const {

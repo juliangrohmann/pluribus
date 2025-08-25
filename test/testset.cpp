@@ -33,30 +33,31 @@ void build_state_testset(const int n_players, const ActionProfile& profile, cons
   for(int p = 0; p < n_players; ++p) rng_agents.push_back(RandomAgent{profile});
   std::vector<Agent*> agents;
   for(int p = 0; p < n_players; ++p) agents.push_back(&rng_agents[p]);
-  ShowdownTestSet testset{profile};
-  testset.cases.resize(n_iter);
+  UtilityTestSet test_set{profile};
+  test_set.cases.resize(n_iter);
+  test_set.rake = RakeStructure{0.0, 0};
   const auto t_0 = std::chrono::high_resolution_clock::now();
   const long log_interval = n_iter / 100L;
   #pragma omp parallel for schedule(dynamic, 1)
   for(long it = 0; it < n_iter; ++it) {
     thread_local omp::HandEvaluator eval;
-    thread_local RakeStructure no_rake{0.0, 0};
-    thread_local Board board;
     thread_local MarginalRejectionSampler sampler{std::vector(n_players, PokerRange::full())};
     if(it > 0 && it % log_interval == 0) Logger::log(progress_str(it, n_iter, t_0));
+    UtilityTestCase& curr_case = test_set.cases[it];
     const RoundSample sample = sampler.sample();
-    board = sample_board({}, sample.mask);
+    curr_case.hands = sample.hands;
+    curr_case.board = sample_board({}, sample.mask);
     std::vector<int> chips = get_random_chips(n_players, min_chips, max_chips, sidepots);
     SlimPokerState state(n_players, chips, 0, false);
-    ShowdownTestCase& curr_case = testset.cases[it];
+    curr_case.state = state;
     while(!state.is_terminal()) {
-      Action a = agents[state.get_active()]->act(state, board, sample.hands[state.get_active()]);
+      Action a = agents[state.get_active()]->act(state, curr_case.board, sample.hands[state.get_active()]);
       curr_case.actions.push_back(a);
       state.apply_in_place(a);
     }
-    for(int p = 0; p < n_players; ++p) curr_case.utilities.push_back(utility(state, p, board, sample.hands, chips[p], no_rake, eval));
+    for(int p = 0; p < n_players; ++p) curr_case.utilities.push_back(utility(state, p, curr_case.board, sample.hands, chips[p], test_set.rake, eval));
   }
-  cereal_save(testset, fn);
+  cereal_save(test_set, fn);
 }
 
 int main(const int argc, char* argv[]) {
