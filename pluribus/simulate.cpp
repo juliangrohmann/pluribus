@@ -17,19 +17,19 @@ std::vector<long> get_payoffs(const Board& board, const std::vector<Hand>& hands
   if(state.get_round() <= 3) {
     if(verbose) std::cout << "Player " << static_cast<int>(state.get_winner()) << " wins without showdown.\n";
     for(int i = 0; i < hands.size(); ++i) {
-      payoffs[i] = state.get_winner() == i ? state.get_pot() : 0;
+      payoffs[i] = state.get_winner() == i ? state.get_pot().total() : 0;
     }
   }
   else {
-    std::vector<uint8_t> win_idxs = winners(state, hands, board, eval);
+    std::vector<uint8_t> win_idxs = winners(state.get_players(), hands, board, eval);
     if(verbose) std::cout << "Player" << (win_idxs.size() > 1 ? "s " : " ");
     for(int i = 0; i < hands.size(); ++i) {
       const bool is_winner = std::ranges::find(win_idxs, i) != win_idxs.end();
-      payoffs[i] = is_winner ? state.get_pot() / win_idxs.size(): 0;
+      payoffs[i] = is_winner ? state.get_pot().total() / win_idxs.size(): 0;
       if constexpr(verbose && is_winner) std::cout << i << (i == win_idxs[win_idxs.size() - 1] ? " " : ", ");
     }
     if(verbose) std::cout << "win" << (win_idxs.size() > 1 ? " " : "s ") << "at showdown.\n";
-    payoffs[win_idxs[0]] += state.get_pot() % win_idxs.size();
+    payoffs[win_idxs[0]] += state.get_pot().total() % win_idxs.size();
   }
   return payoffs;
 }

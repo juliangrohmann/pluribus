@@ -31,7 +31,7 @@ int utility(const SlimPokerState& state, const int i, const Board& board, const 
     return state.get_players()[i].get_chips() - stack_size;
   }
   if(state.get_winner() != -1) {
-    return state.get_players()[i].get_chips() - stack_size + (state.get_winner() == i ? state.get_pot() : 0);
+    return state.get_players()[i].get_chips() - stack_size + (state.get_winner() == i ? state.get_pot().total() : 0); // TODO: account for rake
   }
   if(state.get_round() >= 4) {
     return state.get_players()[i].get_chips() - stack_size + showdown_payoff(state, i, board, hands, rake, eval);

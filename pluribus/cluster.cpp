@@ -234,9 +234,6 @@ std::array<std::vector<uint16_t>, 4> init_flat_cluster_map(const int n_clusters)
   for(int i = 1; i <= 3; ++i) {
     std::cout << "(Flat: " << n_clusters << " clusters) Loading round " << i << "...\n";
     cluster_map[i] = load_clusters(i, n_clusters, 1);
-    std::cout << "Clusters (half): ";
-    for(int j = 0; j < 20; ++j) std::cout << cluster_map[i][j] << " ";
-    std::cout << "\n";
   }
   auto s2 = cnpy::npy_load(bp_cluster_filename(3, n_clusters, 2)).as_vec<uint16_t>();
   const size_t s1_size = cluster_map[3].size();

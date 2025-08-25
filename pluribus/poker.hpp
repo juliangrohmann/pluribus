@@ -160,8 +160,10 @@ public:
 
   int get_chips() const { return _chips; }
   int get_betsize() const { return _betsize; }
+  void set_betsize(const int betsize) { _betsize = betsize;}
   bool has_folded() const { return _folded; }
   void invest(int amount);
+  void take_back(int amount);
   void post_ante(int amount);
   void next_round();
   void fold();
@@ -184,7 +186,7 @@ struct PokerConfig {
   bool operator==(const PokerConfig&) const = default;
 
   template <class Archive>
-  void serialize(Archive& ar) {
+  void serialize(Archive& ar) { // TODO: compatibility
     int n_chips; // buffer for compatibility
     ar(n_players, n_chips, ante, straddle);
   }
@@ -192,6 +194,73 @@ struct PokerConfig {
   int n_players = 2;
   int ante = 0;
   bool straddle = false;
+};
+
+struct SidePot {
+  int amount;
+  std::vector<int> players;
+
+  template <class Archive>
+  void serialize(Archive& ar) {
+    ar(amount, players);
+  }
+};
+
+class Pot {
+public:
+  explicit Pot() = default;
+  explicit Pot(const int amount) : _total{amount} {}
+  Pot(const Pot& o) : _total(o._total) {
+    _pots = o._pots ? new std::vector(*o._pots) : nullptr;
+  }
+  Pot(Pot&& o) noexcept : _total(o._total), _pots(o._pots) { o._pots = nullptr; }
+  ~Pot() { if(_pots) delete _pots; }
+
+  int total() const { return _total; }
+  void add(const int amount) { _total += amount; }
+  void add_side_pot(int amount, const std::vector<int>& player_idxs, const std::vector<Player>& players);
+  bool has_side_pots() const { return _pots != nullptr; }
+  const std::vector<SidePot>* get_side_pots() const { return _pots; }
+
+  bool operator==(const Pot& other) const = default;
+  Pot& operator=(const Pot& o) {
+    if (this == &o) return *this;
+    _total = o._total;
+    delete _pots;
+    _pots = o._pots ? new std::vector(*o._pots) : nullptr;
+    return *this;
+  }
+  Pot& operator=(Pot&& o) noexcept {
+    if (this == &o) return *this;
+    _total = o._total;
+    delete _pots;
+    _pots = o._pots; o._pots = nullptr;
+    return *this;
+  }
+
+  template <class Archive>
+  void load(Archive& ar) {
+    if(_pots) {
+      delete _pots;
+      _pots = nullptr;
+    }
+    bool has_pots;
+    ar(_total, has_pots);
+    if(has_pots) {
+      _pots = new std::vector<SidePot>{};
+      ar(*_pots);
+    }
+  }
+
+  template <class Archive>
+  void save(Archive& ar) const {
+    ar(_total, _pots != nullptr);
+    if(_pots) ar(*_pots);
+  }
+
+private:
+  int _total = 0;
+  std::vector<SidePot>* _pots = nullptr;
 };
 
 class SlimPokerState {
@@ -207,8 +276,8 @@ public:
   bool operator==(const SlimPokerState& other) const = default;
 
   const std::vector<Player>& get_players() const { return _players; }
+  const Pot& get_pot() const { return _pot; }
   bool is_straddle() const { return _straddle; }
-  int get_pot() const { return _pot; }
   int get_max_bet() const { return _max_bet; }
   uint8_t get_active() const { return _active; }
   uint8_t get_round() const { return _round; }
@@ -230,9 +299,16 @@ public:
 
   bool has_biases() const { return _biases.size() > _active && _biases[_active] != Action::BIAS_DUMMY; }
   std::string to_string() const;
-  
+
   template <class Archive>
-  void serialize(Archive& ar) {
+  void load(Archive& ar) { // TODO: compatibility
+    int pot_amount;
+    ar(_players, _biases, pot_amount, _max_bet, _active, _round, _bet_level, _winner, _straddle);
+    _pot = Pot{pot_amount};
+  }
+
+  template <class Archive>
+  void save(Archive& ar) const { // TODO: compatibility
     ar(_players, _biases, _pot, _max_bet, _active, _round, _bet_level, _winner, _straddle);
   }
 
@@ -240,8 +316,8 @@ public:
 
 private:
   std::vector<Player> _players;
+  Pot _pot;
   std::vector<Action> _biases;
-  int _pot;
   int _max_bet;
   uint8_t _active;
   uint8_t _round;
@@ -258,6 +334,9 @@ private:
   void next_player();
   void next_round();
   void next_bias();
+
+  void init_side_pots();
+  void update_side_pots();
 };
 
 class PokerState : public SlimPokerState {
@@ -271,7 +350,12 @@ public:
   [[nodiscard]] PokerState apply_biases(const std::vector<Action>& biases) const;
 
   template <class Archive>
-  void serialize(Archive& ar) {
+  void load(Archive& ar) { // TODO: compatibility with SlimPokerState, use serialize
+    ar(_actions, cereal::base_class<SlimPokerState>(this));
+  }
+
+  template <class Archive>
+  void save(Archive& ar) const { // TODO: compatibility with SlimPokerState, use serialize
     ar(_actions, cereal::base_class<SlimPokerState>(this));
   }
 
@@ -283,8 +367,8 @@ class RakeStructure {
 public:
   RakeStructure(const double percent, const double cap) : _percent{percent}, _cap{cap} {}
 
-  int payoff(const SlimPokerState& state) const {
-    return state.get_round() == 0 ? state.get_pot() : static_cast<int>(round(std::max(state.get_pot() * (1.0 - _percent), state.get_pot() - _cap)));
+  int payoff(const int round, const int pot) const {
+    return round == 0 ? pot : static_cast<int>(std::round(std::max(pot * (1.0 - _percent), pot - _cap)));
   }
 
   bool operator==(const RakeStructure& other) const = default;
@@ -304,11 +388,9 @@ int total_bet_size(const SlimPokerState& state, Action action);
 double fractional_bet_size(const SlimPokerState& state, int total_size);
 std::vector<Action> valid_actions(const SlimPokerState& state, const ActionProfile& profile);
 int round_of_last_action(const SlimPokerState& state);
-std::vector<uint8_t> winners(const SlimPokerState& state, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval);
+std::vector<uint8_t> winners(const std::vector<Player>& players, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval);
 int showdown_payoff(const SlimPokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
     const omp::HandEvaluator& eval);
-void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands);
-void deal_board(Deck& deck, std::array<uint8_t, 5>& board);
 }
 
 template <>
