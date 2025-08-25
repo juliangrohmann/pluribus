@@ -209,7 +209,7 @@ void build_real_time_cluster_map(const int n_clusters, const std::filesystem::pa
       std::vector<int> clusters = round == 2 ? read_int_array(clusters_stem + ".bin") : cnpy::npy_load(clusters_stem + ".npy").as_vec<int>();
       std::ostringstream oss;
       oss << "Clusters: [";
-      for(int i = 0; i < 20; ++i) oss << clusters[i] << (i == 19 ? "" : " ");
+      for(int i = 0; i < 15; ++i) oss << clusters[i] << (i == 14 ? " ...]" : " ");
       Logger::dump(oss);
       _cluster_map[flop_idx][round] = build_cluster_map(indexes, clusters);
     }
