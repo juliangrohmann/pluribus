@@ -245,20 +245,15 @@ TEST_CASE("Split pot", "[poker]") {
   REQUIRE(result[2] == 25);
 }
 
-TEST_CASE("Utility", "[poker]") {
+TEST_CASE("Utility test set", "[poker]") {
   UtilityTestSet test_set;
   cereal_load(test_set, "../resources/utility_no_sidepots.testset");
   const omp::HandEvaluator eval;
-  for(int case_idx = 0; case_idx < test_set.cases.size(); ++case_idx) {
-    const UtilityTestCase& test_case = test_set.cases[case_idx];
+  for(const auto& test_case : test_set.cases) {
     SlimPokerState terminal = test_case.state.apply_copy(test_case.actions);;
     for(int i = 0; i < test_case.state.get_players().size(); ++i) {
       const Player& p = test_case.state.get_players()[i];
-      const int util = utility(terminal, i, test_case.board, test_case.hands, p.get_chips() + p.get_betsize(), test_set.rake, eval);
-      std::cout << "Player " << i << ": Utility=" << util << ", Expected=" << test_case.utilities[i] << "\n";
-      bool match = util == test_case.utilities[i];
-      if(!match) std::cout << "Fail: Case=" << case_idx << ", Player=" << i << "\n";
-      REQUIRE(match);
+      REQUIRE(utility(terminal, i, test_case.board, test_case.hands, p.get_chips() + p.get_betsize(), test_set.rake, eval) == test_case.utilities[i]);
     }
   }
 }
