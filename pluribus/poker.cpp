@@ -24,7 +24,7 @@ int Deck::draw() {
 }
 
 void Deck::reset() {
-  for(uint8_t i = 0; i < _cards.size(); ++i) {
+  for(int i = 0; i < _cards.size(); ++i) {
     _cards[i] = i;
   }
   _current = 0;
@@ -99,6 +99,12 @@ void Player::invest(const int amount) {
   _betsize += amount;
 }
 
+void Player::take_back(const int amount) {
+  assert(amount <= _betsize && "Attempted to take back more chips than the player has invested.");
+  _chips += amount;
+  _betsize -= amount;
+}
+
 void Player::post_ante(const int amount) {
   _chips -= amount;
 }
@@ -116,6 +122,24 @@ void Player::reset(const int chips) {
   _betsize = 0;
 }
 
+void Pot::add_side_pot(int amount, const std::vector<int>& player_idxs, const std::vector<Player>& players) {
+  if(!_pots) _pots = new std::vector<SidePot>{};
+  for(auto& [pot_amount, pot_players] : *_pots) {
+    bool match = true;
+    for(int p : pot_players) {
+      if(!players[p].has_folded() && std::ranges::find(player_idxs, p) == player_idxs.end()) { // TODO: performance: && players[p].chips == 0
+        match = false;
+        break;
+      }
+    }
+    if(match) {
+      pot_amount += amount;
+      return;
+    }
+  }
+  _pots->emplace_back(amount, player_idxs);
+}
+
 SlimPokerState::SlimPokerState(const int n_players, const std::vector<int>& chips, const int ante, const bool straddle)
     : _pot{150}, _max_bet{100}, _round{0}, _bet_level{1}, _winner{-1}, _straddle{straddle} {
   if(n_players != chips.size()) {
@@ -124,15 +148,15 @@ SlimPokerState::SlimPokerState(const int n_players, const std::vector<int>& chip
 
   _players.reserve(n_players);
   for(int i = 0; i < n_players; ++i) {
-    _players.push_back(Player{chips[i]});
+    _players.emplace_back(chips[i]);
   }
-  
+
   if(_players.size() > 2) {
     _players[0].invest(50);
     _players[1].invest(100);
     if(straddle) {
       _players[2].invest(200);
-      _pot += 200;
+      _pot.add(200);
       _max_bet = 200;
       _active = n_players > 3 ? 3 : 0;
     }
@@ -150,14 +174,14 @@ SlimPokerState::SlimPokerState(const int n_players, const std::vector<int>& chip
     for(Player& p : _players) {
       p.post_ante(ante);
     }
-    _pot += _players.size() * ante;
+    _pot.add(static_cast<int>(_players.size()) * ante);
   }
 }
 
 SlimPokerState::SlimPokerState(const int n_players, const int chips, const int ante, const bool straddle)
     : SlimPokerState{n_players, std::vector(n_players, chips), ante, straddle} {}
 
-SlimPokerState::SlimPokerState(const PokerConfig& config, int n_chips) : SlimPokerState{config.n_players, n_chips, config.ante, config.straddle} {}
+SlimPokerState::SlimPokerState(const PokerConfig& config, const int n_chips) : SlimPokerState{config.n_players, n_chips, config.ante, config.straddle} {}
 
 bool SlimPokerState::has_player_vpip(const int pos) const {
   if(get_round() != 0) throw std::runtime_error("VPIP is only defined preflop.");
@@ -234,9 +258,16 @@ int SlimPokerState::vpip_players() const {
 
 std::string SlimPokerState::to_string() const {
   std::ostringstream oss;
-  oss << "============== " << round_to_str(_round) << ": " << std::setprecision(2) << std::fixed << _pot / 100.0 << " bb ==============\n";
+  oss << "============== " << round_to_str(_round) << ": " << std::fixed << std::setprecision(2) << _pot.total() / 100.0 << " bb ==============\n";
+  if(_pot.has_side_pots()) {
+    const auto& pots = *_pot.get_side_pots();
+    for(int i = 0; i < pots.size(); ++i) {
+      oss << "Pot " << i << ": " << pots[i].amount / 100.0 << " bb (Players: ";
+      for(int p = 0; p < pots[i].players.size(); ++p) oss << p << (p != pots[i].players.size() - 1 ? ", " : ")\n");
+    }
+  }
   for(int i = 0; i < _players.size(); ++i) {
-    oss << "Player " << i << "(" << _players[i].get_chips() / 100.0 << " bb): ";
+    oss << "Player " << i << " (" << _players[i].get_chips() / 100.0 << " bb): ";
     if(i == _active) {
       oss << "Active\n";
     }
@@ -253,7 +284,7 @@ std::string SlimPokerState::to_string() const {
 int8_t find_winner(const SlimPokerState& state) {
   int8_t winner = -1;
   const std::vector<Player>& players = state.get_players();
-  for(int8_t i = 0; i < players.size(); ++i) {
+  for(int8_t i = 0; i < static_cast<int8_t>(players.size()); ++i) {
     if(!players[i].has_folded()) {
       if(winner == -1) winner = i;
       else return -1;
@@ -282,14 +313,14 @@ void SlimPokerState::bet(const int amount) {
          "Attempted to bet but the players new betsize does not exceed the existing maximum bet.");
   assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to bet but there are no opponents left.");
   _players[_active].invest(amount);
-  _pot += amount;
+  _pot.add(amount);
   _max_bet = _players[_active].get_betsize();
   ++_bet_level;
   next_player();
 }
 
 void SlimPokerState::call() {
-  const int amount = _max_bet - _players[_active].get_betsize();
+  const int amount = std::min(_max_bet - _players[_active].get_betsize(), _players[_active].get_chips());
   if(verbose) std::cout << std::fixed << std::setprecision(2) << "Player " << static_cast<int>(_active) << " (" 
                         << (_players[_active].get_chips() / 100.0) << "): Call " << (amount / 100.0) << " bb\n";
   assert(!_players[_active].has_folded() && "Attempted to call but player already folded.");
@@ -298,7 +329,7 @@ void SlimPokerState::call() {
   assert(_players[_active].get_chips() >= amount && "Not enough chips to call.");
   assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to call but there are no opponents left.");
   _players[_active].invest(amount);
-  _pot += amount;
+  _pot.add(amount);
   next_player();
 }
 
@@ -330,7 +361,7 @@ void SlimPokerState::fold() {
 }
 
 void SlimPokerState::bias(const Action bias) {
-  if(_biases.size() == 0) {
+  if(_biases.empty()) {
     _first_bias = _active;
     _biases.resize(_players.size(), Action::BIAS_DUMMY);
   }
@@ -345,9 +376,23 @@ uint8_t increment(uint8_t i, const uint8_t max_val) {
   return ++i > max_val ? 0 : i;
 }
 
+
 void SlimPokerState::next_round() {
+  if(_pot.has_side_pots()) {
+    update_side_pots();
+  }
+  else {
+    bool found_all_in = false;
+    bool found_not_all_in = false;
+    for(auto& p : _players) {
+      found_all_in |= !p.has_folded() && p.get_chips() == 0;
+      found_not_all_in |= !p.has_folded() && p.get_chips() > 0;
+    }
+    if(found_all_in && found_not_all_in) init_side_pots();
+  }
+
   ++_round;
-  if(verbose) std::cout << std::fixed << std::setprecision(2) << round_to_str(_round) << " (" << (_pot / 100.0) << " bb):\n";
+  if(verbose) std::cout << std::fixed << std::setprecision(2) << round_to_str(_round) << ":\n";
   for(Player& p : _players) {
     p.next_round();
   }
@@ -382,6 +427,42 @@ void SlimPokerState::next_bias() {
   do {
     _active = increment(_active, _players.size() - 1);
   } while(_active != init_player_idx && _players[_active].has_folded());
+}
+
+void SlimPokerState::init_side_pots() {
+  std::vector<int> p_idxs;
+  int prev_amount = _pot.total();
+  for(int i = 0; i < _players.size(); ++i) {
+    if(!_players[i].has_folded()) p_idxs.push_back(i);
+    prev_amount -= _players[i].get_betsize();
+  }
+  _pot.add_side_pot(prev_amount, p_idxs, _players);
+  update_side_pots();
+}
+
+void SlimPokerState::update_side_pots() {
+  std::vector<int> p_idxs;
+  for(int i = 0; i < _players.size(); ++i) {
+    if(!_players[i].has_folded()) p_idxs.push_back(i);
+  }
+  while(!p_idxs.empty()) {
+    int amount = std::numeric_limits<int>::max();
+    for(int i = static_cast<int>(p_idxs.size()) - 1; i >= 0; --i) {
+      const Player& player = _players[p_idxs[i]];
+      if(player.get_betsize() == 0) {
+        p_idxs.erase(p_idxs.begin() + i);
+      }
+      else {
+        amount = std::min(player.get_betsize(), amount);
+      }
+    }
+    if(!p_idxs.empty()) {
+      _pot.add_side_pot(amount, p_idxs, _players);
+      for(const int p_idx : p_idxs) {
+        _players[p_idx].set_betsize(_players[p_idx].get_betsize() - amount);
+      }
+    }
+  }
 }
 
 PokerState PokerState::apply(const Action action) const {
@@ -419,15 +500,15 @@ int total_bet_size(const SlimPokerState& state, const Action action) {
   }
   if(action.get_bet_type() > 0.0f) {
     const int missing = state.get_max_bet() - active_player.get_betsize();
-    const int real_pot = state.get_pot() + missing;
-    return real_pot * action.get_bet_type() + missing + active_player.get_betsize();
+    const int real_pot = state.get_pot().total() + missing;
+    return static_cast<int>(std::round(static_cast<float>(real_pot) * action.get_bet_type())) + missing + active_player.get_betsize();
   }
   throw std::runtime_error("Invalid action bet size: " + std::to_string(action.get_bet_type()));
 }
 
 double fractional_bet_size(const SlimPokerState& state, const int total_size) {
   const double raise_size = total_size - state.get_max_bet();
-  const double pot_size = state.get_pot() + state.get_max_bet() - state.get_players()[state.get_active()].get_betsize();
+  const double pot_size = state.get_pot().total() + state.get_max_bet() - state.get_players()[state.get_active()].get_betsize();
   return raise_size / pot_size;
 }
 
@@ -461,32 +542,66 @@ std::vector<Action> valid_actions(const SlimPokerState& state, const ActionProfi
   return valid;
 }
 
-std::vector<uint8_t> winners(const SlimPokerState& state, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval) {
-  int best = -1;
-  std::vector<uint8_t> winners{};
+std::pair<uint16_t, std::vector<uint16_t>> score_hands(const std::vector<Player>& players, const std::vector<Hand>& hands, const Board& board_cards,
+    const omp::HandEvaluator& eval) {
+  uint16_t best = 0;
+  std::vector<uint16_t> scores(hands.size(), 0);
   omp::Hand board = omp::Hand::empty();
   for(const uint8_t& idx : board_cards.cards()) {
     board += omp::Hand(idx);
   }
-  for(uint8_t i = 0; i < hands.size(); ++i) {
-    if(state.get_players()[i].has_folded()) continue;
-    if(const uint16_t value = eval.evaluate(board + hands[i].cards()[0] + hands[i].cards()[1]); value == best) {
-      winners.push_back(i);
-    }
-    else if(value > best) {
-      best = value;
-      winners.clear();
+  for(int i = 0; i < hands.size(); ++i) {
+    if(players[i].has_folded()) continue;
+    const uint16_t score = eval.evaluate(board + hands[i].cards()[0] + hands[i].cards()[1]);
+    scores[i] = score;
+    best = std::max(score, best);
+  }
+  return {best, scores};
+}
+
+std::vector<uint8_t> winners(const std::vector<Player>& players, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval) {
+  std::vector<uint8_t> winners{};
+  auto [best, scores] = score_hands(players, hands, board_cards, eval);
+  for(int i = 0; i < players.size(); ++i) {
+    if(!players[i].has_folded() && scores[i] == best) {
       winners.push_back(i);
     }
   }
   return winners;
 }
 
+int side_pot_payoff(const SlimPokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
+    const omp::HandEvaluator& eval) {
+  const auto scores = score_hands(state.get_players(), hands, board, eval).second;
+  const int total_rake = rake.payoff(state.get_round(), state.get_pot().total());
+  int payoff = 0;
+  for(const auto& [amount, pot_players] : *state.get_pot().get_side_pots()) {
+    uint16_t best = 0;
+    std::vector<uint8_t> winners;
+    bool found = false;
+    for(const int p_idx : pot_players) {
+      found |= p_idx == i;
+      if(!state.get_players()[p_idx].has_folded()) {
+        best = std::max(scores[p_idx], best);
+      }
+    }
+    if(!found || scores[i] < best) continue;
+    int n_winners = 0;
+    for(const int p_idx : pot_players) {
+      if(scores[p_idx] == best) ++n_winners;
+    }
+    payoff += amount;
+  }
+  const float net_rake = static_cast<float>(payoff) / static_cast<float>(state.get_pot().total()) * static_cast<float>(total_rake);
+  return static_cast<int>(std::round(static_cast<float>(payoff) - net_rake));
+}
+
 int showdown_payoff(const SlimPokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
     const omp::HandEvaluator& eval) {
   if(state.get_players()[i].has_folded()) return 0;
-  std::vector<uint8_t> win_idxs = winners(state, hands, board, eval);
-  return std::ranges::find(win_idxs, i) != win_idxs.end() ? rake.payoff(state) / win_idxs.size() : 0;
+  if(state.get_pot().has_side_pots()) return side_pot_payoff(state, i, board, hands, rake, eval);
+  std::vector<uint8_t> win_idxs = winners(state.get_players(), hands, board, eval);
+  return std::ranges::find(win_idxs, i) != win_idxs.end() ? rake.payoff(state.get_round(), state.get_pot().total()) / static_cast<int>(win_idxs.size()) : 0;
 }
 
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands) {

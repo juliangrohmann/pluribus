@@ -18,13 +18,13 @@ struct SolverConfig {
   bool operator==(const SolverConfig& other) const = default;
 
   template <class Archive>
-  void load(Archive& ar) {
+  void load(Archive& ar) { // TODO: compatibility
     ar(poker, rake, action_profile, init_ranges, dead_ranges, init_board, init_state, restrict_players);
     for(int i = 0; i < poker.n_players; ++i) init_chips.push_back(infer_stack_size(i));
   }
 
   template <class Archive>
-  void save(Archive& ar) const {
+  void save(Archive& ar) const { // TODO: compatibility
     ar(poker, rake, action_profile, init_ranges, dead_ranges, init_board, init_chips, init_state, restrict_players);
   }
 

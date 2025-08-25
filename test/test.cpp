@@ -217,7 +217,7 @@ TEST_CASE("Simulate hands", "[poker][slow]") {
 
 TEST_CASE("Straddle", "[poker]") {
   PokerState state{6, 20'000, 50, true};
-  REQUIRE(state.get_pot() == 650);
+  REQUIRE(state.get_pot().total() == 650);
   REQUIRE(state.get_active() == 3);
 
   auto history = ActionHistory{{Action::FOLD, Action::FOLD, Action::CHECK_CALL, Action::FOLD, Action::CHECK_CALL}};
