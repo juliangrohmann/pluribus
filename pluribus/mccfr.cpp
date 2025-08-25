@@ -148,7 +148,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
 
 template<template <typename> class StorageT>
 int MCCFRSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& context) const {
-  return utility(context.state, context.i, context.board, context.hands, get_config().stack_size(context.i), get_config().rake, context.eval);
+  return utility(context.state, context.i, context.board, context.hands, get_config().init_chips[context.i], get_config().rake, context.eval);
 }
 
 template <template<typename> class StorageT>
@@ -649,7 +649,7 @@ int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& con
     curr_state.apply_in_place(next_rollout_action(context.indexers[curr_state.get_active()], curr_state, context.hands[curr_state.get_active()],
       context.board));
   }
-  return utility(curr_state, context.i, context.board, context.hands, this->get_config().stack_size(context.i), this->get_config().rake, context.eval);
+  return utility(curr_state, context.i, context.board, context.hands, this->get_config().init_chips[context.i], this->get_config().rake, context.eval);
 }
 
 template<template <typename> class StorageT>

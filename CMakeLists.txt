@@ -43,7 +43,17 @@ target_link_libraries(Temp PRIVATE PluribusLib)
 
 if(UNIT_TEST) 
   add_executable(Test test/test.cpp)
-  target_link_libraries(Test PRIVATE PluribusLib Catch2::Catch2WithMain)
+  target_link_libraries(Test PRIVATE TestLib Catch2::Catch2WithMain)
+  add_library(
+          TestLib
+          test/lib.cpp
+  )
+  target_link_libraries(TestLib PUBLIC PluribusLib)
+
+  if(TESTSET)
+    add_executable(TestSet test/testset.cpp)
+    target_link_libraries(TestSet PRIVATE TestLib)
+  endif()
 endif()
 
 add_executable(Benchmark benchmark/benchmark.cpp)

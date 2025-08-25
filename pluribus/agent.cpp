@@ -9,7 +9,7 @@
 
 namespace pluribus {
 
-Action RandomAgent::act(const PokerState& state, const Board& board, const Hand& hand, const PokerConfig& config) {
+Action RandomAgent::act(const SlimPokerState& state, const Board& board, const Hand& hand) {
   const std::vector<Action> actions = valid_actions(state, _action_profile);
   assert(actions.size() > 0 && "No valid actions available.");
   std::uniform_int_distribution dist(0, static_cast<int>(actions.size()) - 1);

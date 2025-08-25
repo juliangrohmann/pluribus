@@ -12,14 +12,20 @@ struct SolverConfig {
     const std::vector<int>& stacks = std::vector<int>{});
   explicit SolverConfig(const PokerConfig& poker_, const ActionProfile& action_profile, int stacks);
 
-  int stack_size(const int i) const { return init_state.get_players()[i].get_chips() + init_state.get_players()[i].get_betsize(); }
+  int infer_stack_size(const int i) const { return init_state.get_players()[i].get_chips() + init_state.get_players()[i].get_betsize(); }
   std::string to_string() const;
 
   bool operator==(const SolverConfig& other) const = default;
 
   template <class Archive>
-  void serialize(Archive& ar) {
+  void load(Archive& ar) {
     ar(poker, rake, action_profile, init_ranges, dead_ranges, init_board, init_state, restrict_players);
+    for(int i = 0; i < poker.n_players; ++i) init_chips.push_back(infer_stack_size(i));
+  }
+
+  template <class Archive>
+  void save(Archive& ar) const {
+    ar(poker, rake, action_profile, init_ranges, dead_ranges, init_board, init_chips, init_state, restrict_players);
   }
 
   PokerConfig poker;
@@ -28,6 +34,7 @@ struct SolverConfig {
   std::vector<PokerRange> init_ranges;
   std::vector<PokerRange> dead_ranges;
   std::vector<uint8_t> init_board;
+  std::vector<int> init_chips;
   PokerState init_state;
   int restrict_players;
 };
