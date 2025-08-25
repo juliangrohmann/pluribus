@@ -248,7 +248,7 @@ TEST_CASE("Utility", "[poker]") {
   UtilityTestSet test_set;
   cereal_load(test_set, "../resources/utility_no_sidepots.testset");
   const omp::HandEvaluator eval;
-  for(UtilityTestCase test_case : test_set) {
+  for(const UtilityTestCase& test_case : test_set.cases) {
     SlimPokerState terminal = test_case.state.apply_copy(test_case.actions);;
     for(int i = 0; i < test_case.state.get_players().size(); ++i) {
       const Player& p = test_case.state.get_players()[i];
