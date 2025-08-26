@@ -132,16 +132,16 @@ void Pluribus::_apply_action(const Action a) {
   _real_state = _real_state.apply(a);
   Logger::log("New state:\n" + _real_state.to_string());
 
+  if(_can_solve(_root_state) && is_off_tree(a, prev_real_state, _live_profile)) {
+    Logger::log("Action is off-tree. Adding to live actions...");
+    // TODO: interrupt if solving, add action, re-solve
+  }
   const Action translated = translate_pseudo_harmonic(a, actions, prev_real_state);
   _mapped_live_actions.push_back(translated);
   Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
   if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
     Logger::log("Round advanced. Updating root...");
     _update_root();
-  }
-  else if(_can_solve(_root_state) && is_off_tree(a, prev_real_state, _live_profile)) {
-    Logger::log("Action is off-tree. Adding to live actions...");
-    // TODO: interrupt if solving, add action, re-solve
   }
   else if(!_can_solve(_root_state) && _can_solve(_real_state)) {
     Logger::log("First solvable state. Updating root...");
