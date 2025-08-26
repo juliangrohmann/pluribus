@@ -163,6 +163,14 @@ public:
   const std::atomic<T>* get_by_index(const int index) const { return &_values[index]; }
   std::atomic<T>* get_by_index(const int index) { return &_values[index]; }
 
+  void prune(const Action a) {
+    auto& node_atom = _nodes[_compute_action_index(a, _branching_actions)];
+    if(const TreeStorageNode* node = node_atom.load()) {
+      delete node;
+      node_atom.store(nullptr);
+    }
+  }
+
   bool is_allocated(int action_idx) const {
     return _nodes[action_idx].load() != nullptr;
   }

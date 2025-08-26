@@ -261,6 +261,26 @@ void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta, const
   Logger::log("Lossless blueprint built.");
 }
 
+void prune_recurse(TreeStorageNode<float>* node, const SlimPokerState& state) {
+  for(const Action a : node->get_branching_actions()) {
+    if(node->is_allocated(a)) {
+      if(state.apply_copy(a).get_round() > 0) {
+        node->prune(a);
+      }
+      else {
+        SlimPokerState next_state = state.apply_copy(a);
+        if(!next_state.is_terminal()) {
+          prune_recurse(node->apply(a, next_state), next_state);
+        }
+      }
+    }
+  }
+}
+
+void LosslessBlueprint::prune_postflop() {
+  prune_recurse(get_freq().get(), get_config().init_state);
+}
+
 std::unordered_map<Action, uint8_t> build_compression_map(const ActionProfile& profile) {
   Logger::log("Building action compression map...");
   std::unordered_map<Action, uint8_t> compression_map;
