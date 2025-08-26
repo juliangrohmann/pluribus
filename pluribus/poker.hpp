@@ -191,9 +191,14 @@ struct PokerConfig {
   bool operator==(const PokerConfig&) const = default;
 
   template <class Archive>
-  void serialize(Archive& ar) { // TODO: compatibility
+  void load(Archive& ar) { // TODO: compatibility
     int n_chips; // buffer for compatibility
     ar(n_players, n_chips, ante, straddle);
+  }
+
+  template <class Archive>
+  void save(Archive& ar) const { // TODO: compatibility
+    ar(n_players, ante, straddle);
   }
 
   int n_players = 2;

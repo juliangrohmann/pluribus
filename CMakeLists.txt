@@ -41,6 +41,9 @@ target_link_libraries(Pluribus PRIVATE PluribusLib)
 add_executable(Temp temp/temp.cpp)
 target_link_libraries(Temp PRIVATE PluribusLib)
 
+add_executable(Convert convert/convert.cpp)
+target_link_libraries(Convert PRIVATE PluribusLib)
+
 if(UNIT_TEST) 
   add_executable(Test test/test.cpp)
   target_link_libraries(Test PRIVATE TestLib Catch2::Catch2WithMain)
