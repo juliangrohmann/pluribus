@@ -157,8 +157,9 @@ void Pluribus::_update_root() {
   PokerState curr_state = _root_state;
   const RealTimeDecision decision{*_preflop_bp, _solver};
   std::ostringstream oss;
+  const TreeStorageNode<uint8_t>* node = _sampled_bp->get_strategy()->apply(_mapped_bp_actions.get_history());
   for(Action a : _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history()) {
-    const Action translated = translate_pseudo_harmonic(a, valid_actions(curr_state, _sampled_bp->get_config().action_profile), curr_state);
+    const Action translated = translate_pseudo_harmonic(a, node->get_branching_actions(), curr_state);
     _mapped_bp_actions.push_back(translated);
     Logger::log("Blueprint action translation: " + a.to_string() + " -> " + translated.to_string());
     oss << pos_to_str(curr_state) << " action applied to ranges: " + translated.to_string() << ", combos: "
@@ -169,6 +170,7 @@ void Pluribus::_update_root() {
     oss << " -> " << _ranges[curr_state.get_active()].n_combos();
     Logger::dump(oss);
     curr_state = curr_state.apply(a);
+    node = node->apply(translated);
   }
   for(int i = 0; i < _ranges.size(); ++i) {
     oss << pos_to_str(i, _ranges.size(), curr_state.is_straddle()) << " card removal, combos: " << _ranges[i].n_combos();
