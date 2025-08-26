@@ -59,7 +59,12 @@ public:
   long get_n_iterations() const { return _n_iterations; }
 
   template <class Archive>
-  void serialize(Archive& ar) {
+  void load(Archive& ar) { // TODO: compatibility
+    ar(cereal::base_class<Blueprint>(this));
+  }
+
+  template <class Archive>
+  void save(Archive& ar) const { // TODO: compatibility
     ar(cereal::base_class<Blueprint>(this), _n_snapshots, _n_iterations);
   }
 
