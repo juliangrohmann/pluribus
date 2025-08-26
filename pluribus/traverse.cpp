@@ -10,7 +10,8 @@
 
 namespace pluribus {
 
-void traverse(RangeViewer* viewer_p, const DecisionAlgorithm& decision, const SolverConfig& config) {
+template <class T>
+void traverse(RangeViewer* viewer_p, const DecisionAlgorithm& decision, const TreeStorageNode<T>* root, const SolverConfig& config) {
   std::string input;
   std::cout << "Board cards: ";
   auto board_cards = config.init_board;
@@ -27,13 +28,15 @@ void traverse(RangeViewer* viewer_p, const DecisionAlgorithm& decision, const So
   std::cout << "Board: " << board.to_string() << "\n";
 
   PokerState state = config.init_state;
+  const TreeStorageNode<T>* node = root;
   std::vector<PokerRange> ranges = config.init_ranges;
   for(int i = 0; i < config.poker.n_players; ++i) ranges.push_back(PokerRange::full());
-  auto action_ranges = build_renderable_ranges(decision, config.action_profile, state, board, ranges[state.get_active()]);
+  auto action_ranges = build_renderable_ranges(decision, node->get_value_actions(), state, board, ranges[state.get_active()]);
   render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
 
   std::cout << state.to_string();
   std::cout << "\nAction: ";
+
   while(std::getline(std::cin, input)) {
     if(input == "quit") {
       std::cout << "Exiting...\n\n";
@@ -43,20 +46,23 @@ void traverse(RangeViewer* viewer_p, const DecisionAlgorithm& decision, const So
       std::cout << "Resetting...\n\n";
       ranges = config.init_ranges;
       state = config.init_state;
+      node = root;
     }
     else {
       Action action = str_to_action(input);
       std::cout << "\n" << action.to_string() << "\n\n";
       ranges[state.get_active()] = action_ranges.at(action).get_range();
       state = state.apply(action);
+      node = node->apply(action);
     }
 
     if(state.is_terminal()) {
       ranges = config.init_ranges;
       state = config.init_state;
+      node = root;
     }
 
-    action_ranges = build_renderable_ranges(decision, config.action_profile, state, board, ranges[state.get_active()]);
+    action_ranges = build_renderable_ranges(decision, node->get_value_actions(), state, board, ranges[state.get_active()]);
     render_ranges(viewer_p, ranges[state.get_active()], action_ranges);
     std::cout << state.to_string();
     std::cout << "\nAction: ";
@@ -68,7 +74,7 @@ void traverse_tree(RangeViewer* viewer_p, const std::string& bp_fn) {
   TreeBlueprintSolver bp;
   cereal_load(bp, bp_fn);
   std::cout << "Success.\n";
-  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_config());
+  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_strategy(), bp.get_config());
 }
 
 void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn) {
@@ -76,7 +82,7 @@ void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn) {
   LosslessBlueprint bp;
   cereal_load(bp, bp_fn);
   std::cout << "Success.\n";
-  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_config());
+  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_strategy(), bp.get_config());
 }
 
 Action str_to_action(const std::string& str) {
@@ -123,10 +129,9 @@ std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const B
   return ranges;
 }
 
-std::unordered_map<Action, RenderableRange> build_renderable_ranges(const DecisionAlgorithm& decision, const ActionProfile& profile, 
+std::unordered_map<Action, RenderableRange> build_renderable_ranges(const DecisionAlgorithm& decision, const std::vector<Action>& actions,
     const PokerState& state, const Board& board, PokerRange& base_range) {
   std::unordered_map<Action, RenderableRange> ranges;
-  const auto actions = valid_actions(state, profile);
   auto color_map = map_colors(actions);
   base_range.remove_cards(board.as_vector(n_board_cards(state.get_round())));
   for(Action a : actions) {
