@@ -517,11 +517,15 @@ double fractional_bet_size(const SlimPokerState& state, const int total_size) {
 }
 
 std::vector<Action> valid_actions(const SlimPokerState& state, const ActionProfile& profile) {
+  std::cout << "Getting actions...\n";
   const std::vector<Action>& actions = profile.get_actions(state);
+  std::cout << "Gotten actions.\n";
   std::vector<Action> valid;
   valid.reserve(actions.size());
   const Player& player = state.get_players()[state.get_active()];
+  std::cout << "Gotten player.\n";
   for(Action a : actions) {
+    std::cout << "Testing action " << a.to_string() << "\n";;
     if(a == Action::CHECK_CALL) {
       valid.push_back(a);
       continue;
