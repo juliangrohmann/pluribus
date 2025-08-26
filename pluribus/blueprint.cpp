@@ -397,7 +397,9 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
   set_config(meta.config);
 
   Logger::log("Initializing sampled blueprint...");
-  assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta)));
+  auto conf = make_sampled_tree_config(meta);
+  std::cout << "Made config.\n";
+  assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, conf));
   std::cout << "Initialized.\n";
   for(const auto& buf_fn : meta.buffer_fns) {
     std::cout << "1\n";

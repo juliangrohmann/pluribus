@@ -119,7 +119,9 @@ inline int node_value_index(const int n_actions, const int cluster, const int ac
 template <class T>
 class TreeStorageNode {
 public:
-  TreeStorageNode(const SlimPokerState& state, const std::shared_ptr<const TreeStorageConfig>& config) : TreeStorageNode{state, config, true} {}
+  TreeStorageNode(const SlimPokerState& state, const std::shared_ptr<const TreeStorageConfig>& config) : TreeStorageNode{state, config, true} {
+    std::cout << "In constructor.\n";
+  }
   TreeStorageNode(): _n_clusters(0), _is_root{true} {}
 
   ~TreeStorageNode() {
