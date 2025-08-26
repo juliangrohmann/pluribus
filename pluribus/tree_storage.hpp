@@ -38,8 +38,14 @@ public:
   //       For bias sampling, branching actions must be a single action, Action::BIAS_DUMMY, to make each player's choice of bias private information.
   //       (i.e. players cannot choose their bias strategy based on knowledge of the biases chosen by previous players)
   //       In a sampled blueprint, value actions are the biases, values are the sampled action, and branching actions are the actions mapping the game tree.
-  std::vector<Action> branching_actions(const SlimPokerState& state) const { return get_actions(state, true); }
-  std::vector<Action> value_actions(const SlimPokerState& state) const { return get_actions(state, false); }
+  std::vector<Action> branching_actions(const SlimPokerState& state) const {
+    std::cout << "Branching actions...\n";
+    return get_actions(state, true);
+  }
+  std::vector<Action> value_actions(const SlimPokerState& state) const {
+    std::cout << "Value actions...\n";
+    return get_actions(state, false);
+  }
 
   bool operator==(const ActionMode& other) const = default;
 
