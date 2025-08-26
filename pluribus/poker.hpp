@@ -308,16 +308,7 @@ public:
   std::string to_string() const;
 
   template <class Archive>
-  void load(Archive& ar) { // TODO: compatibility
-    int pot_amount;
-    ar(_players, _biases, pot_amount, _max_bet, _active, _round, _bet_level, _winner, _straddle);
-    _pot = Pot{pot_amount};
-    _min_raise = 100;
-    _no_chips = 0;
-  }
-
-  template <class Archive>
-  void save(Archive& ar) const { // TODO: compatibility
+  void serialize(Archive& ar) {
     ar(_players, _biases, _pot, _max_bet, _min_raise, _active, _round, _no_chips, _bet_level, _winner, _straddle);
   }
 
@@ -362,12 +353,7 @@ public:
   [[nodiscard]] PokerState apply_biases(const std::vector<Action>& biases) const;
 
   template <class Archive>
-  void load(Archive& ar) { // TODO: compatibility with SlimPokerState, use serialize
-    ar(_actions, cereal::base_class<SlimPokerState>(this));
-  }
-
-  template <class Archive>
-  void save(Archive& ar) const { // TODO: compatibility with SlimPokerState, use serialize
+  void serialize(Archive& ar) {
     ar(_actions, cereal::base_class<SlimPokerState>(this));
   }
 

@@ -76,7 +76,7 @@ void _validate_ev_inputs(const PokerState& state, const int i, const std::vector
 double node_ev(const TreeStorageNode<float>* node, const SolverConfig& config, const PokerState& state, const int i, const std::vector<Hand>& hands, const Board& board,
     std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) {
   if(state.is_terminal()) {
-    const int hu = utility(state, i, Board{board}, hands, config.infer_stack_size(i), config.rake, eval);
+    const int hu = utility(state, i, Board{board}, hands, config.init_chips[i], config.rake, eval);
     return hu;
   }
   const hand_index_t cached_idx = indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round());
