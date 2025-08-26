@@ -20,6 +20,7 @@ struct LosslessMetadata {
   std::shared_ptr<const TreeStorageConfig> tree_config;
   std::vector<std::string> buffer_fns;
   std::string preflop_buf_fn;
+  long n_iterations = 0;
 };
 
 template <class T>
@@ -55,13 +56,14 @@ public:
 
   template <class Archive>
   void serialize(Archive& ar) {
-    ar(cereal::base_class<Blueprint>(this), _n_snapshots);
+    ar(cereal::base_class<Blueprint>(this), _n_snapshots, _n_iterations);
   }
 
 private:
   void build_from_meta_data(const LosslessMetadata& meta, bool preflop);
 
   int _n_snapshots = 0;
+  long _n_iterations = 0;
 };
 
 std::vector<float> biased_freq(const std::vector<Action>& actions, const std::vector<float>& freq, Action bias, float factor);
