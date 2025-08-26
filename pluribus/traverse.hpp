@@ -22,8 +22,5 @@ PokerRange build_action_range(const PokerRange& base_range, const Action& a, con
 void update_ranges(std::vector<PokerRange>& ranges, Action a, const PokerState& state, const Board& board, 
     const DecisionAlgorithm& decision); 
 std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const Board& board, const Strategy<float>& strat);
-
-std::unordered_map<Action, RenderableRange> build_renderable_ranges(const DecisionAlgorithm& decision, const std::vector<Action>& actions,
-    const PokerState& state, const Board& board, PokerRange& base_range);
 }
 
