@@ -9,17 +9,12 @@ def cast(num_str, dt):
     return None
 
 def new_game(url):
-  players, stacks = [], []
-  while name := input(f"Player {len(players)}: "):
-    players.append(name)
+  stacks = []
   while stack := input(f"Player {len(stacks)} chips: "):
     if (v := cast(stack, int)) is not None:
       stacks.append(v)
-  if len(players) != len(stacks):
-    print("Player amount mismatch.")
-    return None
   print(f"{stacks=}")
-  return requests.post(url + "new_game", json={"players": players, "stacks": stacks})
+  return requests.post(url + "new_game", json={"stacks": stacks})
 
 def update_state(url):
   if (action := cast(input("Betsize: "), float)) is None: return None
@@ -60,6 +55,6 @@ if __name__ == "__main__":
   root_url = f"http://{args.server}:8080/"
   while inp := input("\nEndpoint: "):
     if matches := [e[1] for e in endpoints if e[0] == inp]:
-      if res := matches[0](root_url): print(f"Response: {res.json()}")
+      print(f"Response: {res.json() if (res := matches[0](root_url)) else res}")
     else:
       print("Invalid endpoint.")

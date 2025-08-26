@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
   }
 
   if(std::string command = argv[1]; command == "server") {
-    // Pluribus server lossless_bp_fn sampled_bp_fn
+    // ./Pluribus server preflop_bp_fn sampled_bp_fn
     PluribusServer server{argv[2], argv[3]};
     server.start();
   }

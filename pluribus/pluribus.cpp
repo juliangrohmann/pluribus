@@ -26,13 +26,12 @@ Pluribus::Pluribus(const std::shared_ptr<const LosslessBlueprint>& preflop_bp, c
   Logger::log("Pluribus action profile:\n" + _sampled_bp->get_config().action_profile.to_string());
 }
 
-void Pluribus::new_game(const std::vector<std::string>& players, const std::vector<int>& stacks) {
+void Pluribus::new_game(const std::vector<int>& stacks) {
   Logger::log("================================ New Game ================================");
   std::ostringstream oss;
-  Logger::log("Players: " + join_strs(players, ", "));
   Logger::log("Stacks: " + join_as_strs(stacks, ", "));
   const auto& poker_config = _sampled_bp->get_config().poker;
-  if(players.size() != stacks.size() || players.size() != poker_config.n_players) {
+  if(stacks.size() != poker_config.n_players) {
     Logger::error("Player number mismatch. Expected " + std::to_string(poker_config.n_players) + " players.");
   }
 
@@ -41,11 +40,11 @@ void Pluribus::new_game(const std::vector<std::string>& players, const std::vect
   _root_state = _real_state;
   _mapped_bp_actions = ActionHistory{};
   _mapped_live_actions = ActionHistory{};
-  _live_profile = _sampled_bp->get_config().action_profile; // TODO: use more actions in live solver than blueprint?
+  _live_profile = _sampled_bp->get_config().action_profile; // TODO: use more actions in live solver than blueprint
 
   Logger::log("Real state/Root state:\n" + _root_state.to_string());
-  if(const int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;
-      _root_state.get_bet_level() > 1 || _root_state.get_round() != 0 || _root_state.get_active() != init_pos) {
+  const int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;
+  if(_root_state.get_bet_level() > 1 || _root_state.get_round() != 0 || _root_state.get_active() != init_pos) {
     Logger::error("Invalid initial state.");
   }
 
@@ -74,10 +73,10 @@ void Pluribus::update_state(const Action action, const int pos) {
 }
 
 void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
-  Logger::log("============================== Update Board ==============================\n");
+  Logger::log("============================== Update Board ==============================");
   Logger::log("Previous board: " + cards_to_str(_board));
   Logger::log("Updated board: " + cards_to_str(updated_board));
-  if(_board.size() <= updated_board.size()) Logger::error("No new cards on updated board.");
+  if(_board.size() >= updated_board.size()) Logger::error("No new cards on updated board.");
   for(int i = 0; i < _board.size(); ++i) {
     if(_board[i] != updated_board[i]) Logger::error("Inconsistent boards.");
   }
@@ -162,8 +161,10 @@ void Pluribus::_update_root() {
     const Action translated = translate_pseudo_harmonic(a, valid_actions(curr_state, _sampled_bp->get_config().action_profile), curr_state);
     _mapped_bp_actions.push_back(translated);
     Logger::log("Blueprint action translation: " + a.to_string() + " -> " + translated.to_string());
-    oss << pos_to_str(curr_state) << " action applied to root: " + translated.to_string() << ", combos: "
+    oss << pos_to_str(curr_state) << " action applied to ranges: " + translated.to_string() << ", combos: "
         << std::fixed << std::setprecision(2) << _ranges[curr_state.get_active()].n_combos();
+    const int expected_cards = n_board_cards(curr_state.get_round());
+    if(_board.size() < expected_cards) Logger::error("Not enough board cards. Expected: " + std::to_string(expected_cards) + ", Board=" + cards_to_str(_board));
     update_ranges(_ranges, a, curr_state, Board{_board}, decision);
     oss << " -> " << _ranges[curr_state.get_active()].n_combos();
     Logger::dump(oss);

@@ -40,7 +40,7 @@ void PluribusServer::dispatch_commands() {
 
     switch (cmd.type) {
       case CommandType::NewGame:
-        _engine->new_game(cmd.players, cmd.stacks);
+        _engine->new_game(cmd.stacks);
         break;
       case CommandType::UpdateState:
         _engine->update_state(cmd.action, cmd.pos);
@@ -58,12 +58,11 @@ void PluribusServer::configure_server() {
   _server.Post("/new_game", [&](auto& req, auto& res){
     // ReSharper disable once CppDeprecatedEntity
     auto dat = json::parse(req.body.begin(), req.body.end());
-    const auto players = dat.at("players").template get<std::vector<std::string>>();
     const auto stacks = dat.at("stacks").template get<std::vector<int>>();
-    Logger::log("POST: /new_game players=[" + join_strs(players, ", ") + "], stacks=[" + join_as_strs(stacks, ", ") + "]");
+    Logger::log("POST: /new_game stacks=[" + join_as_strs(stacks, ", ") + "]");
     {
       std::lock_guard lock(_cmd_mtx);
-      _cmd_queue.push_back(Command::make_new_game(players, stacks));
+      _cmd_queue.push_back(Command::make_new_game(stacks));
     }
     _cmd_cv.notify_one();
     res.set_content(R"({"status":"ok"})", "application/json");
