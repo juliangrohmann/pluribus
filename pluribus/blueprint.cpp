@@ -398,9 +398,13 @@ void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::strin
 
   Logger::log("Initializing sampled blueprint...");
   assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta)));
+  std::cout << "Initialized.\n";
   for(const auto& buf_fn : meta.buffer_fns) {
+    std::cout << "1\n";
     BlueprintBuffer<uint8_t> buf;
+    std::cout << "2\n";
     cereal_load(buf, buf_fn);
+    std::cout << "3\n";
     Logger::log("Setting sampled actions from buffer " + buf_fn + ": " + std::to_string(buf.entries.size()) + " nodes");
     #pragma omp parallel for schedule(static)
     for(auto& [history, values] : buf.entries) {
