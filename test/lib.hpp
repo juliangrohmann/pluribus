@@ -13,20 +13,11 @@ namespace testlib {
     std::vector<Hand> hands;
     Board board;
     ActionHistory actions;
-    std::vector<int> utilities;
+    std::vector<int> utilities; // TODO: unused, remove and re-generate test set
 
     template <class Archive>
     void serialize(Archive& ar) {
-      // std::cout << "State:\n";
-      ar(state);
-      // std::cout << "Hands:\n";
-      ar(hands);
-      // std::cout << "Board:\n";
-      ar(board);
-      // std::cout << "Utilities:\n";
-      ar(utilities);
-      // std::cout << "Actions:\n";
-      ar(actions);
+      ar(state, hands, board, utilities, actions);
     }
   };
 

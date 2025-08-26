@@ -284,10 +284,12 @@ public:
   const Pot& get_pot() const { return _pot; }
   bool is_straddle() const { return _straddle; }
   int get_max_bet() const { return _max_bet; }
+  int get_min_raise() const { return _min_raise; }
   uint8_t get_active() const { return _active; }
   uint8_t get_round() const { return _round; }
   uint8_t get_bet_level() const { return _bet_level; }
   int8_t get_winner() const { return _winner; }
+  int n_players_with_chips() const { return _players.size() - _no_chips; }
   const std::vector<Action>& get_biases() const { return _biases; }
   bool is_terminal() const { return get_winner() != -1 || get_round() >= 4; }
   bool has_player_vpip(int pos) const;
@@ -310,11 +312,13 @@ public:
     int pot_amount;
     ar(_players, _biases, pot_amount, _max_bet, _active, _round, _bet_level, _winner, _straddle);
     _pot = Pot{pot_amount};
+    _min_raise = 100;
+    _no_chips = 0;
   }
 
   template <class Archive>
   void save(Archive& ar) const { // TODO: compatibility
-    ar(_players, _biases, _pot, _max_bet, _active, _round, _bet_level, _winner, _straddle);
+    ar(_players, _biases, _pot, _max_bet, _min_raise, _active, _round, _no_chips, _bet_level, _winner, _straddle);
   }
 
   uint8_t _first_bias = 10; // TODO: remove, just for asserts
@@ -324,8 +328,10 @@ private:
   Pot _pot;
   std::vector<Action> _biases;
   int _max_bet;
+  int _min_raise;
   uint8_t _active;
   uint8_t _round;
+  uint8_t _no_chips;
   uint8_t _bet_level;
   int8_t _winner;
   bool _straddle;
@@ -336,6 +342,7 @@ private:
   void fold();
   void bias(Action bias);
 
+  bool is_round_complete() const;
   void next_player();
   void next_round();
   void next_bias();
@@ -394,7 +401,6 @@ int total_bet_size(const SlimPokerState& state, Action action);
 double fractional_bet_size(const SlimPokerState& state, int total_size);
 std::vector<Action> valid_actions(const SlimPokerState& state, const ActionProfile& profile);
 int round_of_last_action(const SlimPokerState& state);
-std::vector<uint8_t> winners(const std::vector<Player>& players, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval);
 int showdown_payoff(const SlimPokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
     const omp::HandEvaluator& eval);
 }

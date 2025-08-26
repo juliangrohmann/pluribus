@@ -141,7 +141,7 @@ void Pot::add_side_pot(int amount, const std::vector<int>& player_idxs, const st
 }
 
 SlimPokerState::SlimPokerState(const int n_players, const std::vector<int>& chips, const int ante, const bool straddle)
-    : _pot{150}, _max_bet{100}, _round{0}, _bet_level{1}, _winner{-1}, _straddle{straddle} {
+    : _pot{150}, _max_bet{100}, _min_raise{100}, _round{0}, _no_chips{0}, _bet_level{1}, _winner{-1}, _straddle{straddle} {
   if(n_players != chips.size()) {
     throw std::runtime_error("Player amount mismatch: n_players=" + std::to_string(n_players) + ", chip stacks=" + std::to_string(chips.size()));
   }
@@ -304,54 +304,64 @@ std::string PokerConfig::to_string() const {
 }
 
 void SlimPokerState::bet(const int amount) {
+  auto& player = _players[_active];
   if(verbose) std::cout << std::fixed << std::setprecision(2) << "Player " << static_cast<int>(_active) << " (" 
-                        << (_players[_active].get_chips() / 100.0) << "): " << (_bet_level == 0 ? "Bet " : "Raise to ")
-                        << ((amount + _players[_active].get_betsize()) / 100.0) << " bb\n";
-  assert(!_players[_active].has_folded() && "Attempted to bet but player already folded.");
-  assert(_players[_active].get_chips() >= amount && "Not enough chips to bet.");
-  assert(amount + _players[_active].get_betsize() > _max_bet && 
-         "Attempted to bet but the players new betsize does not exceed the existing maximum bet.");
+                        << (player.get_chips() / 100.0) << "): " << (_bet_level == 0 ? "Bet " : "Raise to ")
+                        << ((amount + player.get_betsize()) / 100.0) << " bb\n";
+  assert(!player.has_folded() && "Attempted to bet but player already folded.");
+  assert(player.get_chips() >= amount && "Not enough chips to bet.");
+  assert(amount + player.get_betsize() - _max_bet >= _min_raise &&
+         "Attempted to bet/raise but the players new betsize does not exceed the minimum bet/raise size.");
   assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to bet but there are no opponents left.");
-  _players[_active].invest(amount);
+
+  player.invest(amount);
   _pot.add(amount);
-  _max_bet = _players[_active].get_betsize();
+  _min_raise = player.get_betsize() - _max_bet;
+  _max_bet = player.get_betsize();
   ++_bet_level;
+  _no_chips += player.get_chips() == 0;
   next_player();
 }
 
 void SlimPokerState::call() {
-  const int amount = std::min(_max_bet - _players[_active].get_betsize(), _players[_active].get_chips());
+  auto& player = _players[_active];
+  const int amount = std::min(_max_bet - player.get_betsize(), player.get_chips());
   if(verbose) std::cout << std::fixed << std::setprecision(2) << "Player " << static_cast<int>(_active) << " (" 
-                        << (_players[_active].get_chips() / 100.0) << "): Call " << (amount / 100.0) << " bb\n";
-  assert(!_players[_active].has_folded() && "Attempted to call but player already folded.");
+                        << (player.get_chips() / 100.0) << "): Call " << (amount / 100.0) << " bb\n";
+  assert(!player.has_folded() && "Attempted to call but player already folded.");
   assert(_max_bet > 0 && "Attempted call but no bet exists.");
-  assert(_max_bet > _players[_active].get_betsize() && "Attempted call but player has already placed the maximum bet.");
-  assert(_players[_active].get_chips() >= amount && "Not enough chips to call.");
+  assert(_max_bet > player.get_betsize() && "Attempted call but player has already placed the maximum bet.");
+  assert(player.get_chips() >= amount && "Not enough chips to call.");
   assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to call but there are no opponents left.");
-  _players[_active].invest(amount);
+  player.invest(amount);
   _pot.add(amount);
+  _no_chips += player.get_chips() == 0;
   next_player();
 }
 
 void SlimPokerState::check() {
+  const auto& player = _players[_active];
   if(verbose) std::cout << std::fixed << std::setprecision(2) << "Player " << static_cast<int>(_active) << " (" 
-                        << (_players[_active].get_chips() / 100.0) << "): Check\n";
-  assert(!_players[_active].has_folded() && "Attempted to check but player already folded.");
-  assert(_players[_active].get_betsize() == _max_bet && "Attempted check but a unmatched bet exists.");
+                        << (player.get_chips() / 100.0) << "): Check\n";
+  assert(!player.has_folded() && "Attempted to check but player already folded.");
+  assert(player.get_betsize() == _max_bet && "Attempted check but a unmatched bet exists.");
   assert(_max_bet == 0 || (_round == 0 && _active == big_blind_idx(*this)) && "Attempted to check but a bet exists");
   assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to check but there are no opponents left.");
   next_player();
 }
 
 void SlimPokerState::fold() {
+  auto& player = _players[_active];
   if(verbose) std::cout << std::fixed << std::setprecision(2) << "Player " << static_cast<int>(_active) << " (" 
-                        << (_players[_active].get_chips() / 100.0) << "): Fold\n";
-  assert(!_players[_active].has_folded() && "Attempted to fold but player already folded.");
+                        << (player.get_chips() / 100.0) << "): Fold\n";
+  assert(!player.has_folded() && "Attempted to fold but player already folded.");
   assert(_max_bet > 0 && "Attempted fold but no bet exists.");
-  assert(_players[_active].get_betsize() < _max_bet && "Attempted to fold but player can check");
+  assert(player.get_betsize() < _max_bet && "Attempted to fold but player can check");
   assert(_winner == -1 && find_winner(*this) == -1 && "Attempted to fold but there are no opponents left.");
-  _players[_active].fold();
+  assert(player.get_chips() > 0 && "Attempted to fold but player is all-in.");
+  player.fold();
   _winner = find_winner(*this);
+  ++_no_chips;
   if(_winner == -1) {
     next_player();
   }
@@ -383,27 +393,36 @@ void SlimPokerState::next_round() {
     update_side_pots();
   }
   else {
-    bool found_all_in = false;
-    bool found_not_all_in = false;
+    int expected_bet = -1;
     for(auto& p : _players) {
-      found_all_in |= !p.has_folded() && p.get_chips() == 0;
-      found_not_all_in |= !p.has_folded() && p.get_chips() > 0;
+      if(!p.has_folded()) {
+        if(expected_bet == -1) {
+          expected_bet = p.get_betsize();
+        }
+        else if(expected_bet != p.get_betsize()) {
+          init_side_pots();
+          break;
+        }
+      }
     }
-    if(found_all_in && found_not_all_in) init_side_pots();
   }
-
   ++_round;
   for(Player& p : _players) p.next_round();
   _active = 0;
   _max_bet = 0;
+  _min_raise = 100;
   _bet_level = 0;
-  if(_round < 4 && (_players[_active].has_folded() || _players[_active].get_chips() == 0)) next_player();
+  if(_round < 4 && (_players[_active].has_folded() || _players[_active].get_chips() == 0 || n_players_with_chips() == 1)) {
+    next_player();
+  }
 }
 
-bool is_round_complete(const SlimPokerState& state) {
-  return state.get_players()[state.get_active()].get_betsize() == state.get_max_bet() && 
-         (state.get_max_bet() > 0 || state.get_active() == 0) &&
-         (state.get_max_bet() > big_blind_size(state) || state.get_active() != big_blind_idx(state) || state.get_round() != 0); // preflop, big blind
+bool SlimPokerState::is_round_complete() const {
+  const auto& player = get_players()[get_active()];
+  const bool is_done = n_players_with_chips() == 1;
+  return player.get_betsize() == get_max_bet() &&
+         (get_max_bet() > 0 || get_active() == 0 || is_done) &&
+         (get_max_bet() > big_blind_size(*this) || get_active() != big_blind_idx(*this) || get_round() != 0 || is_done); // preflop, big blind
 }
 
 int round_of_last_action(const SlimPokerState& state) {
@@ -413,7 +432,7 @@ int round_of_last_action(const SlimPokerState& state) {
 void SlimPokerState::next_player() {
   do {
     _active = increment(_active, _players.size() - 1);
-    if(is_round_complete(*this)) {
+    if(is_round_complete()) {
       next_round();
       return;
     }
@@ -431,7 +450,8 @@ void SlimPokerState::init_side_pots() {
   std::vector<int> p_idxs;
   int prev_amount = _pot.total();
   for(int i = 0; i < _players.size(); ++i) {
-    if(!_players[i].has_folded()) p_idxs.push_back(i);
+    // add folded players with invested chips to avoid creating a separate side pot during update_side_pots()
+    if(!_players[i].has_folded() || _players[i].get_betsize() > 0) p_idxs.push_back(i);
     prev_amount -= _players[i].get_betsize();
   }
   _pot.add_side_pot(prev_amount, p_idxs, _players);
@@ -441,7 +461,7 @@ void SlimPokerState::init_side_pots() {
 void SlimPokerState::update_side_pots() {
   std::vector<int> p_idxs;
   for(int i = 0; i < _players.size(); ++i) {
-    if(!_players[i].has_folded()) p_idxs.push_back(i);
+    if(!_players[i].has_folded() || _players[i].get_betsize() > 0) p_idxs.push_back(i);
   }
   while(!p_idxs.empty()) {
     int amount = std::numeric_limits<int>::max();
@@ -454,13 +474,8 @@ void SlimPokerState::update_side_pots() {
         amount = std::min(player.get_betsize(), amount);
       }
     }
-    if(p_idxs.size() == 1) {
-      auto& player = _players[p_idxs[0]];
-      player.take_back(player.get_betsize());
-      p_idxs.clear();
-    }
-    else if(!p_idxs.empty()) {
-      _pot.add_side_pot(amount, p_idxs, _players);
+    if(!p_idxs.empty()) {
+      _pot.add_side_pot(amount * static_cast<int>(p_idxs.size()), p_idxs, _players);
       for(const int p_idx : p_idxs) {
         _players[p_idx].set_betsize(_players[p_idx].get_betsize() - amount);
       }
@@ -492,15 +507,7 @@ PokerState PokerState::apply_biases(const std::vector<Action>& biases) const {
 
 int total_bet_size(const SlimPokerState& state, const Action action) {
   const Player& active_player = state.get_players()[state.get_active()];
-  if(action == Action::ALL_IN) {
-    int max_total = 0;
-    for(int i = 0; i < state.get_players().size(); ++i) {
-      if(i != state.get_active() && !state.get_players()[i].has_folded()) {
-        max_total = std::max(state.get_players()[i].get_betsize() + state.get_players()[i].get_chips(), max_total);
-      }
-    }
-    return std::min(active_player.get_chips() + active_player.get_betsize(), max_total);
-  }
+  if(action == Action::ALL_IN) return active_player.get_chips() + active_player.get_betsize();
   if(action.get_bet_type() > 0.0f) {
     const int missing = state.get_max_bet() - active_player.get_betsize();
     const int real_pot = state.get_pot().total() + missing;
@@ -532,15 +539,20 @@ std::vector<Action> valid_actions(const SlimPokerState& state, const ActionProfi
       }
       continue;
     }
-    if(a == Action::ALL_IN) { // faster than calling total_bet_size
-      if(player.get_chips() > state.get_max_bet() - player.get_betsize()) {
-        valid.push_back(a);
-      }
-      continue;
-    }
+    if(state.n_players_with_chips() == 1) continue;
+
     const int total_bet = total_bet_size(state, a);
-    if(const int required = total_bet - player.get_betsize(); required <= player.get_chips() && total_bet > state.get_max_bet()) {
-      valid.push_back(a);
+    const int required = total_bet - player.get_betsize();
+    // TODO: bets below the min_raise are allowed when no one has bet yet and the player's stack is less than the min_raise
+    // TODO: what about when a previous player has bet all-in less than the min raise - can the next player raise less than the min raise if his stack is
+    //       less than the min_raise? is the next min raise decreased due to the all-in raise?
+    if(required <= player.get_chips() && total_bet - state.get_max_bet() >= state.get_min_raise()) {
+      bool can_bet = false;
+      for(int p_idx = 0; p_idx < state.get_players().size(); ++p_idx) {
+        const Player& opponent = state.get_players()[p_idx];
+        can_bet |= !opponent.has_folded() && p_idx != state.get_active() && opponent.get_betsize() + opponent.get_chips() > state.get_max_bet();
+      }
+      if(can_bet) valid.push_back(a);
     }
   }
   return valid;
@@ -563,21 +575,12 @@ std::pair<uint16_t, std::vector<uint16_t>> score_hands(const std::vector<Player>
   return {best, scores};
 }
 
-std::vector<uint8_t> winners(const std::vector<Player>& players, const std::vector<Hand>& hands, const Board& board_cards, const omp::HandEvaluator& eval) {
-  std::vector<uint8_t> winners{};
-  auto [best, scores] = score_hands(players, hands, board_cards, eval);
-  for(int i = 0; i < players.size(); ++i) {
-    if(!players[i].has_folded() && scores[i] == best) {
-      winners.push_back(i);
-    }
-  }
-  return winners;
-}
-
 int side_pot_payoff(const SlimPokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
     const omp::HandEvaluator& eval) {
+  // TODO: collapse side pots to distribute odd chips correctly - pop all players that have folded from all pots, combine equal pots.
+  // two odd chip pots -> one even chip pot, removes odd chip bias to the first winner
   const auto scores = score_hands(state.get_players(), hands, board, eval).second;
-  const int total_rake = rake.payoff(state.get_round(), state.get_pot().total());
+  const int total_payoff = rake.payoff(state.get_round(), state.get_pot().total());
   int payoff = 0;
   for(const auto& [amount, pot_players] : *state.get_pot().get_side_pots()) {
     uint16_t best = 0;
@@ -591,21 +594,40 @@ int side_pot_payoff(const SlimPokerState& state, const int i, const Board& board
     }
     if(!found || scores[i] < best) continue;
     int n_winners = 0;
+    int first_winner = -1;
     for(const int p_idx : pot_players) {
-      if(scores[p_idx] == best) ++n_winners;
+      if(!state.get_players()[p_idx].has_folded() && scores[p_idx] == best) {
+        ++n_winners;
+        if(first_winner == -1) first_winner = p_idx;
+      }
     }
-    payoff += amount;
+    payoff += amount / n_winners + (first_winner == i ? amount % n_winners : 0);
   }
-  const float net_rake = static_cast<float>(payoff) / static_cast<float>(state.get_pot().total()) * static_cast<float>(total_rake);
-  return static_cast<int>(std::round(static_cast<float>(payoff) - net_rake));
+  return static_cast<int>(std::round(static_cast<float>(payoff) / static_cast<float>(state.get_pot().total()) * static_cast<float>(total_payoff)));
+}
+
+int no_side_pot_payoff(const SlimPokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
+    const omp::HandEvaluator& eval) {
+  auto [best, scores] = score_hands(state.get_players(), hands, board, eval);
+  bool winner = false;
+  int n_winners = 0;
+  int first_winner = -1;
+  for(int p = 0; p < state.get_players().size(); ++p) {
+    if(!state.get_players()[p].has_folded() && scores[p] == best) {
+      winner |= p == i;
+      ++n_winners;
+      if(first_winner == -1) first_winner = p;
+    }
+  }
+  const int payoff = rake.payoff(state.get_round(), state.get_pot().total());
+  return winner ? payoff / n_winners + (first_winner == i ? payoff % n_winners : 0) : 0;
 }
 
 int showdown_payoff(const SlimPokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
     const omp::HandEvaluator& eval) {
   if(state.get_players()[i].has_folded()) return 0;
-  if(state.get_pot().has_side_pots()) return side_pot_payoff(state, i, board, hands, rake, eval);
-  std::vector<uint8_t> win_idxs = winners(state.get_players(), hands, board, eval);
-  return std::ranges::find(win_idxs, i) != win_idxs.end() ? rake.payoff(state.get_round(), state.get_pot().total()) / static_cast<int>(win_idxs.size()) : 0;
+  return state.get_pot().has_side_pots() ? side_pot_payoff(state, i, board, hands, rake, eval) : no_side_pot_payoff(state, i, board, hands, rake, eval);
+
 }
 
 void deal_hands(Deck& deck, std::vector<std::array<uint8_t, 2>>& hands) {
