@@ -35,7 +35,12 @@ public:
   const SolverConfig& get_config() const override { return _config; }
 
   template <class Archive>
-  void serialize(Archive& ar) {
+  void load(Archive& ar) { // TODO: compatibility
+    ar(_freq, _config);
+  }
+
+  template <class Archive>
+  void save(Archive& ar) const { // TODO: compatibility
     ar(_freq, _config);
   }
 
@@ -92,7 +97,12 @@ public:
   int bias_offset(const Action bias) const { return _bias_to_offset.at(bias); }
 
   template <class Archive>
-  void serialize(Archive& ar) {
+  void load(Archive& ar) { // TODO: compatibility
+    ar(cereal::base_class<Blueprint>(this), _idx_to_action, _bias_to_offset);
+  }
+
+  template <class Archive>
+  void save(Archive& ar) const { // TODO: compatibility
     ar(cereal::base_class<Blueprint>(this), _idx_to_action, _bias_to_offset);
   }
 
