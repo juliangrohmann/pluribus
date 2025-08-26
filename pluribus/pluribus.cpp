@@ -81,6 +81,10 @@ void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
     if(_board[i] != updated_board[i]) Logger::error("Inconsistent boards.");
   }
   _board = updated_board;
+  if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
+    Logger::log("Street advanced. Updating root...");
+    _update_root();
+  }
 }
 
 Solution Pluribus::solution(const Hand& hand) const {
@@ -109,18 +113,10 @@ void Pluribus::_init_solver() {
   RealTimeSolverConfig rt_config;
   rt_config.bias_profile = BiasActionProfile{};
   rt_config.init_actions = _mapped_bp_actions.get_history();
-  // rt_config.terminal_round = terminal_round(_root_state); // TODO: solve multiple rounds
+  rt_config.terminal_round = terminal_round(_root_state); // TODO: solve multiple rounds
   rt_config.terminal_bet_level = _root_state.get_round() + 1;
   rt_config.terminal_bet_level = 999;
-  _solver = std::unique_ptr<Solver>{new TreeRealTimeSolver{config, rt_config, _sampled_bp}};
-}
-
-bool can_solve(const PokerState& root) {
-  return root.get_round() > 0 || root.active_players() <= 4;
-}
-
-bool should_solve(const PokerState& root) {
-  return can_solve(root) && root.get_round() > 0;
+  _solver = std::unique_ptr<TreeRealTimeSolver>{new TreeRealTimeSolver{config, rt_config, _sampled_bp}};
 }
 
 bool is_off_tree(Action a, const PokerState& state, const ActionProfile& profile) {
@@ -139,15 +135,15 @@ void Pluribus::_apply_action(const Action a) {
   const Action translated = translate_pseudo_harmonic(a, actions, prev_real_state);
   _mapped_live_actions.push_back(translated);
   Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
-  if(_real_state.get_round() > _root_state.get_round()) {
+  if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
     Logger::log("Round advanced. Updating root...");
     _update_root();
   }
-  else if(can_solve(_root_state) && is_off_tree(a, prev_real_state, _live_profile)) {
+  else if(_can_solve(_root_state) && is_off_tree(a, prev_real_state, _live_profile)) {
     Logger::log("Action is off-tree. Adding to live actions...");
     // TODO: interrupt if solving, add action, re-solve
   }
-  else if(!can_solve(_root_state) && can_solve(_real_state)) {
+  else if(!_can_solve(_root_state) && _can_solve(_real_state)) {
     Logger::log("First solvable state. Updating root...");
     _update_root();
   }
@@ -184,12 +180,24 @@ void Pluribus::_update_root() {
   if(_root_state.get_action_history().size() != _mapped_bp_actions.size()) {
     Logger::error("Mapped action length mismatch!\nRoot: " + _root_state.get_action_history().to_string() + "\nMapped: " + _mapped_bp_actions.to_string());
   }
-  if(should_solve(_root_state)) {
+  if(_should_solve(_root_state)) {
     Logger::log("Should solve.");
     // TODO: interrupt if solving
     _init_solver();
     _solver->solve(100'000'000'000L);
   }
+  else {
+    Logger::log("Should not solve.");
+  }
+}
+
+bool Pluribus::_can_solve(const PokerState& root) const {
+  return (root.get_round() > 0 || root.active_players() <= 4) && _board.size() >= n_board_cards(root.get_round());
+}
+
+bool Pluribus::_should_solve(const PokerState& root) const {
+  return _can_solve(root) && root.get_round() > 0 &&
+    (!_solver || _solver->get_real_time_config().terminal_round <= 3 || _solver->get_real_time_config().terminal_bet_level <= 99);
 }
 
 }

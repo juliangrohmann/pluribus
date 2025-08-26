@@ -24,10 +24,12 @@ private:
   void _init_solver();
   void _apply_action(Action a);
   void _update_root();
+  bool _can_solve(const PokerState& root) const;
+  bool _should_solve(const PokerState& root) const;
 
   const std::shared_ptr<const LosslessBlueprint> _preflop_bp = nullptr;
   const std::shared_ptr<const SampledBlueprint> _sampled_bp = nullptr;
-  std::shared_ptr<Solver> _solver = nullptr;
+  std::shared_ptr<TreeRealTimeSolver> _solver = nullptr;
   PokerState _root_state;
   PokerState _real_state;
   ActionHistory _mapped_bp_actions;
