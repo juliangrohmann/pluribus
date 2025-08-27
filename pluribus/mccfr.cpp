@@ -327,11 +327,11 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
-  auto next_node = next_bp_node(a, ctx.state, ctx.bp_node);
+  auto next_node = !ctx.state.is_terminal() ? next_bp_node(a, ctx.state, ctx.bp_node) : nullptr;
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr_p(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
-      !ctx.state.is_terminal() ? next_node : nullptr, next_consec_folds(ctx.consec_folds, a), ctx});
+  return traverse_mccfr_p(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i), next_node,
+      next_consec_folds(ctx.consec_folds, a), ctx});
 }
 
 template <template<typename> class StorageT>
@@ -393,8 +393,8 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
   auto next_node = next_bp_node(a, ctx.state, ctx.bp_node);
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
-      !ctx.state.is_terminal() ? next_node : nullptr, next_consec_folds(ctx.consec_folds, a), ctx});
+  return traverse_mccfr(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i), next_node,
+      next_consec_folds(ctx.consec_folds, a), ctx});
 }
 
 template <template<typename> class StorageT>
