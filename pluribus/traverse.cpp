@@ -131,11 +131,13 @@ std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const B
 
 std::unordered_map<Action, RenderableRange> build_renderable_ranges(const DecisionAlgorithm& decision, const std::vector<Action>& actions,
     const PokerState& state, const Board& board, PokerRange& base_range) {
+  std::cout << "Base range combos: " << base_range.n_combos() << "\n";
   std::unordered_map<Action, RenderableRange> ranges;
   auto color_map = map_colors(actions);
   base_range.remove_cards(board.as_vector(n_board_cards(state.get_round())));
   for(Action a : actions) {
     PokerRange action_range = build_action_range(base_range, a, state, board, decision);
+    std::cout << a.to_string() << " range combos: " << action_range.n_combos() << "\n";
     ranges.insert({a, RenderableRange{base_range * action_range, a.to_string(), color_map[a], true}});
   }
   return ranges;
