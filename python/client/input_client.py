@@ -68,7 +68,7 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("host", type=str)
   cmd_args = parser.parse_args()
-  while inp_args := input("\nEndpoint: ").split(' '):
+  while inp_args := input("\nEndpoint: ").strip().split(' '):
     if inp_args and inp_args[0] == "config":
       with open(inp_args[1]) as f:
         for line in f:
