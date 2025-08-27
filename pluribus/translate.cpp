@@ -16,7 +16,7 @@ std::vector<std::pair<Action, double>> translatable_actions(const SlimPokerState
 
 TranslationResult pseudo_harmonic_result(const Action a, const std::vector<Action>& actions, const SlimPokerState& state) {
   const double x = a != Action::ALL_IN ? a.get_bet_type() : fractional_bet_size(state, total_bet_size(state, Action::ALL_IN));
-  if(x < 0.0) throw std::runtime_error("Cannot apply pseudo harmonic action translation to action: " + a.to_string());
+  if(x < 0.0) return {a, a, 1.0};
   const auto translatable = translatable_actions(state, actions);
   for(int i = 0; i < translatable.size(); ++i) {
     const Action action = translatable[i].first;
