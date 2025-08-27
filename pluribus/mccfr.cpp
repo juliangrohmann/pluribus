@@ -104,7 +104,6 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         Logger::log(progress_str(t - init_t, _t - init_t, t_0));
       }
       for(int i = 0; i < get_config().poker.n_players; ++i) {
-        if(is_interrupted()) break;
         if(is_debug) Logger::log("============== i = " + std::to_string(i) + " ==============");
         std::vector<CachedIndexer> indexers(get_config().poker.n_players);
         RoundSample sample = sampler.sample();
