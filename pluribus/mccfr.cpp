@@ -628,9 +628,9 @@ RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlue
 
 template<template <typename> class StorageT>
 const StorageT<uint8_t>* RealTimeSolver<StorageT>::next_bp_node(const Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) {
-  std::cout << "Existing bp node is nulL: " << (bp_node == nullptr) << "\n";
+  std::cout << "Existing bp node is null: " << (bp_node == nullptr) << "\n";
   std::cout << "Next bp node: Action=" << a.to_string() << ", Branching actions:\n";
-  for(const Action a : bp_node->get_branching_actions()) std::cout << a.to_string() << " (" << (bp_node->is_allocated(a) ? "" : "not") << " allocated), " << "\n";
+  for(const Action action : bp_node->get_branching_actions()) std::cout << action.to_string() << " (" << (bp_node->is_allocated(a) ? "" : "not") << " allocated), " << "\n";
   std::cout << "State:\n" << state.to_string() << "\n";
   std::cout << "Terminal: " << state.apply_copy(a).is_terminal() << "\n";
   return !state.apply_copy(a).is_terminal() ? bp_node->apply(translate_pseudo_harmonic(a, bp_node->get_branching_actions(), state)) : nullptr;
