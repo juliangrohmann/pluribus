@@ -32,6 +32,8 @@ public:
     }
     int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), board, hand);
     auto freq = calculate_strategy(node->get(cluster), node->get_value_actions().size());
+    std::cout << "a=" << a.to_string() << ", value_actions=\n";
+    for(Action va : node->get_value_actions()) std::cout << a.to_string() << "\n";
     return freq[index_of(a, node->get_value_actions())];
   }
 
