@@ -122,9 +122,8 @@ void PluribusServer::configure_server() {
       std::lock_guard lock(_cmd_mtx);
       _cmd_queue.push_back(Command::make_save_range(fn));
     }
-    json j;
-    j["status"]  = "ok";
-    res.set_content(j.dump(), "application/json");
+    _cmd_cv.notify_one();
+    res.set_content(R"({"status":"ok"})", "application/json");
   });
 
 }

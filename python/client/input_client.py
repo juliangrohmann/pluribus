@@ -46,6 +46,10 @@ def save_range(url, args=None):
   fn = (input("Filename: ") if not args else args[0]).strip()
   return requests.post(url + "save_range", json={"fn": fn})
 
+def pull_range(url, args=None):
+  fn = (input("Filename: ") if not args else args[0]).strip()
+  # return requests.post(url + "save_range", json={"fn": fn})
+
 def wait(_, args=None):
   if args: time.sleep(cast(args[0], float))
 
@@ -61,6 +65,7 @@ endpoints = [
   ("update_board", update_board),
   ("solution", solution),
   ("save_range", save_range),
+  ("pull_range", pull_range),
   ("wait", wait),
 ]
 
