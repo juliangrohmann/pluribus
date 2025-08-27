@@ -17,8 +17,8 @@ void PluribusServer::start() {
   Logger::log("Starting HTTP server on port 8080...");
   _running = true;
   _dispatch_thread = std::thread{[this] { this->dispatch_commands(); }};
-  _server.listen("0.0.0.0", 8080);
   Logger::log("Listening...");
+  _server.listen("0.0.0.0", 8080);
   stop();
 }
 

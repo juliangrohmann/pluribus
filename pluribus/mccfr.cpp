@@ -292,7 +292,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
         SlimPokerState next_state = ctx.state.apply_copy(a);
         const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
         const int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-            !next_state.is_terminal() ? next_bp_node(a, ctx.state, ctx.bp_node) : nullptr, next_consec_folds(ctx.consec_folds, a), ctx});
+            next_bp_node(a, ctx.state, ctx.bp_node), next_consec_folds(ctx.consec_folds, a), ctx});
         const int v_r = std::max(regret, 0);
         values[a_idx] = v_a;
         v_exact += static_cast<double>(v_r) * static_cast<double>(v_a);
@@ -327,11 +327,10 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
-  auto next_node = !ctx.state.is_terminal() ? next_bp_node(a, ctx.state, ctx.bp_node) : nullptr;
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr_p(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i), next_node,
-      next_consec_folds(ctx.consec_folds, a), ctx});
+  return traverse_mccfr_p(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
+      next_bp_node(a, ctx.state, ctx.bp_node), next_consec_folds(ctx.consec_folds, a), ctx});
 }
 
 template <template<typename> class StorageT>
@@ -361,7 +360,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
       const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
       SlimPokerState next_state = ctx.state.apply_copy(a);
       const int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-        !next_state.is_terminal() ? next_bp_node(a, ctx.state, ctx.bp_node) : nullptr, next_consec_folds(ctx.consec_folds, a), ctx});
+        next_bp_node(a, ctx.state, ctx.bp_node), next_consec_folds(ctx.consec_folds, a), ctx});
       const int v_r = std::max(base_ptr[a_idx].load(std::memory_order_relaxed), 0);
       values[a_idx] = v_a;
       v_exact += static_cast<double>(v_r) * static_cast<double>(v_a);
@@ -390,11 +389,10 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
-  auto next_node = !ctx.state.is_terminal() ? next_bp_node(a, ctx.state, ctx.bp_node) : nullptr;
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i), next_node,
-      next_consec_folds(ctx.consec_folds, a), ctx});
+  return traverse_mccfr(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
+      next_bp_node(a, ctx.state, ctx.bp_node), next_consec_folds(ctx.consec_folds, a), ctx});
 }
 
 template <template<typename> class StorageT>
@@ -632,7 +630,7 @@ const StorageT<uint8_t>* RealTimeSolver<StorageT>::next_bp_node(const Action a, 
   for(const Action a : bp_node->get_branching_actions()) std::cout << a.to_string() << " (" << (bp_node->is_allocated(a) ? "" : "not") << " allocated), " << "\n";
   std::cout << "State:\n" << state.to_string() << "\n";
   std::cout << "Terminal: " << state.apply_copy(a).is_terminal() << "\n";
-  return bp_node->apply(translate_pseudo_harmonic(a, bp_node->get_branching_actions(), state));
+  return !state.apply_copy(a).is_terminal() ? bp_node->apply(translate_pseudo_harmonic(a, bp_node->get_branching_actions(), state)) : nullptr;
 }
 
 template <template<typename> class StorageT>
