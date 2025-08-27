@@ -10,7 +10,7 @@ std::string progress_str(const uint64_t idx, const uint64_t total, const std::ch
   std::ostringstream oss;
   oss << std::setw(11) << std::to_string(idx) << ":   "
       << std::fixed << std::setprecision(1) << std::setw(5) << (percent * 100) << "%"
-      << std::setw(7) << std::setprecision(0) << static_cast<double>(idx) / static_cast<double>(dt) / 1000.0 << "it/s    "
+      << std::setw(7) << std::setprecision(0) << static_cast<double>(idx) / static_cast<double>(dt) * 1000.0 << " it/s    "
       << std::setw(7) << dt / 1000.0 << " s elapsed    "
       << std::setw(7) << (1 / percent * dt - dt) / 1000.0 << " s remaining";
   return oss.str();
