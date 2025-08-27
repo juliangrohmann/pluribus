@@ -13,7 +13,7 @@ class DecisionAlgorithm {
 public:
   virtual ~DecisionAlgorithm() = default;
 
-  virtual float frequency(Action a, const PokerState& state, const Board& board, const Hand& hand) const = 0;
+  virtual float frequency(Action a, const PokerState& state, const Board& board, const Hand& hand, int cluster = -1) const = 0;
 };
 
 template<class T>
@@ -21,7 +21,7 @@ class TreeDecision : public DecisionAlgorithm {
 public:
   TreeDecision(const TreeStorageNode<T>* root, const PokerState& init_state) : _init_state{init_state}, _root{root} {}
 
-  float frequency(Action a, const PokerState& state, const Board& board, const Hand& hand) const override {
+  float frequency(Action a, const PokerState& state, const Board& board, const Hand& hand, const int cluster = -1) const override {
     if(!state.get_action_history().is_consistent(_init_state.get_action_history())) {
       Logger::error("Cannot compute TreeSolver frequency for inconsistent histories:\nInitial state: "
         + _init_state.get_action_history().to_string() + "\nGiven state: " + state.get_action_history().to_string());
@@ -30,11 +30,16 @@ public:
     for(int i = _init_state.get_action_history().size(); i < state.get_action_history().size(); ++i) {
       node = node->apply(state.get_action_history().get(i));
     }
-    int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), board, hand);
-    auto freq = calculate_strategy(node->get(cluster), node->get_value_actions().size());
+    int real_cluster = cluster == -1 ? BlueprintClusterMap::get_instance()->cluster(state.get_round(), board, hand) : cluster;
+    auto freq = calculate_strategy(node->get(real_cluster), node->get_value_actions().size());
     if(std::ranges::find(node->get_value_actions(), a) == node->get_value_actions().end()) {
-      std::cout << "a=" << a.to_string() << ", value_actions=\n";
-      for(Action va : node->get_value_actions()) std::cout << va.to_string() << "\n";
+      std::cout << "Failed to find action: " << a.to_string();
+      std::cout << "Value actions:\n";
+      for(Action va : node->get_value_actions()) {
+        std::cout << va.to_string() << "\n";
+      }
+      std::cout << "Init state: " << _init_state.get_action_history().to_string() << "\n";
+      std::cout << "Curr state: " << state.get_action_history().to_string() << "\n";
     }
     return freq[index_of(a, node->get_value_actions())];
   }

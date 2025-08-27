@@ -10,7 +10,7 @@ public:
   RealTimeDecision(const LosslessBlueprint& preflop_bp, const std::shared_ptr<const Solver>& solver)
       : _preflop_decision{TreeDecision{preflop_bp.get_strategy(), preflop_bp.get_config().init_state}}, _solver{solver} {}
 
-  float frequency(const Action a, const PokerState& state, const Board& board, const Hand& hand) const override {
+  float frequency(const Action a, const PokerState& state, const Board& board, const Hand& hand, const int cluster = -1) const override {
     if(_solver) return _solver->frequency(a, state, board, hand);
     if(state.get_round() == 0) return _preflop_decision.frequency(a, state, board, hand);
     Logger::error("Cannot decide postflop frequency without solver.");
@@ -145,7 +145,6 @@ void Pluribus::_enqueue_job() {
   rt_config.bias_profile = BiasActionProfile{};
   rt_config.init_actions = _mapped_bp_actions.get_history();
   rt_config.terminal_round = terminal_round(_root_state);
-  rt_config.terminal_bet_level = _root_state.get_round() + 1;
   rt_config.terminal_bet_level = 999;
   SolveJob job{config, rt_config};
   {

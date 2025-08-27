@@ -335,6 +335,8 @@ public:
   explicit TreeRealTimeSolver(const SolverConfig& config = SolverConfig{}, const RealTimeSolverConfig& rt_config = RealTimeSolverConfig{},
     const std::shared_ptr<const SampledBlueprint>& bp = nullptr);
 
+  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const override;
+
   bool operator==(const TreeRealTimeSolver& other) const;
 
   template <class Archive>

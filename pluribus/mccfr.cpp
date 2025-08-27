@@ -230,7 +230,7 @@ template<class Context>
 int context_cluster(const Context& ctx) {
   const int r = ctx.state.get_round();
   const int p = ctx.state.get_active();
-  return BlueprintClusterMap::get_instance()->cluster(r, ctx.indexers[p].index(ctx.board, ctx.hands[p], r));
+  return BlueprintClusterMap::get_instance()->cluster(r, ctx.indexers[p].index(ctx.board, ctx.hands[p], r)); // TODO: use get_cluster
 }
 
 inline int next_consec_folds(const int consec_folds, const Action a) {
@@ -491,7 +491,7 @@ template class MCCFRSolver<TreeStorageNode>;
 // ==========================================================================================
 
 float TreeSolver::frequency(const Action action, const PokerState& state, const Board& board, const Hand& hand) const {
-  const TreeDecision decision{_regrets_root.get(), get_config().init_state};
+  const TreeDecision decision{_regrets_root.get(), get_config().init_state}; // TODO: use get_cluster
   return decision.frequency(action, state, board, hand);
 }
 
@@ -799,6 +799,11 @@ TreeRealTimeSolver::TreeRealTimeSolver(const SolverConfig& config, const RealTim
     Logger::error("Init state action count does not match mapped action count.\nInit state actions: "
       + actions_to_str(config.init_state.get_action_history().get_history()) + "\nMapped actions: " + actions_to_str(rt_config.init_actions));
   }
+}
+
+float TreeRealTimeSolver::frequency(const Action action, const PokerState& state, const Board& board, const Hand& hand) const {
+  const TreeDecision decision{get_strategy(), get_config().init_state};
+  return decision.frequency(action, state, board, hand);
 }
 
 bool TreeRealTimeSolver::operator==(const TreeRealTimeSolver& other) const {
