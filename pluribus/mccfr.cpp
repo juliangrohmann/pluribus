@@ -641,13 +641,18 @@ Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, con
   // std::cout << "Rollout cluster=" << cluster << "\n";
   const uint8_t bias_offset = _bp->bias_offset(state.get_biases()[state.get_active()]);
   // std::cout << "Bias offset=" << static_cast<int>(bias_offset) << "\n";
-  return _bp->decompress_action(node->get(cluster, bias_offset)->load());
+  const Action action = _bp->decompress_action(node->get(cluster, bias_offset)->load());
+  const auto& player = state.get_players()[state.get_active()];
+  if(action.get_bet_type() > 0.0f && total_bet_size(state, action) > player.get_betsize() + player.get_chips()) {
+    return is_action_valid(Action::ALL_IN, state) ? Action::ALL_IN : Action::CHECK_CALL;
+  }
+  return action;
 }
 
 template <template<typename> class StorageT>
 int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& ctx) const {
-  std::cout << "Calculating terminal utility...\n";
-  std::cout << "Biases=" << actions_to_str(ctx.state.get_biases()) << "\n";
+  // std::cout << "Calculating terminal utility...\n";
+  // std::cout << "Biases=" << actions_to_str(ctx.state.get_biases()) << "\n";
   if(ctx.state.has_biases() && ctx.state.get_active() != ctx.state._first_bias) {
     std::ostringstream oss;
     oss << "Active player changed after biasing. Active=" << static_cast<int>(ctx.state.get_active()) << ", First bias="
@@ -657,16 +662,15 @@ int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& ctx
   }
   SlimPokerState curr_state = ctx.state;
   const TreeStorageNode<uint8_t>* node = ctx.bp_node;
-  int it = 0;
-  while(!curr_state.is_terminal() && !curr_state.get_players()[ctx.i].has_folded() && it++ < 30) {
+  while(!curr_state.is_terminal() && !curr_state.get_players()[ctx.i].has_folded()) {
     Action ra = next_rollout_action(ctx.indexers[curr_state.get_active()], curr_state, ctx.hands[curr_state.get_active()],
       ctx.board, node);
-    std::cout << "Rollout action: " << ra.to_string() << "\n";
+    // std::cout << "Rollout action: " << ra.to_string() << "\n";
     curr_state.apply_in_place(ra);
     if(!curr_state.is_terminal()) node = node->apply(ra);
-    std::cout << "Applied:\n" << curr_state.to_string();
-    std::cout << "Is terminal: " << curr_state.is_terminal() << "\n";
-    std::cout << ctx.i << " folded: " << curr_state.get_players()[ctx.i].has_folded() << "\n";
+    // std::cout << "Applied:\n" << curr_state.to_string();
+    // std::cout << "Is terminal: " << curr_state.is_terminal() << "\n";
+    // std::cout << ctx.i << " folded: " << curr_state.get_players()[ctx.i].has_folded() << "\n";
   }
   return utility(curr_state, ctx.i, ctx.board, ctx.hands, this->get_config().init_chips[ctx.i], this->get_config().rake, ctx.eval);
 }

@@ -522,37 +522,33 @@ double fractional_bet_size(const SlimPokerState& state, const int total_size) {
   return raise_size / pot_size;
 }
 
+bool is_action_valid(const Action a, const SlimPokerState& state) {
+  const Player& player = state.get_players()[state.get_active()];
+  if(a == Action::CHECK_CALL) return true;
+  if(a == Action::FOLD) return player.get_betsize() < state.get_max_bet() && player.get_chips() > 0;
+  if(state.n_players_with_chips() == 1) return false;
+  const int total_bet = total_bet_size(state, a);
+  const int required = total_bet - player.get_betsize();
+  // TODO: bets below the min_raise are allowed when no one has bet yet and the player's stack is less than the min_raise
+  // TODO: what about when a previous player has bet all-in less than the min raise - can the next player raise less than the min raise if his stack is
+  //       less than the min_raise? is the next min raise decreased due to the all-in raise?
+  if(required <= player.get_chips() && total_bet - state.get_max_bet() >= state.get_min_raise()) {
+    bool can_bet = false;
+    for(int p_idx = 0; p_idx < state.get_players().size(); ++p_idx) {
+      const Player& opponent = state.get_players()[p_idx];
+      can_bet |= !opponent.has_folded() && p_idx != state.get_active() && opponent.get_betsize() + opponent.get_chips() > state.get_max_bet();
+    }
+    if(can_bet) return true;
+  }
+  return false;
+}
+
 std::vector<Action> valid_actions(const SlimPokerState& state, const ActionProfile& profile) {
   const std::vector<Action>& actions = profile.get_actions(state);
   std::vector<Action> valid;
   valid.reserve(actions.size());
-  const Player& player = state.get_players()[state.get_active()];
-  for(Action a : actions) {
-    if(a == Action::CHECK_CALL) {
-      valid.push_back(a);
-      continue;
-    }
-    if(a == Action::FOLD) {
-      if(player.get_betsize() < state.get_max_bet() && player.get_chips() > 0) {
-        valid.push_back(a);
-      }
-      continue;
-    }
-    if(state.n_players_with_chips() == 1) continue;
-
-    const int total_bet = total_bet_size(state, a);
-    const int required = total_bet - player.get_betsize();
-    // TODO: bets below the min_raise are allowed when no one has bet yet and the player's stack is less than the min_raise
-    // TODO: what about when a previous player has bet all-in less than the min raise - can the next player raise less than the min raise if his stack is
-    //       less than the min_raise? is the next min raise decreased due to the all-in raise?
-    if(required <= player.get_chips() && total_bet - state.get_max_bet() >= state.get_min_raise()) {
-      bool can_bet = false;
-      for(int p_idx = 0; p_idx < state.get_players().size(); ++p_idx) {
-        const Player& opponent = state.get_players()[p_idx];
-        can_bet |= !opponent.has_folded() && p_idx != state.get_active() && opponent.get_betsize() + opponent.get_chips() > state.get_max_bet();
-      }
-      if(can_bet) valid.push_back(a);
-    }
+  for(const Action a : actions) {
+    if(is_action_valid(a, state)) valid.push_back(a);
   }
   return valid;
 }

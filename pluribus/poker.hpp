@@ -384,6 +384,7 @@ private:
 inline std::string pos_to_str(const SlimPokerState& state) { return pos_to_str(state.get_active(), state.get_players().size(), state.is_straddle()); }
 int total_bet_size(const SlimPokerState& state, Action action);
 double fractional_bet_size(const SlimPokerState& state, int total_size);
+bool is_action_valid(Action a, const SlimPokerState& state);
 std::vector<Action> valid_actions(const SlimPokerState& state, const ActionProfile& profile);
 int round_of_last_action(const SlimPokerState& state);
 int showdown_payoff(const SlimPokerState& state, int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
