@@ -117,7 +117,7 @@ Solution Pluribus::solution(const Hand& hand) const {
 void Pluribus::save_range(const std::string& fn) {
   PngRangeViewer viewer{fn};
   const RealTimeDecision decision{*_preflop_bp, _solver};
-  std::cout << "Applying live actions...\n"
+  std::cout << "Applying live actions...\n";
   const TreeStorageNode<uint8_t>* node = node->apply(_mapped_live_actions.get_history());
   auto live_ranges = _ranges;
   PokerState curr_state = _root_state;
