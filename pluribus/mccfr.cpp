@@ -629,7 +629,8 @@ RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlue
 
 template<template <typename> class StorageT>
 const StorageT<uint8_t>* RealTimeSolver<StorageT>::next_bp_node(const Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) {
-  return !_rt_config.is_terminal() && !state.apply_copy(a).is_terminal() ? bp_node->apply(translate_pseudo_harmonic(a, bp_node->get_branching_actions(), state)) : nullptr;
+  if(_rt_config.is_terminal() || state.apply_copy(a).is_terminal()) return nullptr;
+  return !is_bias(a) ? bp_node->apply(translate_pseudo_harmonic(a, bp_node->get_branching_actions(), state)) : bp_node;
 }
 
 template <template<typename> class StorageT>
