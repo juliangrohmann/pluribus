@@ -172,10 +172,6 @@ void RangeViewer::render_range(const RenderableRange* range, const RenderableRan
       const float rel_freq = !base_range ? 1.0f : range->get_matrix()[row][col] / base_range->get_matrix()[row][col];
       render_hand(range->get_color(), row, col, freq, rel_freq, offset_matrix[row][col]);
       if(base_range) offset_matrix[row][col] += static_cast<int>(round(_field_sz * rel_freq));
-      
-      if(row == 0 && col == 2 && base_range) {
-        std::cout << "action=" << range->get_label() << ", freq=" << freq << ", rel_freq=" << rel_freq << ", matrix=" << range->get_matrix()[row][col] << ", base_matrix=" << base_range->get_matrix()[row][col] << "\n";
-      }
     }
   }
 }
