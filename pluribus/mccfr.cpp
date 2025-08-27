@@ -81,7 +81,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
 
   Logger::log("Training blueprint from " + std::to_string(_t) + " to " + std::to_string(T));
   std::ostringstream buf;
-  while(_t < T && !is_interrupted()) {
+  while(_t < T) {
     long init_t = _t;
     _t = next_step(_t, T); 
     auto interval_start = std::chrono::high_resolution_clock::now();
@@ -91,13 +91,12 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
     if(is_debug) omp_set_num_threads(1);
     #pragma omp parallel for schedule(dynamic, 1)
     for(long t = init_t; t < _t; ++t) {
-      #pragma omp cancel for if(is_interrupted())
+      if(is_interrupted()) continue;
       thread_local omp::HandEvaluator eval;
       thread_local Board board;
       thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board, get_config().dead_ranges};
       if(is_debug) Logger::log("============== t = " + std::to_string(t) + " ==============");
       if(should_log(t)) {
-        #pragma omp cancellation point for
         std::ostringstream metrics_fn;
         metrics_fn << std::setprecision(1) << std::fixed << t / 1'000'000.0 << ".json";
         write_to_file(_metrics_dir / metrics_fn.str(), track_wandb_metrics(t));
@@ -124,25 +123,24 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         }
       }
     }
-    if(!is_interrupted()) {
-      auto interval_end = std::chrono::high_resolution_clock::now();
-      buf << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
+    if(is_interrupted()) break;
+    auto interval_end = std::chrono::high_resolution_clock::now();
+    buf << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
+    Logger::dump(buf);
+    if(should_discount(_t) && !is_interrupted()) {
+      Logger::log("============== Discounting ==============");
+      double d = get_discount_factor(_t);
+      buf << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
       Logger::dump(buf);
-      if(should_discount(_t) && !is_interrupted()) {
-        Logger::log("============== Discounting ==============");
-        double d = get_discount_factor(_t);
-        buf << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
-        Logger::dump(buf);
-        init_regret_storage()->lcfr_discount(d);
-        if(StorageT<float>* init_avg = init_avg_storage()) init_avg->lcfr_discount(d);
-      }
-      if(should_snapshot(_t, T)) {
-        std::ostringstream fn_stream;
-        Logger::log("============== Saving snapshot ==============");
-        fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
-        save_snapshot((_snapshot_dir / fn_stream.str()).string());
-        on_snapshot();
-      }
+      init_regret_storage()->lcfr_discount(d);
+      if(StorageT<float>* init_avg = init_avg_storage()) init_avg->lcfr_discount(d);
+    }
+    if(should_snapshot(_t, T)) {
+      std::ostringstream fn_stream;
+      Logger::log("============== Saving snapshot ==============");
+      fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
+      save_snapshot((_snapshot_dir / fn_stream.str()).string());
+      on_snapshot();
     }
   }
   Logger::log(is_interrupted() ? "====================== Interrupted ======================" : "============== Blueprint training complete ==============");

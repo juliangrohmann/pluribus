@@ -275,7 +275,7 @@ protected:
   bool should_discount(const long t) const override { return t % _rt_config.discount_interval == 0; }
   bool should_snapshot(long t, long T) const override { return false; }
   bool should_log(const long t) const override { return (t + 1) % _rt_config.log_interval == 0; }
-  long next_step(const long t, const long T) const override { return _rt_config.next_discount_step(t, T); }
+  long next_step(const long t, const long T) const override { return std::min(_rt_config.next_discount_step(t, T), t + 20'000'000); }
 
   int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
   double get_discount_factor(const long t) const override { return _rt_config.get_discount_factor(t); }
