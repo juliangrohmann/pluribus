@@ -646,6 +646,8 @@ Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, con
 
 template <template<typename> class StorageT>
 int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& ctx) const {
+  std::cout << "Calculating terminal utility...\n";
+  std::cout << "Biases=" << actions_to_str(ctx.state.get_biases()) << "\n";
   if(ctx.state.has_biases() && ctx.state.get_active() != ctx.state._first_bias) {
     std::ostringstream oss;
     oss << "Active player changed after biasing. Active=" << static_cast<int>(ctx.state.get_active()) << ", First bias="
@@ -655,8 +657,10 @@ int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& ctx
   }
   SlimPokerState curr_state = ctx.state;
   while(!curr_state.is_terminal() && !curr_state.get_players()[ctx.i].has_folded()) {
-    curr_state.apply_in_place(next_rollout_action(ctx.indexers[curr_state.get_active()], curr_state, ctx.hands[curr_state.get_active()],
-      ctx.board, ctx.bp_node));
+    Action ra = next_rollout_action(ctx.indexers[curr_state.get_active()], curr_state, ctx.hands[curr_state.get_active()],
+      ctx.board, ctx.bp_node);
+    std::cout << "Rollout action: " << ra.to_string() << "\n";
+    curr_state.apply_in_place(ra);
   }
   return utility(curr_state, ctx.i, ctx.board, ctx.hands, this->get_config().init_chips[ctx.i], this->get_config().rake, ctx.eval);
 }
