@@ -1,4 +1,4 @@
-find_package(OpenMP REQUIRED)
+find_package(OpenMP REQUIRED COMPONENTS CXX)
 find_package(TBB REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
@@ -6,6 +6,15 @@ find_package(GSL REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SDL2_TTF REQUIRED SDL2_ttf)
+
+if(NOT DEFINED OpenMP_CXX_SPEC_DATE)
+    message(FATAL_ERROR "CMake’s OpenMP module did not provide SPEC_DATE; upgrade CMake or use Option B.")
+endif()
+if(OpenMP_CXX_SPEC_DATE LESS 201307)
+    message(FATAL_ERROR
+            "OpenMP 4.0+ required. Detected spec date: ${OpenMP_CXX_SPEC_DATE} "
+            "(version ${OpenMP_CXX_VERSION}).")
+endif()
 
 add_library(
   PluribusLib
