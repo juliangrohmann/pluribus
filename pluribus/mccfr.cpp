@@ -642,6 +642,9 @@ Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, con
   // std::cout << "Bias offset=" << static_cast<int>(bias_offset) << "\n";
   const Action action = _bp->decompress_action(node->get(cluster, bias_offset)->load());
   const auto& player = state.get_players()[state.get_active()];
+  if(action == Action::FOLD) {
+    return !is_action_valid(action, state) ? Action::CHECK_CALL : action;
+  }
   if(action.get_bet_type() > 0.0f && total_bet_size(state, action) > player.get_betsize() + player.get_chips()) {
     return is_action_valid(Action::ALL_IN, state) ? Action::ALL_IN : Action::CHECK_CALL;
   }

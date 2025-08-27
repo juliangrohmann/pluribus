@@ -126,23 +126,6 @@ void fill_from_profile(ActionProfile& to_profile, const ActionProfile& from_prof
   }
 }
 
-RingLiveProfile::RingLiveProfile(const int n_players) : ActionProfile{n_players} {
-  fill_from_profile(*this, RingBlueprintProfile{n_players}, 1);
-  for(int pos = 0; pos < n_players; ++pos) {
-    for(int in_position = 0; in_position <= 1; ++in_position) {
-      const bool is_in_pos = static_cast<bool>(in_position);
-      set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action{1.25f}, Action{1.50f}, Action::ALL_IN},
-        2, 0, pos, is_in_pos); // turn bet
-      set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action{1.50f}, Action{2.00f}, Action::ALL_IN},
-        3, 0, pos, is_in_pos); // river bet
-      for(int bet_level = 1; bet_level <= 4; ++bet_level) {
-        set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 2, 1, pos, is_in_pos); // turn raise
-        set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 3, 1, pos, is_in_pos); // river raise
-      }
-    }
-  }
-}
-
 WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players, const bool fine_grained) : ActionProfile{n_players} {
   // preflop RFI & isos
   for(int pos = 0; pos < 3; ++pos) set_actions(single_size(0.75), 0, 1, pos);
@@ -199,6 +182,40 @@ WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players, co
   // river
   set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 3, 0, 0);
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 3, 1, 0);
+}
+
+HeadsUpLiveProfile::HeadsUpLiveProfile() : ActionProfile{2} {
+  fill_from_profile(*this, HeadsUpBlueprintProfile{10'000}, 1);
+  for(int pos = 0; pos < n_players(); ++pos) {
+    for(int in_position = 0; in_position <= 1; ++in_position) {
+      const bool is_in_pos = static_cast<bool>(in_position);
+      set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action{1.25f}, Action{1.50f}, Action::ALL_IN},
+        2, 0, pos, is_in_pos); // turn bet
+      set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action{1.50f}, Action{2.00f}, Action::ALL_IN},
+        3, 0, pos, is_in_pos); // river bet
+      for(int bet_level = 1; bet_level <= 4; ++bet_level) {
+        set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 2, 1, pos, is_in_pos); // turn raise
+        set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 3, 1, pos, is_in_pos); // river raise
+      }
+    }
+  }
+}
+
+RingLiveProfile::RingLiveProfile(const int n_players) : ActionProfile{n_players} {
+  fill_from_profile(*this, RingBlueprintProfile{n_players}, 1);
+  for(int pos = 0; pos < n_players; ++pos) {
+    for(int in_position = 0; in_position <= 1; ++in_position) {
+      const bool is_in_pos = static_cast<bool>(in_position);
+      set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action{1.25f}, Action{1.50f}, Action::ALL_IN},
+        2, 0, pos, is_in_pos); // turn bet
+      set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action{1.50f}, Action{2.00f}, Action::ALL_IN},
+        3, 0, pos, is_in_pos); // river bet
+      for(int bet_level = 1; bet_level <= 4; ++bet_level) {
+        set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 2, 1, pos, is_in_pos); // turn raise
+        set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 3, 1, pos, is_in_pos); // river raise
+      }
+    }
+  }
 }
 
 }

@@ -21,8 +21,9 @@ private:
   const std::shared_ptr<const Solver> _solver;
 };
 
-Pluribus::Pluribus(const std::shared_ptr<const LosslessBlueprint>& preflop_bp, const std::shared_ptr<const SampledBlueprint>& sampled_bp)
-    : _preflop_bp{preflop_bp}, _sampled_bp{sampled_bp} {
+Pluribus::Pluribus(const ActionProfile& live_profile, const std::shared_ptr<const LosslessBlueprint>& preflop_bp,
+  const std::shared_ptr<const SampledBlueprint>& sampled_bp)
+    : _preflop_bp{preflop_bp}, _sampled_bp{sampled_bp}, _init_profile{live_profile} {
   Logger::log("Pluribus action profile:\n" + _sampled_bp->get_config().action_profile.to_string());
   Logger::log((HoleCardIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hole card indexer."});
   Logger::log((HandIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hand indexer."});
@@ -57,7 +58,7 @@ void Pluribus::new_game(const std::vector<int>& stacks) {
   _root_state = _real_state;
   _mapped_bp_actions = ActionHistory{};
   _mapped_live_actions = ActionHistory{};
-  _live_profile = _sampled_bp->get_config().action_profile; // TODO: use more actions in live solver than blueprint
+  _live_profile = _init_profile;
 
   Logger::log("Real state/Root state:\n" + _root_state.to_string());
   const int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;

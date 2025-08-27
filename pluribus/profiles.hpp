@@ -24,6 +24,11 @@ public:
   explicit WPTGoldRingBlueprintProfile(int n_players, bool fine_grained);
 };
 
+class HeadsUpLiveProfile : public ActionProfile {
+public:
+  explicit HeadsUpLiveProfile();
+};
+
 class RingLiveProfile : public ActionProfile {
 public:
   explicit RingLiveProfile(int n_players);
