@@ -129,7 +129,7 @@ void Pluribus::_enqueue_job() {
   RealTimeSolverConfig rt_config;
   rt_config.bias_profile = BiasActionProfile{};
   rt_config.init_actions = _mapped_bp_actions.get_history();
-  rt_config.terminal_round = terminal_round(_root_state); // TODO: solve multiple rounds
+  rt_config.terminal_round = terminal_round(_root_state);
   rt_config.terminal_bet_level = _root_state.get_round() + 1;
   rt_config.terminal_bet_level = 999;
   SolveJob job{config, rt_config};
@@ -202,24 +202,17 @@ void Pluribus::_update_root() {
   if(_root_state.get_action_history().size() != _mapped_bp_actions.size()) {
     Logger::error("Mapped action length mismatch!\nRoot: " + _root_state.get_action_history().to_string() + "\nMapped: " + _mapped_bp_actions.to_string());
   }
-  if(_should_solve(_root_state)) {
-    Logger::log("Should solve.");
-    // TODO: interrupt if solving
-    _enqueue_job();
-  }
-  else {
-    Logger::log("Should not solve.");
-  }
+  Logger::log("Enqueing solve.");
+  _enqueue_job();
 }
 
 bool Pluribus::_can_solve(const PokerState& root) const {
   return (root.get_round() > 0 || root.active_players() <= 4) && _board.size() >= n_board_cards(root.get_round());
 }
 
-bool Pluribus::_should_solve(const PokerState& root) const {
-  return _can_solve(root) && root.get_round() > 0 &&
-    (!_solver || _solver->get_real_time_config().terminal_round <= 3 || _solver->get_real_time_config().terminal_bet_level <= 99);
-}
+// bool Pluribus::_should_solve(const PokerState& root) const {
+  // return _can_solve(root) && root.get_round() > 0 && (!_solver || !_solver->get_real_time_config().is_terminal());
+// }
 
 void Pluribus::_start_worker() {
   if(_solver_thread.joinable()) return;
