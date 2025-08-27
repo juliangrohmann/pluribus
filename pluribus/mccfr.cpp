@@ -633,6 +633,7 @@ const StorageT<uint8_t>* RealTimeSolver<StorageT>::next_bp_node(const Action a, 
   for(const Action action : bp_node->get_branching_actions()) std::cout << action.to_string() << " (" << (bp_node->is_allocated(a) ? "" : "not") << " allocated), " << "\n";
   std::cout << "State:\n" << state.to_string() << "\n";
   std::cout << "Terminal: " << state.apply_copy(a).is_terminal() << "\n";
+  std::cout << "Next state:\n" << state.apply_copy(a).to_string() << "\n";
   return !state.apply_copy(a).is_terminal() ? bp_node->apply(translate_pseudo_harmonic(a, bp_node->get_branching_actions(), state)) : nullptr;
 }
 
