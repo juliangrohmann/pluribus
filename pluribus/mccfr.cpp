@@ -87,19 +87,20 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
     auto interval_start = std::chrono::high_resolution_clock::now();
     buf << std::setprecision(1) << std::fixed << "Next step: " << _t / 1'000'000.0 << "M\n"; 
     Logger::dump(buf);
-
+    auto t_0 = std::chrono::high_resolution_clock::now();
     if(is_debug) omp_set_num_threads(1);
     #pragma omp parallel for schedule(dynamic, 1)
     for(long t = init_t; t < _t; ++t) {
+      #pragma omp cancel for if(is_interrupted())
       thread_local omp::HandEvaluator eval;
       thread_local Board board;
       thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board, get_config().dead_ranges};
-      #pragma omp cancel for if(is_interrupted())
       if(is_debug) Logger::log("============== t = " + std::to_string(t) + " ==============");
       if(should_log(t)) {
         std::ostringstream metrics_fn;
         metrics_fn << std::setprecision(1) << std::fixed << t / 1'000'000.0 << ".json";
         write_to_file(_metrics_dir / metrics_fn.str(), track_wandb_metrics(t));
+        Logger::log(progress_str(t - init_t, _t - init_t, t_0));
       }
       for(int i = 0; i < get_config().poker.n_players; ++i) {
         #pragma omp cancellation point for
