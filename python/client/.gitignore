@@ -1,4 +1,4 @@
 img_debug/
 trt_cache/
 resources/*.onnx
-*.confg
+*.config
