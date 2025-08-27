@@ -92,7 +92,7 @@ struct RealTimeTimingConfig {
 };
 
 struct RealTimeSolverConfig : DiscountConfig {
-  explicit RealTimeSolverConfig(const RealTimeTimingConfig& timings = RealTimeTimingConfig{}, long it_per_sec = 500'000);
+  explicit RealTimeSolverConfig(const RealTimeTimingConfig& timings = RealTimeTimingConfig{}, long it_per_sec = 750'000);
 
   std::string to_string() const;
   void set_iterations(const RealTimeTimingConfig& timings, long it_per_sec);
