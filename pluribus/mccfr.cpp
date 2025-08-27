@@ -85,7 +85,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
     long init_t = _t;
     _t = next_step(_t, T); 
     auto interval_start = std::chrono::high_resolution_clock::now();
-    buf << std::setprecision(1) << std::fixed << "Next step: " << _t / 1'000'000.0 << "M\n"; 
+    buf << std::setprecision(1) << std::fixed << "Next step: " << _t / 1'000'000.0 << "M";
     Logger::dump(buf);
     auto t_0 = std::chrono::high_resolution_clock::now();
     if(is_debug) omp_set_num_threads(1);
@@ -125,12 +125,12 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
     }
     if(is_interrupted()) break;
     auto interval_end = std::chrono::high_resolution_clock::now();
-    buf << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
+    buf << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.";
     Logger::dump(buf);
     if(should_discount(_t) && !is_interrupted()) {
       Logger::log("============== Discounting ==============");
       double d = get_discount_factor(_t);
-      buf << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
+      buf << std::setprecision(2) << std::fixed << "Discount factor: " << d;
       Logger::dump(buf);
       init_regret_storage()->lcfr_discount(d);
       if(StorageT<float>* init_avg = init_avg_storage()) init_avg->lcfr_discount(d);
