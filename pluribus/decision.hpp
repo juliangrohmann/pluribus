@@ -23,7 +23,7 @@ public:
 
   float frequency(Action a, const PokerState& state, const Board& board, const Hand& hand) const override {
     if(!state.get_action_history().is_consistent(_init_state.get_action_history())) {
-      Logger::error("Cannot compute TreeSolver frequency for inconsistent histories:\nInitial state: "  
+      Logger::error("Cannot compute TreeSolver frequency for inconsistent histories:\nInitial state: "
         + _init_state.get_action_history().to_string() + "\nGiven state: " + state.get_action_history().to_string());
     }
     const TreeStorageNode<T>* node = _root;
@@ -32,8 +32,10 @@ public:
     }
     int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), board, hand);
     auto freq = calculate_strategy(node->get(cluster), node->get_value_actions().size());
-    std::cout << "a=" << a.to_string() << ", value_actions=\n";
-    for(Action va : node->get_value_actions()) std::cout << a.to_string() << "\n";
+    if(std::ranges::find(node->get_value_actions(), a) == node->get_value_actions().end()) {
+      std::cout << "a=" << a.to_string() << ", value_actions=\n";
+      for(Action va : node->get_value_actions()) std::cout << va.to_string() << "\n";
+    }
     return freq[index_of(a, node->get_value_actions())];
   }
 
@@ -52,28 +54,14 @@ public:
 
 class LosslessActionProvider : public ActionProvider<LosslessBlueprint> {
 public:
-  Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board, const LosslessBlueprint* bp) const override {
-    const hand_index_t hand_idx = indexer.index(board, hands[state.get_active()], state.get_round());
-    const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
-    const std::vector<Action> history = state.get_action_history().slice(bp->get_config().init_state.get_action_history().size()).get_history();
-    const TreeStorageNode<float>* node = bp->get_strategy()->apply(history);
-    const std::atomic<float>* base_ptr = node->get(cluster);
-
-    const auto freq = calculate_strategy(base_ptr, node->get_value_actions().size());
-    return node->get_value_actions()[sample_action_idx(freq.data(), freq.size())];
-  }
+  Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board,
+    const LosslessBlueprint* bp) const override;
 };
 
 class SampledActionProvider : public ActionProvider<SampledBlueprint> {
 public:
-  Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board, const SampledBlueprint* bp) const override {
-    const hand_index_t hand_idx = indexer.index(board, hands[state.get_active()], state.get_round());
-    const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
-    const std::vector<Action> history = state.get_action_history().slice(bp->get_config().init_state.get_action_history().size()).get_history();
-    const TreeStorageNode<uint8_t>* node = bp->get_strategy()->apply(history);
-    const uint8_t bias_offset = bp->bias_offset(state.get_biases()[state.get_active()]);
-    return bp->decompress_action(node->get(cluster, bias_offset)->load());
-  }
+  Action next_action(CachedIndexer& indexer, const PokerState& state, const std::vector<Hand>& hands, const Board& board,
+    const SampledBlueprint* bp) const override;
 };
 
 }
