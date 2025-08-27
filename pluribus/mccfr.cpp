@@ -91,10 +91,10 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
     if(is_debug) omp_set_num_threads(1);
     #pragma omp parallel for schedule(dynamic, 1)
     for(long t = init_t; t < _t; ++t) {
-      #pragma omp cancel for if(is_interrupted())
       thread_local omp::HandEvaluator eval;
       thread_local Board board;
       thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board, get_config().dead_ranges};
+      if(is_interrupted()) break;
       if(is_debug) Logger::log("============== t = " + std::to_string(t) + " ==============");
       if(should_log(t)) {
         std::ostringstream metrics_fn;
@@ -103,7 +103,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         Logger::log(progress_str(t - init_t, _t - init_t, t_0));
       }
       for(int i = 0; i < get_config().poker.n_players; ++i) {
-        #pragma omp cancellation point for
+        if(is_interrupted()) break;
         if(is_debug) Logger::log("============== i = " + std::to_string(i) + " ==============");
         std::vector<CachedIndexer> indexers(get_config().poker.n_players);
         RoundSample sample = sampler.sample();
