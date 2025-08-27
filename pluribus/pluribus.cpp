@@ -225,7 +225,7 @@ void Pluribus::_solver_worker() {
     {
       std::unique_lock lk(_solver_mtx);
       _solver_cv.wait(lk, [&]{ return !_running_worker ? true : _pending_job.has_value(); });
-      if (!_running_worker) break;
+      if(!_running_worker) break;
       job.swap(_pending_job);
     }
     const auto local = std::make_shared<TreeRealTimeSolver>(job->cfg, job->rt_cfg, _sampled_bp);
@@ -234,6 +234,7 @@ void Pluribus::_solver_worker() {
       _solver = local;
     }
     local->solve(100'000'000'000L);
+    Logger::log("Fully interrupted.");
   }
 }
 
