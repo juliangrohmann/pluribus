@@ -10,8 +10,8 @@ struct TranslationResult {
   double p_A;
 };
 
-TranslationResult pseudo_harmonic_result(Action a, const std::vector<Action>& actions, const PokerState& state);
+TranslationResult pseudo_harmonic_result(Action a, const std::vector<Action>& actions, const SlimPokerState& state);
 Action sample(const TranslationResult& result);
-Action translate_pseudo_harmonic(Action a, const std::vector<Action>& actions, const PokerState& state);
+Action translate_pseudo_harmonic(Action a, const std::vector<Action>& actions, const SlimPokerState& state);
 
 }

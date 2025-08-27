@@ -4,7 +4,7 @@
 
 namespace pluribus {
 
-std::vector<std::pair<Action, double>> translatable_actions(const PokerState& state, const std::vector<Action>& actions) {
+std::vector<std::pair<Action, double>> translatable_actions(const SlimPokerState& state, const std::vector<Action>& actions) {
   std::vector<std::pair<Action, double>> translatable;
   for(Action a : actions) {
     if(a == Action::ALL_IN) translatable.emplace_back(a, fractional_bet_size(state, total_bet_size(state, Action::ALL_IN)));
@@ -14,7 +14,7 @@ std::vector<std::pair<Action, double>> translatable_actions(const PokerState& st
   return translatable;
 }
 
-TranslationResult pseudo_harmonic_result(const Action a, const std::vector<Action>& actions, const PokerState& state) {
+TranslationResult pseudo_harmonic_result(const Action a, const std::vector<Action>& actions, const SlimPokerState& state) {
   const double x = a != Action::ALL_IN ? a.get_bet_type() : fractional_bet_size(state, total_bet_size(state, Action::ALL_IN));
   if(x < 0.0) throw std::runtime_error("Cannot apply pseudo harmonic action translation to action: " + a.to_string());
   const auto translatable = translatable_actions(state, actions);
@@ -38,7 +38,7 @@ Action sample(const TranslationResult& result) {
   return GSLGlobalRNG::uniform() < result.p_A ? result.A : result.B;
 }
 
-Action translate_pseudo_harmonic(const Action a, const std::vector<Action>& actions, const PokerState& state) {
+Action translate_pseudo_harmonic(const Action a, const std::vector<Action>& actions, const SlimPokerState& state) {
   return sample(pseudo_harmonic_result(a, actions, state));
 }
 

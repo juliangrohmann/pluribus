@@ -58,12 +58,14 @@ struct MetricsConfig {
 template <template<typename> class StorageT>
 struct MCCFRContext {
   MCCFRContext(SlimPokerState& state_, const long t_, const int i_, const int consec_folds_, const Board& board_,
-      const std::vector<Hand>& hands_, std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_)
+      const std::vector<Hand>& hands_, std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_,
+      const StorageT<uint8_t>* bp_node_)
     : state{state_}, t{t_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
-      regret_storage{regret_storage_} {}
-  MCCFRContext(SlimPokerState& next_state, StorageT<int>* next_regret_storage, const int next_consec_folds, const MCCFRContext& context)
+      regret_storage{regret_storage_}, bp_node{bp_node_} {}
+  MCCFRContext(SlimPokerState& next_state, StorageT<int>* next_regret_storage, const StorageT<uint8_t>* next_bp_node, const int next_consec_folds,
+      const MCCFRContext& context)
     : state{next_state}, t{context.t}, i{context.i}, consec_folds{next_consec_folds}, board{context.board}, hands{context.hands},
-      indexers{context.indexers}, eval{context.eval}, regret_storage{next_regret_storage} {}
+      indexers{context.indexers}, eval{context.eval}, regret_storage{next_regret_storage}, bp_node{next_bp_node} {}
 
   SlimPokerState& state;
   const long t;
@@ -74,6 +76,7 @@ struct MCCFRContext {
   std::vector<CachedIndexer>& indexers;
   const omp::HandEvaluator& eval;
   StorageT<int>* regret_storage;
+  const StorageT<uint8_t>* bp_node;
 };
 
 template <template<typename> class StorageT>
@@ -135,8 +138,10 @@ protected:
   virtual std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, int cluster) = 0;
   virtual StorageT<int>* init_regret_storage() = 0;
   virtual StorageT<float>* init_avg_storage() = 0;
+  virtual const StorageT<uint8_t>* init_bp_node() = 0;
   virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, int action_idx, const SlimPokerState& next_state, int i) = 0;
   virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const SlimPokerState& next_state, int i) = 0;
+  virtual const StorageT<uint8_t>* next_bp_node(Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) = 0;
   virtual const std::vector<Action>& regret_branching_actions(StorageT<int>* storage) const = 0;
   virtual const std::vector<Action>& regret_value_actions(StorageT<int>* storage) const = 0;
   virtual const std::vector<Action>& avg_branching_actions(StorageT<float>* storage) const = 0;
@@ -212,7 +217,6 @@ public:
 
   BlueprintSolverConfig& get_blueprint_config() { return _bp_config; }
   void set_avg_metrics_config(const MetricsConfig& metrics_config) { _avg_metrics_config = metrics_config; }
-
   bool operator==(const BlueprintSolver& other) const { return MCCFRSolver<StorageT>::operator==(other) && _bp_config == other._bp_config; }
 
   template <class Archive>
@@ -239,6 +243,9 @@ protected:
 
   MetricsConfig get_avg_metrics_config() const { return _avg_metrics_config; }
 
+  const StorageT<uint8_t>* init_bp_node() override { return nullptr; }
+  const StorageT<uint8_t>* next_bp_node(Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) override { return bp_node; }
+
 private:
   MetricsConfig _avg_metrics_config;
   BlueprintSolverConfig _bp_config;
@@ -257,7 +264,7 @@ public:
   }
 
 protected:
-  int terminal_utility(const MCCFRContext<StorageT>& context) const override;
+  int terminal_utility(const MCCFRContext<StorageT>& ctx) const override;
   bool is_terminal(const SlimPokerState& state, int i) const override;
 
   void on_start() override { Logger::log("Real time solver config:\n" + _rt_config.to_string()); }
@@ -272,10 +279,13 @@ protected:
 
   std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, int cluster) override { return nullptr; }
   StorageT<float>* init_avg_storage() override { return nullptr; }
+  const StorageT<uint8_t>* init_bp_node() override { return _root_node; }
   StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const SlimPokerState& next_state, int i) override { return nullptr; }
+  const StorageT<uint8_t>* next_bp_node(Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) override;
 
 private:
-  Action next_rollout_action(CachedIndexer& indexer, const SlimPokerState& state, const Hand& hand, const Board& board) const;
+  Action next_rollout_action(CachedIndexer& indexer, const SlimPokerState& state, const Hand& hand, const Board& board,
+    const TreeStorageNode<uint8_t>* node) const;
 
   const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
   const TreeStorageNode<uint8_t>* _root_node = nullptr;

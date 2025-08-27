@@ -19,6 +19,8 @@
 #include <pluribus/util.hpp>
 #include <tqdm/tqdm.hpp>
 
+#include "translate.hpp"
+
 namespace pluribus {
 
 static constexpr int PRUNE_CUTOFF = -300'000'000;
@@ -113,14 +115,14 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         }
         on_step(t, i, sample.hands, indexers);
         SlimPokerState state{get_config().init_state};
-        MCCFRContext<StorageT> context{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage()};
+        MCCFRContext<StorageT> ctx{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), init_bp_node()};
         if(should_prune(t)) {
           if(is_debug) Logger::log("============== Traverse MCCFR-P ==============");
-          traverse_mccfr_p(context);
+          traverse_mccfr_p(ctx);
         }
         else {
           if(is_debug) Logger::log("============== Traverse MCCFR ==============");
-          traverse_mccfr(context);
+          traverse_mccfr(ctx);
         }
       }
     }
@@ -295,7 +297,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
         SlimPokerState next_state = ctx.state.apply_copy(a);
         const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
         const int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-            next_consec_folds(ctx.consec_folds, a), ctx});
+            next_bp_node(a, ctx.state, ctx.bp_node), next_consec_folds(ctx.consec_folds, a), ctx});
         const int v_r = std::max(regret, 0);
         values[a_idx] = v_a;
         v_exact += static_cast<double>(v_r) * static_cast<double>(v_a);
@@ -330,10 +332,11 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
+  auto next_node = next_bp_node(a, ctx.state, ctx.bp_node);
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
   return traverse_mccfr_p(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
-      next_consec_folds(ctx.consec_folds, a), ctx});
+      next_node, next_consec_folds(ctx.consec_folds, a), ctx});
 }
 
 template <template<typename> class StorageT>
@@ -363,7 +366,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
       const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
       SlimPokerState next_state = ctx.state.apply_copy(a);
       const int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-        next_consec_folds(ctx.consec_folds, a), ctx});
+        next_bp_node(a, ctx.state, ctx.bp_node), next_consec_folds(ctx.consec_folds, a), ctx});
       const int v_r = std::max(base_ptr[a_idx].load(std::memory_order_relaxed), 0);
       values[a_idx] = v_a;
       v_exact += static_cast<double>(v_r) * static_cast<double>(v_a);
@@ -392,10 +395,11 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
+  auto next_node = next_bp_node(a, ctx.state, ctx.bp_node);
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
   return traverse_mccfr(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
-      next_consec_folds(ctx.consec_folds, a), ctx});
+      next_node, next_consec_folds(ctx.consec_folds, a), ctx});
 }
 
 template <template<typename> class StorageT>
@@ -621,37 +625,37 @@ template <template<typename> class StorageT>
 RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlueprint>& bp, const RealTimeSolverConfig& rt_config)
     : _bp{bp}, _root_node{bp->get_strategy()->apply(rt_config.init_actions)}, _rt_config{rt_config} {}
 
+template<template <typename> class StorageT>
+const StorageT<uint8_t>* RealTimeSolver<StorageT>::next_bp_node(const Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) {
+  return bp_node->apply(translate_pseudo_harmonic(a, bp_node->get_branching_actions(), state));
+}
+
 template <template<typename> class StorageT>
-Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, const SlimPokerState& state, const Hand& hand, const Board& board) const {
+Action RealTimeSolver<StorageT>::next_rollout_action(CachedIndexer& indexer, const SlimPokerState& state, const Hand& hand, const Board& board,
+    const TreeStorageNode<uint8_t>* node) const {
   const hand_index_t hand_idx = indexer.index(board, hand, state.get_round());
   const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), hand_idx);
   // std::cout << "Rollout cluster=" << cluster << "\n";
-  // const std::vector<Action> history = state.get_action_history().slice(_rt_config.init_actions.size()).get_history(); TODO: uncomment
-  const std::vector<Action> history; // TODO: just a placeholder for SlimPokerState compatibility
-  // std::cout << "Live history=" << actions_to_str(history) << "\n";
-  // TODO: action translation
-  const TreeStorageNode<uint8_t>* node = _root_node->apply(history);
-  // std::cout << "Applied!\n";
   const uint8_t bias_offset = _bp->bias_offset(state.get_biases()[state.get_active()]);
   // std::cout << "Bias offset=" << static_cast<int>(bias_offset) << "\n";
   return _bp->decompress_action(node->get(cluster, bias_offset)->load());
 }
 
 template <template<typename> class StorageT>
-int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& context) const {
-  if(context.state.has_biases() && context.state.get_active() != context.state._first_bias) {
+int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& ctx) const {
+  if(ctx.state.has_biases() && ctx.state.get_active() != ctx.state._first_bias) {
     std::ostringstream oss;
-    oss << "Active player changed after biasing. Active=" << static_cast<int>(context.state.get_active()) << ", First bias="
-        << static_cast<int>(context.state._first_bias) << ", Biases=";
-    for(Action a : context.state.get_biases()) oss << a.to_string() << "  ";
+    oss << "Active player changed after biasing. Active=" << static_cast<int>(ctx.state.get_active()) << ", First bias="
+        << static_cast<int>(ctx.state._first_bias) << ", Biases=";
+    for(Action a : ctx.state.get_biases()) oss << a.to_string() << "  ";
     Logger::error(oss.str());
   }
-  SlimPokerState curr_state = context.state;
-  while(!curr_state.is_terminal() && !curr_state.get_players()[context.i].has_folded()) {
-    curr_state.apply_in_place(next_rollout_action(context.indexers[curr_state.get_active()], curr_state, context.hands[curr_state.get_active()],
-      context.board));
+  SlimPokerState curr_state = ctx.state;
+  while(!curr_state.is_terminal() && !curr_state.get_players()[ctx.i].has_folded()) {
+    curr_state.apply_in_place(next_rollout_action(ctx.indexers[curr_state.get_active()], curr_state, ctx.hands[curr_state.get_active()],
+      ctx.board, ctx.bp_node));
   }
-  return utility(curr_state, context.i, context.board, context.hands, this->get_config().init_chips[context.i], this->get_config().rake, context.eval);
+  return utility(curr_state, ctx.i, ctx.board, ctx.hands, this->get_config().init_chips[ctx.i], this->get_config().rake, ctx.eval);
 }
 
 template<template <typename> class StorageT>
