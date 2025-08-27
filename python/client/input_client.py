@@ -1,5 +1,6 @@
 import requests
 import argparse
+import time
 
 def cast(num_str, dt):
   try:
@@ -41,6 +42,9 @@ def solution(url, args=None):
     return None
   return requests.post(url + "solution", json={"hand": hand})
 
+def wait(_, args=None):
+  if args: time.sleep(cast(args[0], float))
+
 def dispatch_endpoint(args, endpoints):
   if matches := [e[1] for e in endpoints if e[0] == args[0]]:
     print(f"Response: {res.json() if (res := matches[0](root_url, args[1:])) else res}")
@@ -51,19 +55,20 @@ endpoints = [
   ("new_game", new_game),
   ("update_state", update_state),
   ("update_board", update_board),
-  ("solution", solution)
+  ("solution", solution),
+  ("wait", wait),
 ]
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("server", type=str)
-  args = parser.parse_args()
-  root_url = f"http://{args.server}:8080/"
-  while args := input("\nEndpoint: ").split(' '):
-    if args and args[0] == "config":
-      with open(args[1]) as f:
+  cmd_args = parser.parse_args()
+  root_url = f"http://{cmd_args.server}:8080/"
+  while cmd_args := input("\nEndpoint: ").split(' '):
+    if cmd_args and cmd_args[0] == "config":
+      with open(cmd_args[1]) as f:
         for line in f: dispatch_endpoint(line.split(' '), endpoints)
     else:
-      dispatch_endpoint(args, endpoints)
+      dispatch_endpoint(cmd_args, endpoints)
 
 
