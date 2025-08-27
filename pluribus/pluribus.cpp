@@ -24,6 +24,10 @@ private:
 Pluribus::Pluribus(const std::shared_ptr<const LosslessBlueprint>& preflop_bp, const std::shared_ptr<const SampledBlueprint>& sampled_bp)
     : _preflop_bp{preflop_bp}, _sampled_bp{sampled_bp} {
   Logger::log("Pluribus action profile:\n" + _sampled_bp->get_config().action_profile.to_string());
+  Logger::log((HoleCardIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hole card indexer."});
+  Logger::log((HandIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hand indexer."});
+  Logger::log((BlueprintClusterMap::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" blueprint cluster map."});
+  // Logger::log((RealTimeClusterMap::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" real time cluster map."});
 }
 
 void Pluribus::new_game(const std::vector<int>& stacks) {
