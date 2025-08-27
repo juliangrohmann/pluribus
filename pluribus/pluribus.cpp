@@ -28,6 +28,18 @@ Pluribus::Pluribus(const std::shared_ptr<const LosslessBlueprint>& preflop_bp, c
   Logger::log((HandIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hand indexer."});
   Logger::log((BlueprintClusterMap::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" blueprint cluster map."});
   // Logger::log((RealTimeClusterMap::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" real time cluster map."});
+  _start_worker();
+}
+
+Pluribus::~Pluribus() {
+  {
+    std::lock_guard lk(_solver_mtx);
+    _running_worker = false;
+    _pending_job.reset();
+    if(_solver) _solver->interrupt();
+  }
+  _solver_cv.notify_all();
+  if(_solver_thread.joinable()) _solver_thread.join();
 }
 
 void Pluribus::new_game(const std::vector<int>& stacks) {
@@ -106,7 +118,7 @@ int terminal_round(const PokerState& root) {
   return root.get_round() >= 2 || (root.get_round() == 1 && root.active_players() == 2) ? 4 : root.get_round() + 1;
 }
 
-void Pluribus::_init_solver() {
+void Pluribus::_enqueue_job() {
   Logger::log("Initializing solver: MappedRealTimeSolver");
   SolverConfig config{_sampled_bp->get_config().poker, _live_profile};
   config.rake = _sampled_bp->get_config().rake;
@@ -120,7 +132,13 @@ void Pluribus::_init_solver() {
   rt_config.terminal_round = terminal_round(_root_state); // TODO: solve multiple rounds
   rt_config.terminal_bet_level = _root_state.get_round() + 1;
   rt_config.terminal_bet_level = 999;
-  _solver = std::unique_ptr<TreeRealTimeSolver>{new TreeRealTimeSolver{config, rt_config, _sampled_bp}};
+  SolveJob job{config, rt_config};
+  {
+    std::lock_guard lk(_solver_mtx);
+    if(_solver) _solver->interrupt();
+    _pending_job = std::move(job);
+  }
+  _solver_cv.notify_one();
 }
 
 bool is_off_tree(Action a, const PokerState& state, const ActionProfile& profile) {
@@ -187,8 +205,7 @@ void Pluribus::_update_root() {
   if(_should_solve(_root_state)) {
     Logger::log("Should solve.");
     // TODO: interrupt if solving
-    _init_solver();
-    _solver->solve(100'000'000'000L);
+    _enqueue_job();
   }
   else {
     Logger::log("Should not solve.");
@@ -202,6 +219,29 @@ bool Pluribus::_can_solve(const PokerState& root) const {
 bool Pluribus::_should_solve(const PokerState& root) const {
   return _can_solve(root) && root.get_round() > 0 &&
     (!_solver || _solver->get_real_time_config().terminal_round <= 3 || _solver->get_real_time_config().terminal_bet_level <= 99);
+}
+
+void Pluribus::_start_worker() {
+  if(_solver_thread.joinable()) return;
+  _solver_thread = std::thread{[this]{ _solver_worker(); }};
+}
+
+void Pluribus::_solver_worker() {
+  while(true) {
+    std::optional<SolveJob> job;
+    {
+      std::unique_lock lk(_solver_mtx);
+      _solver_cv.wait(lk, [&]{ return !_running_worker ? true : _pending_job.has_value(); });
+      if (!_running_worker) break;
+      job.swap(_pending_job);
+    }
+    const auto local = std::make_shared<TreeRealTimeSolver>(job->cfg, job->rt_cfg, _sampled_bp);
+    {
+      std::lock_guard lk(_solver_mtx);
+      _solver = local;
+    }
+    local->solve(100'000'000'000L);
+  }
 }
 
 }

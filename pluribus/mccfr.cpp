@@ -94,6 +94,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       thread_local omp::HandEvaluator eval;
       thread_local Board board;
       thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board, get_config().dead_ranges};
+      #pragma omp cancel for if(is_interrupted())
       if(is_debug) Logger::log("============== t = " + std::to_string(t) + " ==============");
       if(should_log(t)) {
         std::ostringstream metrics_fn;
@@ -101,6 +102,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         write_to_file(_metrics_dir / metrics_fn.str(), track_wandb_metrics(t));
       }
       for(int i = 0; i < get_config().poker.n_players; ++i) {
+        #pragma omp cancellation point for
         if(is_debug) Logger::log("============== i = " + std::to_string(i) + " ==============");
         std::vector<CachedIndexer> indexers(get_config().poker.n_players);
         RoundSample sample = sampler.sample();
@@ -121,11 +123,11 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         }
       }
     }
-    
+    if(is_interrupted()) break;
     auto interval_end = std::chrono::high_resolution_clock::now();
     buf << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
     Logger::dump(buf);
-    if(should_discount(_t)) {
+    if(should_discount(_t) && !is_interrupted()) {
       Logger::log("============== Discounting ==============");
       double d = get_discount_factor(_t);
       buf << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
@@ -141,8 +143,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       on_snapshot();
     }
   }
-
-  Logger::log("============== Blueprint training complete ==============");
+  Logger::log(is_interrupted() ? "====================== Interrupted ======================" : "============== Blueprint training complete ==============");
 }
 
 template<template <typename> class StorageT>

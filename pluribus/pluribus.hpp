@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <condition_variable>
 #include <pluribus/blueprint.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/poker.hpp>
@@ -15,17 +16,21 @@ struct Solution  {
 class Pluribus {
 public:
   Pluribus(const std::shared_ptr<const LosslessBlueprint>& preflop_bp, const std::shared_ptr<const SampledBlueprint>& sampled_bp);
+  ~Pluribus();
   void new_game(const std::vector<int>& stacks);
   void update_state(Action action, int pos);
   void update_board(const std::vector<uint8_t>& updated_board);
   Solution solution(const Hand& hand) const;
 
 private:
-  void _init_solver();
+  void _enqueue_job();
   void _apply_action(Action a);
   void _update_root();
   bool _can_solve(const PokerState& root) const;
   bool _should_solve(const PokerState& root) const;
+
+  void _solver_worker();
+  void _start_worker();
 
   const std::shared_ptr<const LosslessBlueprint> _preflop_bp = nullptr;
   const std::shared_ptr<const SampledBlueprint> _sampled_bp = nullptr;
@@ -40,6 +45,17 @@ private:
   std::filesystem::path _log_file;
   int _hero_pos = -1;
   int _game_idx = 0;
+
+  struct SolveJob {
+    SolverConfig cfg;
+    RealTimeSolverConfig rt_cfg;
+  };
+
+  std::thread _solver_thread;
+  std::mutex _solver_mtx;
+  std::condition_variable _solver_cv;
+  std::optional<SolveJob> _pending_job;
+  bool _running_worker = true;
 };
   
 }

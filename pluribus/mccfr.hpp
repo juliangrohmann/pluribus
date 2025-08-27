@@ -110,6 +110,8 @@ public:
   void set_metrics_dir(const std::string& metrics_dir) { _metrics_dir = metrics_dir; }
   void set_log_dir(const std::string& log_dir) { _log_dir = log_dir; }
   void set_regret_metrics_config(const MetricsConfig& metrics_config) { _regret_metrics_config = metrics_config; }
+  void interrupt() { _interrupt.store(true, std::memory_order_relaxed); }
+  bool is_interrupted() const { return _interrupt.load(std::memory_order_relaxed); }
 
   bool operator==(const MCCFRSolver& other) const { return Solver::operator==(other) && _t == other._t; }
 
@@ -174,6 +176,7 @@ private:
   std::filesystem::path _metrics_dir = "metrics";
   std::filesystem::path _log_dir = "logs";
   MetricsConfig _regret_metrics_config;
+  std::atomic<bool> _interrupt = false;
 };
 
 class TreeSolver : virtual public MCCFRSolver<TreeStorageNode>, public Strategy<int> {
