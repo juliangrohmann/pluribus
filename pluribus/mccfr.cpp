@@ -91,12 +91,14 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
     if(is_debug) omp_set_num_threads(1);
     #pragma omp parallel for schedule(dynamic, 1)
     for(long t = init_t; t < _t; ++t) {
+      #pragma omp cancel for if(is_interrupted())
       thread_local omp::HandEvaluator eval;
       thread_local Board board;
       thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board, get_config().dead_ranges};
       if(is_interrupted()) continue;
       if(is_debug) Logger::log("============== t = " + std::to_string(t) + " ==============");
       if(should_log(t)) {
+        #pragma omp cancellation point for
         std::ostringstream metrics_fn;
         metrics_fn << std::setprecision(1) << std::fixed << t / 1'000'000.0 << ".json";
         write_to_file(_metrics_dir / metrics_fn.str(), track_wandb_metrics(t));
