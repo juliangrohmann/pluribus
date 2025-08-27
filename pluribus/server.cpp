@@ -18,6 +18,7 @@ void PluribusServer::start() {
   _running = true;
   _dispatch_thread = std::thread{[this] { this->dispatch_commands(); }};
   _server.listen("0.0.0.0", 8080);
+  Logger::log("Listening...");
   stop();
 }
 

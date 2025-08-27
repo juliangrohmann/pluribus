@@ -229,7 +229,7 @@ protected:
 
   void update_strategy(const UpdateContext<StorageT>& ctx);
 
-  void on_start() override { Logger::log("Blueprint solver config:\n" + _bp_config.to_string()); }
+  void on_start() override;
   void on_step(long t,int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
 
   bool should_prune(long t) const override;
@@ -267,7 +267,7 @@ protected:
   int terminal_utility(const MCCFRContext<StorageT>& ctx) const override;
   bool is_terminal(const SlimPokerState& state, int i) const override;
 
-  void on_start() override { Logger::log("Real time solver config:\n" + _rt_config.to_string()); }
+  void on_start() override;
   bool should_prune(long t) const override { return false; /* TODO: test pruning */ }
   bool should_discount(const long t) const override { return t % _rt_config.discount_interval == 0; }
   bool should_snapshot(long t, long T) const override { return false; }

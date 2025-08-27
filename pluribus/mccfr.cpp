@@ -75,13 +75,8 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
   if(max_actions > MAX_ACTIONS) Logger::error("Action profile max actions is too large: " + std::to_string(max_actions) + " > " + std::to_string(MAX_ACTIONS));
 
   long T = _t + t_plus;
-  Logger::log("MCCFRSolver --- Initializing HoleCardIndexer...");
-  Logger::log(HoleCardIndexer::get_instance() ? "Success." : "Failure.");
-  Logger::log("MCCFRSolver --- Initializing HandIndexer...");
-  Logger::log(HandIndexer::get_instance() ? "Success." : "Failure.");
-  Logger::log("MCCFRSolver --- Initializing FlatClusterMap...");
-  Logger::log(BlueprintClusterMap::get_instance() ? "Success." : "Failure.");
-  Logger::log("Solver config:\n" + get_config().to_string());
+  Logger::log((HoleCardIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hole card indexer."});
+  Logger::log((HandIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hand indexer."});
   on_start();
 
   Logger::log("Training blueprint from " + std::to_string(_t) + " to " + std::to_string(T));
@@ -591,6 +586,12 @@ void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& c
   }
 }
 
+template<template <typename> class StorageT>
+void BlueprintSolver<StorageT>::on_start() {
+  Logger::log("Blueprint solver config:\n" + _bp_config.to_string());
+  Logger::log((BlueprintClusterMap::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" blueprint cluster map."});
+}
+
 template <template<typename> class StorageT>
 void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
   if(t > 0 && t % get_blueprint_config().strategy_interval == 0 && t < get_blueprint_config().preflop_threshold) {
@@ -661,6 +662,12 @@ int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& ctx
 template<template <typename> class StorageT>
 bool RealTimeSolver<StorageT>::is_terminal(const SlimPokerState& state, const int i) const {
   return state.has_biases() || state.is_terminal() || state.get_players()[i].has_folded();
+}
+
+template<template <typename> class StorageT>
+void RealTimeSolver<StorageT>::on_start() {
+  Logger::log("Real time solver config:\n" + _rt_config.to_string());
+  // Logger::log((RealTimeClusterMap::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" real time cluster map."}); // TODO
 }
 
 template<template <typename> class StorageT>
