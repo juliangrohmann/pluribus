@@ -147,7 +147,8 @@ void Pluribus::_enqueue_job() {
   RealTimeSolverConfig rt_config;
   rt_config.bias_profile = BiasActionProfile{};
   rt_config.init_actions = _mapped_bp_actions.get_history();
-  rt_config.terminal_round = terminal_round(_root_state);
+  // rt_config.terminal_round = terminal_round(_root_state);
+  rt_config.terminal_round = _root_state.get_round() + 1;
   rt_config.terminal_bet_level = 999;
   SolveJob job{config, rt_config};
   {
