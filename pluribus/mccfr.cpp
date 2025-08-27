@@ -663,7 +663,7 @@ int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& ctx
       ctx.board, node);
     std::cout << "Rollout action: " << ra.to_string() << "\n";
     curr_state.apply_in_place(ra);
-    node = node->apply(ra);
+    if(!curr_state.is_terminal()) node = node->apply(ra);
     std::cout << "Applied:\n" << curr_state.to_string();
     std::cout << "Is terminal: " << curr_state.is_terminal() << "\n";
     std::cout << ctx.i << " folded: " << curr_state.get_players()[ctx.i].has_folded() << "\n";
