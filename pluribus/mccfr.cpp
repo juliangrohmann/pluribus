@@ -359,6 +359,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
       if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (traverser): " + a.to_string());
       const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
       SlimPokerState next_state = ctx.state.apply_copy(a);
+      std::cout << "Internal\n";
       const int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
         next_bp_node(a, ctx.state, ctx.bp_node), next_consec_folds(ctx.consec_folds, a), ctx});
       const int v_r = std::max(base_ptr[a_idx].load(std::memory_order_relaxed), 0);
@@ -391,6 +392,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
+  std::cout << "External\n";
   return traverse_mccfr(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
       next_bp_node(a, ctx.state, ctx.bp_node), next_consec_folds(ctx.consec_folds, a), ctx});
 }
