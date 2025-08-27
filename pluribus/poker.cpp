@@ -184,8 +184,7 @@ SlimPokerState::SlimPokerState(const int n_players, const int chips, const int a
 SlimPokerState::SlimPokerState(const PokerConfig& config, const int n_chips) : SlimPokerState{config.n_players, n_chips, config.ante, config.straddle} {}
 
 bool SlimPokerState::has_player_vpip(const int pos) const {
-  if(get_round() != 0) throw std::runtime_error("VPIP is only defined preflop.");
-  return get_players()[pos].get_betsize() > blind_size(*this, pos);
+  return get_players()[pos].get_betsize() > (get_round == 0 ? blind_size(*this, pos) : 0);
 }
 
 bool SlimPokerState::is_in_position(const int pos) const {
