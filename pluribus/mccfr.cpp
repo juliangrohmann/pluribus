@@ -628,6 +628,8 @@ RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlue
 
 template<template <typename> class StorageT>
 const StorageT<uint8_t>* RealTimeSolver<StorageT>::next_bp_node(const Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) {
+  std::cout << "Next bp node: Action=" << a.to_string() << ", Branching actions: ";
+  for(const Action a : bp_node->get_branching_actios()) std::cout << a.to_string() << " (" << (bp_node->is_allocated(a) ? "" : "not") << " allocated), " << "\n";
   return bp_node->apply(translate_pseudo_harmonic(a, bp_node->get_branching_actions(), state));
 }
 
