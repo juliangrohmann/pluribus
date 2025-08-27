@@ -114,6 +114,21 @@ Solution Pluribus::solution(const Hand& hand) const {
   return solution;
 }
 
+void Pluribus::save_range(const std::string& fn) {
+  PngRangeViewer viewer{fn};
+  const RealTimeDecision decision{*_preflop_bp, _solver};
+  const TreeStorageNode<uint8_t>* node = _sampled_bp->get_strategy()->apply(_mapped_bp_actions.get_history());
+  node = node->apply(_mapped_live_actions.get_history());
+  auto live_ranges = _ranges;
+  PokerState curr_state = _root_state;
+  for(Action a : _mapped_live_actions.get_history()) {
+    update_ranges(_ranges, a, curr_state, Board{_board}, decision);
+    curr_state.apply_in_place(a);
+  }
+  const auto action_ranges = build_renderable_ranges(decision, node->get_branching_actions(), _real_state, Board{_board}, live_ranges[_real_state.get_active()]);
+  render_ranges(&viewer, live_ranges[_real_state.get_active()], action_ranges);
+}
+
 int terminal_round(const PokerState& root) { 
   return root.get_round() >= 2 || (root.get_round() == 1 && root.active_players() == 2) ? 4 : root.get_round() + 1;
 }

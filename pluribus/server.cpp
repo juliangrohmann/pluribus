@@ -49,6 +49,9 @@ void PluribusServer::dispatch_commands() {
       case CommandType::UpdateBoard:
         _engine->update_board(cmd.board);
         break;
+      case CommandType::SaveRange:
+        _engine->save_range(cmd.fn);
+        break;
       default:
         Logger::error("Failed to dispatch. Unknown command.");
     }
@@ -106,6 +109,20 @@ void PluribusServer::configure_server() {
     json j;
     j["actions"] = str_actions;
     j["freq"]    = freq;
+    j["status"]  = "ok";
+    res.set_content(j.dump(), "application/json");
+  });
+
+  _server.Post("/save_range", [&](auto& req, auto& res){
+    // ReSharper disable once CppDeprecatedEntity
+    auto dat = json::parse(req.body.begin(), req.body.end());
+    const auto fn = dat.at("fn").template get<std::string>();
+    Logger::log("POST: /save_range fn=" + fn);
+    {
+      std::lock_guard lock(_cmd_mtx);
+      _cmd_queue.push_back(Command::make_save_range(fn));
+    }
+    json j;
     j["status"]  = "ok";
     res.set_content(j.dump(), "application/json");
   });

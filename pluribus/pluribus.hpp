@@ -21,6 +21,7 @@ public:
   void update_state(Action action, int pos);
   void update_board(const std::vector<uint8_t>& updated_board);
   Solution solution(const Hand& hand) const;
+  void save_range(const std::string& fn);
 
 private:
   void _enqueue_job();

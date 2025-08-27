@@ -12,27 +12,31 @@
 
 namespace pluribus {
 
-enum class CommandType { NewGame, UpdateState, UpdateBoard, Solution };
+enum class CommandType { NewGame, UpdateState, UpdateBoard, Solution, SaveRange };
 
 struct Command {
   CommandType type;
-  std::vector<int> stacks;
-  std::vector<uint8_t> board;
-  Hand hand;
-  Action action;
-  int pos;
+  std::vector<int> stacks{};
+  std::vector<uint8_t> board{};
+  Hand hand{};
+  Action action = Action::UNDEFINED;
+  int pos = -1;
+  std::string fn;
 
   static Command make_new_game(const std::vector<int>& stacks_) {
-    return Command{CommandType::NewGame, stacks_, {}, {}, Action::UNDEFINED, -1};
+    return Command{CommandType::NewGame, stacks_};
   }
   static Command make_update_state(const Action action_, const int pos_) {
     return Command{CommandType::UpdateState, {}, {}, {}, action_, pos_};
   }
   static Command make_update_board(const std::vector<uint8_t>& board_) {
-    return Command{CommandType::UpdateBoard, {}, board_, {}, Action::UNDEFINED, -1};
+    return Command{CommandType::UpdateBoard, {}, board_};
   }
   static Command make_solution(const Hand& hand_) {
-    return Command{CommandType::Solution, {}, {}, hand_, Action::UNDEFINED, -1};
+    return Command{CommandType::Solution, {}, {}, hand_};
+  }
+  static Command make_save_range(const std::string& fn_) {
+    return Command{CommandType::SaveRange, {}, {}, {}, Action::UNDEFINED, -1, fn_};
   }
 };
 

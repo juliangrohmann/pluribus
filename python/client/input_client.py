@@ -29,19 +29,22 @@ def update_state(url, args=None):
   return requests.post(url + "update_state", json={"action": action, "pos": pos})
 
 def update_board(url, args=None):
-  board = input("Board: ") if not args else args[0].strip()
-  print(board)
+  board = (input("Board: ") if not args else args[0]).strip()
   if len(board) % 2 != 0 or len(board) < 6:
     print("Invalid board.")
     return None
   return requests.post(url + "update_board", json={"board": board})
 
 def solution(url, args=None):
-  hand = input("Hand: ") if not args else args[0].strip()
+  hand = (input("Hand: ") if not args else args[0]).strip()
   if len(hand) != 4:
     print("Invalid hand.")
     return None
   return requests.post(url + "solution", json={"hand": hand})
+
+def save_range(url, args=None):
+  fn = (input("Filename: ") if not args else args[0]).strip()
+  return requests.post(url + "save_range", json={"fn": fn})
 
 def wait(_, args=None):
   if args: time.sleep(cast(args[0], float))
@@ -57,6 +60,7 @@ endpoints = [
   ("update_state", update_state),
   ("update_board", update_board),
   ("solution", solution),
+  ("save_range", save_range),
   ("wait", wait),
 ]
 
