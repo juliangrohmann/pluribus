@@ -86,7 +86,7 @@ struct BlueprintSolverConfig : DiscountConfig {
 };
 
 struct RealTimeTimingConfig {
-  double discount_interval_s = 1.0;
+  double discount_interval_s = 2.0;
   double lcfr_thresh_s = 15.0;
   double log_interval_s = 1.0;
 };
