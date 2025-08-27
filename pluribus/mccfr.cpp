@@ -81,7 +81,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
 
   Logger::log("Training blueprint from " + std::to_string(_t) + " to " + std::to_string(T));
   std::ostringstream buf;
-  while(_t < T) {
+  while(_t < T && !is_interrupted()) {
     long init_t = _t;
     _t = next_step(_t, T); 
     auto interval_start = std::chrono::high_resolution_clock::now();
@@ -125,24 +125,25 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         }
       }
     }
-    if(is_interrupted()) break;
-    auto interval_end = std::chrono::high_resolution_clock::now();
-    buf << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
-    Logger::dump(buf);
-    if(should_discount(_t) && !is_interrupted()) {
-      Logger::log("============== Discounting ==============");
-      double d = get_discount_factor(_t);
-      buf << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
+    if(!is_interrupted()) {
+      auto interval_end = std::chrono::high_resolution_clock::now();
+      buf << "Step duration: " << std::chrono::duration_cast<std::chrono::seconds>(interval_end - interval_start).count() << " s.\n";
       Logger::dump(buf);
-      init_regret_storage()->lcfr_discount(d);
-      if(StorageT<float>* init_avg = init_avg_storage()) init_avg->lcfr_discount(d);
-    }
-    if(should_snapshot(_t, T)) {
-      std::ostringstream fn_stream;
-      Logger::log("============== Saving snapshot ==============");
-      fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
-      save_snapshot((_snapshot_dir / fn_stream.str()).string());
-      on_snapshot();
+      if(should_discount(_t) && !is_interrupted()) {
+        Logger::log("============== Discounting ==============");
+        double d = get_discount_factor(_t);
+        buf << std::setprecision(2) << std::fixed << "Discount factor: " << d << "\n";
+        Logger::dump(buf);
+        init_regret_storage()->lcfr_discount(d);
+        if(StorageT<float>* init_avg = init_avg_storage()) init_avg->lcfr_discount(d);
+      }
+      if(should_snapshot(_t, T)) {
+        std::ostringstream fn_stream;
+        Logger::log("============== Saving snapshot ==============");
+        fn_stream << date_time_str() << "_t" << std::setprecision(1) << std::fixed << _t / 1'000'000.0 << "M.bin";
+        save_snapshot((_snapshot_dir / fn_stream.str()).string());
+        on_snapshot();
+      }
     }
   }
   Logger::log(is_interrupted() ? "====================== Interrupted ======================" : "============== Blueprint training complete ==============");

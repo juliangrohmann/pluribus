@@ -118,6 +118,7 @@ void Pluribus::save_range(const std::string& fn) {
   PngRangeViewer viewer{fn};
   const RealTimeDecision decision{*_preflop_bp, _solver};
   std::cout << "Applying live actions...\n";
+  std::cout << "Mapped live actions: " << _mapped_live_actions.to_string() << "\n";
   const TreeStorageNode<int>* node = _solver->get_strategy()->apply(_mapped_live_actions.get_history());
   auto live_ranges = _ranges;
   PokerState curr_state = _root_state;
