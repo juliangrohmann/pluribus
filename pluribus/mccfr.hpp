@@ -349,8 +349,8 @@ protected:
 
   void save_snapshot(const std::string& fn) const override { cereal_save(*this, fn); }
 
-  void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override {}
-  void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override {}
+  // void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override {}
+  // void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override {}
 
   std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;
 };
