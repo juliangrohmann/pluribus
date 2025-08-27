@@ -135,6 +135,7 @@ void Pluribus::_enqueue_job() {
   SolveJob job{config, rt_config};
   {
     std::lock_guard lk(_solver_mtx);
+    Logger::log("### ### Interrupting now! ### ###");
     if(_solver) _solver->interrupt();
     _pending_job = std::move(job);
   }

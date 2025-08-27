@@ -94,7 +94,10 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       thread_local omp::HandEvaluator eval;
       thread_local Board board;
       thread_local MarginalRejectionSampler sampler{get_config().init_ranges, get_config().init_board, get_config().dead_ranges};
-      if(is_interrupted()) continue;
+      if(is_interrupted()) {
+        Logger::log("interrupted!");
+        continue;
+      }
       if(is_debug) Logger::log("============== t = " + std::to_string(t) + " ==============");
       if(should_log(t)) {
         std::ostringstream metrics_fn;
