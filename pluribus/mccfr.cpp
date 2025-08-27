@@ -598,7 +598,6 @@ void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::ve
   if(t > 0 && t % get_blueprint_config().strategy_interval == 0 && t < get_blueprint_config().preflop_threshold) {
     if(is_debug) Logger::log("============== Updating strategy ==============");
     SlimPokerState state{this->get_config().init_state};
-    std::vector freq_buffer(this->get_config().action_profile.max_actions(), 0.0f);
     update_strategy(UpdateContext<StorageT>{state, i, 0, Board{this->get_config().init_board}, hands, indexers,
         this->init_regret_storage(), this->init_avg_storage()});
   }

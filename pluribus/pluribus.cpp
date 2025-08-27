@@ -51,7 +51,7 @@ void Pluribus::new_game(const std::vector<int>& stacks) {
     Logger::error("Player number mismatch. Expected " + std::to_string(poker_config.n_players) + " players.");
   }
 
-  if(_solver) _solver->interrupt();
+  if(_solver)   _solver->interrupt();
   _solver = nullptr;
   _real_state = PokerState{poker_config.n_players, stacks, poker_config.ante, poker_config.straddle};
   _root_state = _real_state;

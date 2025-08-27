@@ -111,6 +111,39 @@ RingBlueprintProfile::RingBlueprintProfile(const int n_players) : ActionProfile{
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 3, 1, 0);
 }
 
+RingLiveProfile::RingLiveProfile(const int n_players) : ActionProfile{n_players} {
+  // preflop RFI & isos
+  for(int pos = 0; pos < 2; ++pos) set_actions(single_size(0.80f), 0, 1, pos);
+  for(int pos = 2; pos < n_players; ++pos) set_actions(single_size(0.60f), 0, 1, pos);
+  set_iso_actions(action_range(1.00, 2.00, 0.50), 0, false);
+  set_iso_actions(action_vec({1.00, 1.50}), 0, true);
+
+  // preflop 3-bet
+  for(int pos = 0; pos < 2; ++pos) {
+    set_actions(action_range(0.90, 1.90, 0.20), 0, 2, pos, false);
+    set_actions(action_range(0.60, 1.80, 0.20), 0, 2, pos, true);
+  }
+  for(int pos = 2; pos < n_players; ++pos) {
+    set_actions(action_range(0.90, 1.90, 0.20), 0, 2, pos, false);
+    set_actions(action_range(0.60, 1.20, 0.20), 0, 2, pos, true);
+  }
+
+  // preflop 4-bet+
+  set_actions(action_range(0.50, 1.20, 0.10), 0, 3, 0);
+
+  // flop
+  set_actions({Action::CHECK_CALL, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 1, 0);
+
+  // turn
+  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 2, 0, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 2, 1, 0);
+
+  // river
+  set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action::ALL_IN}, 3, 0, 0);
+  set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action::ALL_IN}, 3, 1, 0);
+}
+
 WPTGoldRingBlueprintProfile::WPTGoldRingBlueprintProfile(const int n_players, const bool fine_grained) : ActionProfile{n_players} {
   // preflop RFI & isos
   for(int pos = 0; pos < 3; ++pos) set_actions(single_size(0.75), 0, 1, pos);
