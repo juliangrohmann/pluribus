@@ -104,9 +104,9 @@ void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
 }
 
 Solution Pluribus::solution(const Hand& hand) const {
-  const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
   Solution solution;
-  solution.actions = valid_actions(mapped_state, _live_profile);
+  solution.actions = _solver->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
+  const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
   const RealTimeDecision decision{*_preflop_bp, _solver};
   for(const Action a : solution.actions) {
     solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
