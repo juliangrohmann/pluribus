@@ -656,7 +656,7 @@ int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& ctx
     Logger::error(oss.str());
   }
   SlimPokerState curr_state = ctx.state;
-  const TreeStorageNode<uint8_t>* node = ctx.node;
+  const TreeStorageNode<uint8_t>* node = ctx.bp_node;
   int it = 0;
   while(!curr_state.is_terminal() && !curr_state.get_players()[ctx.i].has_folded() && it++ < 30) {
     Action ra = next_rollout_action(ctx.indexers[curr_state.get_active()], curr_state, ctx.hands[curr_state.get_active()],
