@@ -32,15 +32,6 @@ public:
     }
     int real_cluster = cluster == -1 ? BlueprintClusterMap::get_instance()->cluster(state.get_round(), board, hand) : cluster;
     auto freq = calculate_strategy(node->get(real_cluster), node->get_value_actions().size());
-    if(std::ranges::find(node->get_value_actions(), a) == node->get_value_actions().end()) {
-      std::cout << "Failed to find action: " << a.to_string();
-      std::cout << "Value actions:\n";
-      for(Action va : node->get_value_actions()) {
-        std::cout << va.to_string() << "\n";
-      }
-      std::cout << "Init state: " << _init_state.get_action_history().to_string() << "\n";
-      std::cout << "Curr state: " << state.get_action_history().to_string() << "\n";
-    }
     return freq[index_of(a, node->get_value_actions())];
   }
 
