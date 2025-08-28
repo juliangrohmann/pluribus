@@ -167,7 +167,9 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
 void LosslessBlueprint::build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns,
     const bool preflop) {
   Logger::log("Building lossless blueprint from cached buffers...");
-  build_from_meta_data(collect_meta_data(preflop_buf_fn, final_bp_fn, buffer_fns), preflop);
+  const auto metadata = collect_meta_data(preflop_buf_fn, final_bp_fn, buffer_fns);
+  cereal_save(metadata, "metadata.bin");
+  build_from_meta_data(metadata, preflop);
 }
 
 void set_preflop_strategy(TreeStorageNode<float>* node, const TreeStorageNode<float>* preflop_node, const PokerState& state) {

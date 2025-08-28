@@ -117,6 +117,21 @@ int main(int argc, char* argv[]) {
       cereal_save(sampled_bp, "sampled_" + std::string{argv[5]});
     }
   }
+  else if(command == "blueprint-metadata") {
+    // ./Pluribus blueprint-metadata metadata_fn out_fn [--no-preflop]
+    if(argc < 4) {
+      std::cout << "Missing arguments to build blueprint from cache.\n";
+    }
+    else {
+      bool no_preflop = argc >= 5 && strcmp(argv[4], "--no-preflop") == 0;
+      LosslessMetadata metadata;
+      cereal_load(metadata, argv[2]);
+      LosslessBlueprint lossless_bp;
+      lossless_bp.build_from_meta_data(metadata, !no_preflop);
+      std::string lossless_fn = "lossless_" + std::string{argv[5]};
+      cereal_save(lossless_bp, lossless_fn);
+    }
+  }
   else if(command == "sampled-blueprint") {
     // ./Pluribus sampled-blueprint lossless_bp_fn buf_dir out_fn
     if(argc < 5) {
