@@ -13,13 +13,13 @@ def cast(num_str, dt):
 
 def new_game(host, args=None):
   stacks = []
-  if len(hand := (input("Hand: ") if not args else args[0]).strip()) != 4: return print("Invalid hand.")
-  if (hero := cast(input("Hero position: ") if args is None else args.pop(0), int)) is None: return None
-  if hero < 0: print("Invalid position.")
+  if len(hero_hand := (input("Hand: ") if not args else args[0]).strip()) != 4: return print("Invalid hand.")
+  if (hero_pos := cast(input("Hero position: ") if args is None else args.pop(0), int)) is None: return None
+  if hero_pos < 0: print("Invalid position.")
   while stack := (input(f"Player {len(stacks)} chips: ") if args is None else args.pop(0) if args else None):
     if (v := cast(stack, int)) is not None: stacks.append(v)
-  if hero >= len(stack): print("Invalid position.")
-  return requests.post(to_url(host, "new_game"), json={"stacks": stacks, "hero": hero})
+  if hero_pos >= len(stack): print("Invalid position.")
+  return requests.post(to_url(host, "new_game"), json={"stacks": stacks, "hero_hand": hero_hand, "hero_pos": hero_pos})
 
 def update_state(host, args=None):
   if (action := cast(input("Betsize: ") if not args else args.pop(0), float)) is None: return None
@@ -27,6 +27,14 @@ def update_state(host, args=None):
   if (pos := cast(input("Position: ") if not args else args.pop(0), int)) is None: return None
   if pos < 0: return print("Invalid position")
   return requests.post(to_url(host, "update_state"), json={"action": action, "pos": pos})
+
+def hero_action(host, args=None):
+  freq = []
+  if (action := cast(input("Betsize: ") if not args else args.pop(0), float)) is None: return None
+  if action < 0: return print("Invalid betsize.")
+  while f_str := (input(f"Action {len(freq)} frquency: ") if args is None else args.pop(0) if args else None):
+    if (v := cast(f_str, float)) is not None: stacks.append(v)
+  return requests.post(to_url(host, "hero_action"), json={"action": action, "freq": freq})
 
 def update_board(host, args=None):
   board = (input("Board: ") if not args else args[0]).strip()

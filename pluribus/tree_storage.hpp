@@ -259,7 +259,8 @@ public:
   template <class Archive>
   void load(Archive& ar) {
     free_memory();
-    // ar(_branching_actions, _value_actions, _frozen, _n_clusters, _is_root); // TODO: compatibility
+    // ar(_branching_actions, _value_actions, _frozen, _n_clusters, _is_root);
+    ar(_branching_actions, _value_actions, _n_clusters, _is_root); // TODO: compatibility
     if(_is_root) ar(_config);
 
     _values = std::make_unique<std::atomic<T>[]>(get_n_values());
