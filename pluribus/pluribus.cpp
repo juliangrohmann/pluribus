@@ -5,6 +5,21 @@
 
 namespace pluribus {
 
+std::string Solution::to_string() const {
+  std::ostringstream oss;
+  oss << std::fixed << std::setprecision(4) << "Solution: actions=" << actions_to_str(actions) << ", freq=[";
+  for(int i = 0; i < actions.size(); ++i) oss << freq[i] << (i == freq.size() - 1 ? "]" : ", ");
+  return oss.str();
+}
+
+std::string FrozenNode::to_string() const {
+  std::ostringstream oss;
+  oss << std::fixed << std::setprecision(4) << "FrozenNode: freq=[";
+  for(int i = 0; i < freq.size(); ++i) oss << freq[i] << (i == freq.size() - 1 ? "]" : ", ");
+  oss << ", hand=" << hand.to_string() << ", board=" << board.to_string() << ", live_actions=" << live_actions.to_string();
+  return oss.str();
+}
+
 class RealTimeDecision : public DecisionAlgorithm {
 public:
   RealTimeDecision(const LosslessBlueprint& preflop_bp, const std::shared_ptr<const Solver>& solver)
@@ -136,6 +151,7 @@ Solution Pluribus::solution(const Hand& hand) {
       solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
     }
   }
+  Logger::log(solution.to_string());
   return solution;
 }
 
@@ -231,14 +247,11 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
     Logger::log("New state:\n" + _real_state.to_string());
 
     if(_solver && prev_real_state.get_active() == _hero_pos) {
+      const FrozenNode frozen_node{freq, _hero_hand, Board{_board}, _mapped_live_actions};
+      Logger::log("Freezing hero actions. " + frozen_node.to_string());
       if(freq.size() != actions.size()) {
-        std::ostringstream oss;
-        oss << std::fixed << std::setprecision(2) << "Freeze frequency amount mismatch:\nFreeze freq=[";
-        for(int i = 0; i < freq.size(); ++i) oss << freq[i] << (i == freq.size() - 1 ? "]\n" : ", ");
-        oss << "Actions=" + actions_to_str(actions);
-        Logger::dump(oss);
+        Logger::error("Freeze frequency amount mismatch:\nActions=" + actions_to_str(actions));
       }
-      FrozenNode frozen_node{freq, _hero_hand, Board{_board}, _mapped_live_actions};
       _solver->freeze(frozen_node.freq, frozen_node.hand, frozen_node.board, frozen_node.live_actions);
       _frozen.push_back(frozen_node);
     }
@@ -351,7 +364,6 @@ void Pluribus::_solver_worker() {
       _solver = local;
     }
     local->solve(100'000'000'000L);
-    Logger::log("Fully interrupted.");
   }
 }
 

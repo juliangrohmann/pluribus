@@ -11,6 +11,8 @@ namespace pluribus {
 struct Solution  {
   std::vector<Action> actions;
   std::vector<float> freq;
+
+  std::string to_string() const;
 };
 
 struct FrozenNode {
@@ -18,6 +20,8 @@ struct FrozenNode {
   Hand hand;
   Board board;
   ActionHistory live_actions;
+
+  std::string to_string() const;
 };
 
 class Pluribus {
