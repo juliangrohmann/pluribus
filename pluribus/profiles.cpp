@@ -202,6 +202,7 @@ HeadsUpLiveProfile::HeadsUpLiveProfile() : ActionProfile{2} {
 }
 
 RingLiveProfile::RingLiveProfile(const int n_players, const int round) : ActionProfile{n_players} {
+  // TODO: unify blueprint/live profile
   fill_from_profile(*this, RingBlueprintProfile{n_players}, 3);
   for(int pos = 0; pos < n_players; ++pos) {
     for(int in_position = 0; in_position <= 1; ++in_position) {

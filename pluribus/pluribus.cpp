@@ -140,12 +140,30 @@ void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
   }
 }
 
+std::vector<Action> Pluribus::_get_solution_actions() const {
+  std::vector<Action> actions;
+  if(_solver) {
+    Logger::log("Getting solution actions...");
+    Logger::log("Applying live actions to solver. Mapped live actions: " + _mapped_live_actions.to_string());
+    actions = _solver->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
+  }
+  else {
+    Logger::log("Applying blueprint actions to preflop blueprint. Mapped blueprint actions: " + _mapped_bp_actions.to_string());
+    const TreeStorageNode<float>* node = _preflop_bp->get_strategy()->apply(_mapped_bp_actions.get_history());
+    Logger::log("Applying live actions to preflop blueprint. Mapped live actions: " + _mapped_live_actions.to_string());
+    actions = node->apply(_mapped_live_actions.get_history())->get_value_actions();
+  }
+  Logger::log("Value actions=" + actions_to_str(actions));
+  return actions;
+}
+
 Solution Pluribus::solution(const Hand& hand) {
+  Logger::log("================================ Solution ================================");
   Solution solution;
   const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
   {
     std::lock_guard lk(_solver_mtx);
-    solution.actions = _solver->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
+    solution.actions = _get_solution_actions();
     const RealTimeDecision decision{*_preflop_bp, _solver};
     for(const Action a : solution.actions) {
       solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
@@ -156,10 +174,9 @@ Solution Pluribus::solution(const Hand& hand) {
 }
 
 void Pluribus::save_range(const std::string& fn) {
+  Logger::log("=============================== Save Range ===============================");
   PngRangeViewer viewer{fn};
-  std::cout << "Applying live actions...\n";
-  std::cout << "Mapped live actions: " << _mapped_live_actions.to_string() << "\n";
-  const TreeStorageNode<int>* node = _solver->get_strategy()->apply(_mapped_live_actions.get_history());
+  const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
   {
     std::lock_guard lk(_solver_mtx);
     const RealTimeDecision decision{*_preflop_bp, _solver};
@@ -171,9 +188,10 @@ void Pluribus::save_range(const std::string& fn) {
       curr_state.apply_in_place(a);
     }
     std::cout << "Building renderable ranges...\n";
-    const auto action_ranges = build_renderable_ranges(decision, node->get_value_actions(), _real_state, Board{_board}, live_ranges[_real_state.get_active()]);
+    const std::vector<Action> actions = _get_solution_actions();
+    const auto action_ranges = build_renderable_ranges(decision, actions, mapped_state, Board{_board}, live_ranges[mapped_state.get_active()]);
     std::cout << "Rendering ranges...\n";
-    render_ranges(&viewer, live_ranges[_real_state.get_active()], action_ranges);
+    render_ranges(&viewer, live_ranges[mapped_state.get_active()], action_ranges);
   }
 }
 
@@ -235,13 +253,10 @@ bool is_off_tree(const Action a, const std::vector<Action>& actions, const Poker
 
 void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
   const PokerState prev_real_state = _real_state;
-  std::vector<Action> actions;
   {
     std::lock_guard lk(_solver_mtx);
     Logger::log("Applying action: " + a.to_string());
-    if(_solver) actions = _solver->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
-    else actions = _preflop_bp->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
-    Logger::log("Valid actions: " + actions_to_str(actions));
+    const std::vector<Action> actions = _get_solution_actions();
 
     _real_state = _real_state.apply(a);
     Logger::log("New state:\n" + _real_state.to_string());

@@ -37,6 +37,7 @@ public:
   void save_range(const std::string& fn);
 
 private:
+  std::vector<Action> _get_solution_actions() const;
   void _enqueue_job();
   void _apply_action(Action a, const std::vector<float>& freq);
   void _update_root();
