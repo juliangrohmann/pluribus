@@ -92,10 +92,10 @@ void tree_to_lossless_buffers(const TreeStorageNode<int>* node, const ActionHist
 
 long long compute_max_bytes(const double max_gb) {
   const double free_gb = static_cast<double>(get_free_ram()) / pow(1024.0, 3.0);
-  if(std::min(free_gb, max_gb) < 8) {
-    Logger::error("At least 8G free RAM required to build blueprint. Available (G): " + std::to_string(free_gb));
+  if(std::min(free_gb, max_gb) < 1) {
+    Logger::error("At least 1G free RAM required to build blueprint. Available (G): " + std::to_string(free_gb));
   }
-  return static_cast<long long>(std::min(free_gb - 4.0, max_gb) * pow(1024.0, 3.0));
+  return static_cast<long long>(std::min(free_gb - 1.0, max_gb) * pow(1024.0, 3.0));
 }
 
 LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std::vector<std::string>& all_fns, const std::string& buf_dir,
