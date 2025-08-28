@@ -504,16 +504,19 @@ PokerState PokerState::apply_biases(const std::vector<Action>& biases) const {
   return state;
 }
 
+int total_bet_size(const SlimPokerState& state, const float frac) {
+  const Player& active_player = state.get_players()[state.get_active()];
+  if(frac <= 0.0f) throw std::runtime_error("Invalid action bet size: " + std::to_string(frac));
+  const int missing = state.get_max_bet() - active_player.get_betsize();
+  const int real_pot = state.get_pot().total() + missing;
+  // return static_cast<int>(std::round(static_cast<float>(real_pot) * action.get_bet_type())) + missing + active_player.get_betsize();
+  return real_pot * frac + missing + active_player.get_betsize();
+}
+
 int total_bet_size(const SlimPokerState& state, const Action action) {
   const Player& active_player = state.get_players()[state.get_active()];
   if(action == Action::ALL_IN) return active_player.get_chips() + active_player.get_betsize();
-  if(action.get_bet_type() > 0.0f) {
-    const int missing = state.get_max_bet() - active_player.get_betsize();
-    const int real_pot = state.get_pot().total() + missing;
-    // return static_cast<int>(std::round(static_cast<float>(real_pot) * action.get_bet_type())) + missing + active_player.get_betsize();
-    return real_pot * action.get_bet_type() + missing + active_player.get_betsize();
-  }
-  throw std::runtime_error("Invalid action bet size: " + std::to_string(action.get_bet_type()));
+  return total_bet_size(state, action.get_bet_type());
 }
 
 double fractional_bet_size(const SlimPokerState& state, const int total_size) {

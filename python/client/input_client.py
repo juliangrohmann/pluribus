@@ -13,9 +13,12 @@ def cast(num_str, dt):
 
 def new_game(host, args=None):
   stacks = []
+  if (hero := cast(input("Hero position: ") if args is None else args.pop(0), int)) is None: return None
+  if hero < 0: print("Invalid position.")
   while stack := (input(f"Player {len(stacks)} chips: ") if args is None else args.pop(0) if args else None):
     if (v := cast(stack, int)) is not None: stacks.append(v)
-  return requests.post(to_url(host, "new_game"), json={"stacks": stacks})
+  if hero >= len(stack): print("Invalid position.")
+  return requests.post(to_url(host, "new_game"), json={"stacks": stacks, "hero": hero})
 
 def update_state(host, args=None):
   if (action := cast(input("Betsize: ") if not args else args.pop(0), float)) is None: return None

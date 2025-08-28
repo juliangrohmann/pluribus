@@ -18,7 +18,7 @@ public:
   Pluribus(const ActionProfile& live_profile, const std::shared_ptr<const LosslessBlueprint>& preflop_bp,
     const std::shared_ptr<const SampledBlueprint>& sampled_bp);
   ~Pluribus();
-  void new_game(const std::vector<int>& stacks);
+  void new_game(const std::vector<int>& stacks, int hero_pos);
   void update_state(Action action, int pos);
   void update_board(const std::vector<uint8_t>& updated_board);
   Solution solution(const Hand& hand) const;
@@ -29,7 +29,7 @@ private:
   void _apply_action(Action a);
   void _update_root();
   bool _can_solve(const PokerState& root) const;
-  bool _should_solve(const PokerState& root) const;
+  // bool _should_solve(const PokerState& root) const;
 
   void _solver_worker();
   void _start_worker();

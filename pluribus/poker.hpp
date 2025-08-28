@@ -382,6 +382,7 @@ private:
 };
 
 inline std::string pos_to_str(const SlimPokerState& state) { return pos_to_str(state.get_active(), state.get_players().size(), state.is_straddle()); }
+int total_bet_size(const SlimPokerState& state, float frac);
 int total_bet_size(const SlimPokerState& state, Action action);
 double fractional_bet_size(const SlimPokerState& state, int total_size);
 bool is_action_valid(Action a, const SlimPokerState& state);

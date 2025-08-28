@@ -63,10 +63,11 @@ void PluribusServer::configure_server() {
     // ReSharper disable once CppDeprecatedEntity
     auto dat = json::parse(req.body.begin(), req.body.end());
     const auto stacks = dat.at("stacks").template get<std::vector<int>>();
-    Logger::log("POST: /new_game stacks=[" + join_as_strs(stacks, ", ") + "]");
+    const auto hero_pos = dat.at("hero").template get<int>();
+    Logger::log("POST: /new_game stacks=[" + join_as_strs(stacks, ", ") + "], hero=" + std::to_string(hero_pos));
     {
       std::lock_guard lock(_cmd_mtx);
-      _cmd_queue.push_back(Command::make_new_game(stacks));
+      _cmd_queue.push_back(Command::make_new_game(stacks, hero_pos));
     }
     _cmd_cv.notify_one();
     res.set_content(R"({"status":"ok"})", "application/json");

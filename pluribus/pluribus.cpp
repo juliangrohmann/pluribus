@@ -43,17 +43,22 @@ Pluribus::~Pluribus() {
   if(_solver_thread.joinable()) _solver_thread.join();
 }
 
-void Pluribus::new_game(const std::vector<int>& stacks) {
+void Pluribus::new_game(const std::vector<int>& stacks, const int hero_pos) {
   Logger::log("================================ New Game ================================");
   std::ostringstream oss;
   Logger::log("Stacks: " + join_as_strs(stacks, ", "));
   const auto& poker_config = _sampled_bp->get_config().poker;
+  if(hero_pos < 0 || hero_pos >= poker_config.n_players) {
+    Logger::error("0 <= Hero position < " + std::to_string(poker_config.n_players) + " required. Hero position=" + std::to_string(hero_pos));
+  }
+  Logger::log("Hero position: " + std::to_string(hero_pos) + " (" + pos_to_str(hero_pos, poker_config.n_players, poker_config.straddle) + ")");
   if(stacks.size() != poker_config.n_players) {
     Logger::error("Player number mismatch. Expected " + std::to_string(poker_config.n_players) + " players.");
   }
 
-  if(_solver)   _solver->interrupt();
+  if(_solver) _solver->interrupt();
   _solver = nullptr;
+  _hero_pos = hero_pos;
   _real_state = PokerState{poker_config.n_players, stacks, poker_config.ante, poker_config.straddle};
   _root_state = _real_state;
   _mapped_bp_actions = ActionHistory{};
@@ -160,33 +165,79 @@ void Pluribus::_enqueue_job() {
   _solver_cv.notify_one();
 }
 
-bool is_off_tree(Action a, const PokerState& state, const ActionProfile& profile) {
-  // TODO
+bool is_off_tree(const Action a, const std::vector<Action>& actions, const PokerState& state) {
+  if(a.get_bet_type() <= 0.0f) return false;
+  float min_diff = 100.0f;
+  Action closest = Action::UNDEFINED;
+  for(const Action action : actions) {
+    if(action.get_bet_type() > 0.0f || action == Action::ALL_IN) {
+      const float frac = action == Action::ALL_IN ? fractional_bet_size(state, total_bet_size(state, action)) : action.get_bet_type();
+      const float diff = abs(frac - a.get_bet_type());
+      if(diff < min_diff) {
+        min_diff = diff;
+        closest = action;
+      }
+    }
+  }
+  if(closest == Action::UNDEFINED) {
+    Logger::error("Unexpected actions during off-tree check: Action=" + a.to_string() + ", Tree actions=" + actions_to_str(actions));
+  }
+  const int action_size = total_bet_size(state, a);
+  const int closest_size = total_bet_size(state, closest);
+  const int total_diff = abs(action_size - closest_size);
+  if(min_diff > 0.25 && total_diff > 150) {
+    Logger::log("Action is off tree: Action=" + a.to_string() + ", Tree actions=" + actions_to_str(actions));
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << "Max frac difference=" << min_diff << "\nAction size=" << std::setprecision(0) << action_size
+        << "\nClosest size=" << closest_size << "\nMax total difference=" << total_diff;
+    Logger::dump(oss);
+    return true;
+  }
   return false;
 }
 
 void Pluribus::_apply_action(const Action a) {
   Logger::log("Applying action: " + a.to_string());
-  const auto actions = valid_actions(_real_state, _live_profile);
+  const std::vector<Action>& actions = (_solver ? _solver : _preflop_bp)->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
   Logger::log("Valid actions: " + actions_to_str(actions));
   const PokerState prev_real_state = _real_state;
   _real_state = _real_state.apply(a);
   Logger::log("New state:\n" + _real_state.to_string());
 
-  if(_can_solve(_root_state) && is_off_tree(a, prev_real_state, _live_profile)) {
+  bool should_solve = false;
+  if(_can_solve(_root_state) && is_off_tree(a, actions, prev_real_state)) {
+    should_solve = true;
     Logger::log("Action is off-tree. Adding to live actions...");
-    // TODO: interrupt if solving, add action, re-solve
+    _live_profile.add_action(a, prev_real_state.get_round(), prev_real_state.get_bet_level(), prev_real_state.get_active(),
+        prev_real_state.is_in_position(prev_real_state.get_active()));
+    Logger::log("New live profile:\n" + _live_profile.to_string());
+    // TODO: remap actions to new live profile
+    // TODO: if root is updated afterwards before the solve can start, seg faults during root update
+    // TODO: if root is updated afterwards before the solve can converge, assigns bad ranges during root update
+    // Logger::log("Remapping live actions...");
+    // Logger::log("Bef mapped live actions: " + _mapped_live_actions.to_string());
+    // _mapped_live_actions = ActionHistory{};
+    // PokerState curr_state = _root_state;
+    // for(Action real_action : _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history()) {
+    //   const Action translated = translate_pseudo_harmonic(a, valid_actions(curr_state, _live_profile), prev_real_state);
+    //   _mapped_live_actions.push_back(translated);
+    //   Logger::log(real_action.to_string() + " -> " + translated.to_string());
+    //   curr_state = curr_state.apply(real_action);
+    // }
+    // Logger::log("New mapped live actions: " + _mapped_live_actions.to_string());
   }
-  const Action translated = translate_pseudo_harmonic(a, actions, prev_real_state);
-  _mapped_live_actions.push_back(translated);
-  Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
+  else {
+    const Action translated = translate_pseudo_harmonic(a, actions, prev_real_state);
+    _mapped_live_actions.push_back(translated);
+    Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
+  }
+
   if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
     Logger::log("Round advanced. Updating root...");
     _update_root();
   }
-  else if(!_can_solve(_root_state) && _can_solve(_real_state)) {
-    Logger::log("First solvable state. Updating root...");
-    _update_root();
+  else if(should_solve) {
+    _enqueue_job();
   }
 }
 
