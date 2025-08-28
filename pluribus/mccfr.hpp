@@ -102,6 +102,7 @@ class MCCFRSolver : public Solver {
 public:
   explicit MCCFRSolver(const SolverConfig& config) : Solver{config} {}
 
+  long get_iteration() const { return _t; }
   void set_snapshot_dir(const std::string& snapshot_dir) { _snapshot_dir = snapshot_dir; }
   void set_metrics_dir(const std::string& metrics_dir) { _metrics_dir = metrics_dir; }
   void set_log_dir(const std::string& log_dir) { _log_dir = log_dir; }
@@ -151,7 +152,6 @@ protected:
   void track_strategy_by_decision(const PokerState& state, const std::vector<PokerRange>& ranges, const DecisionAlgorithm& decision,
       const MetricsConfig& metrics_config, bool phi, nlohmann::json& metrics) const;
 
-  long get_iteration() const { return _t; }
   MetricsConfig get_regret_metrics_config() const { return _regret_metrics_config; }
 
 private:

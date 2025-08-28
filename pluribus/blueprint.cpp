@@ -115,6 +115,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
     Logger::log("Loading blueprint " + std::to_string(bp_idx) + "...");
     TreeBlueprintSolver bp;
     cereal_load(bp, all_fns[bp_idx]);
+    meta.n_iterations = std::max(bp.get_iteration(), meta.n_iterations);
     const TreeStorageNode<int>* tree_root = bp.get_strategy();
     if(bp_idx == 0) {
       set_meta_config(meta, bp);
@@ -155,6 +156,7 @@ LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std:
   TreeBlueprintSolver final_bp;
   cereal_load(final_bp, final_bp_fn);
   set_meta_config(meta, final_bp);
+  meta.n_iterations = final_bp.get_iteration();
   return meta;
 }
 
@@ -217,6 +219,7 @@ void normalize_tree(TreeStorageNode<float>* node, const PokerState& state) {
 void LosslessBlueprint::build_from_meta_data(const LosslessMetadata& meta, const bool preflop) {
   Logger::log("Building lossless blueprint from meta data...");
   set_config(meta.config);
+  _n_iterations = meta.n_iterations;
   assign_freq(new TreeStorageNode<float>{meta.config.init_state, meta.tree_config});
   for(int buf_idx = 0; buf_idx < meta.buffer_fns.size(); ++buf_idx) {
     BlueprintBuffer<float> buf;
