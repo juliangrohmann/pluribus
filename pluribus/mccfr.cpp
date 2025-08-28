@@ -308,17 +308,19 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
     v_exact = v_r_sum > 0 ? v_exact / v_r_sum : v_a_sum / filter_sum;
     const int v = static_cast<int>(std::lrint(v_exact));
     if(is_debug) log_net_ev(v, v_exact);
-    for(int a_idx = 0; a_idx < n_value_actions; ++a_idx) {
-      if(filter[a_idx]) {
-        auto& r_atom = base_ptr[a_idx];
-        const int prev_r = r_atom.load(std::memory_order_relaxed);
-        int d_r = values[a_idx] - v;
-        const int next_r = prev_r + d_r;
-        if(is_debug && next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
-        if(next_r > REGRET_FLOOR) {
-          r_atom.fetch_add(d_r, std::memory_order_relaxed);
+    if(!is_frozen(cluster, ctx.regret_storage)) {
+      for(int a_idx = 0; a_idx < n_value_actions; ++a_idx) {
+        if(filter[a_idx]) {
+          auto& r_atom = base_ptr[a_idx];
+          const int prev_r = r_atom.load(std::memory_order_relaxed);
+          int d_r = values[a_idx] - v;
+          const int next_r = prev_r + d_r;
+          if(is_debug && next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
+          if(next_r > REGRET_FLOOR) {
+            r_atom.fetch_add(d_r, std::memory_order_relaxed);
+          }
+          if(is_debug) log_regret(value_actions[a_idx], d_r, next_r);
         }
-        if(is_debug) log_regret(value_actions[a_idx], d_r, next_r);
       }
     }
     return v;
@@ -373,16 +375,18 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
     v_exact = v_r_sum > 0 ? v_exact / v_r_sum : v_a_sum / n_value_actions;
     const int v = static_cast<int>(std::lrint(v_exact));
     if(is_debug) log_net_ev(v, v_exact);
-    for(int a_idx = 0; a_idx < n_value_actions; ++a_idx) {
-      auto& r_atom = base_ptr[a_idx];
-      const int prev_r = r_atom.load(std::memory_order_relaxed);
-      const int d_r = values[a_idx] - v;
-      const int next_r = prev_r + d_r;
-      if(is_debug && next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
-      if(next_r > REGRET_FLOOR) {
-        r_atom.fetch_add(d_r, std::memory_order_relaxed);
+    if(!is_frozen(cluster, ctx.regret_storage)) {
+      for(int a_idx = 0; a_idx < n_value_actions; ++a_idx) {
+        auto& r_atom = base_ptr[a_idx];
+        const int prev_r = r_atom.load(std::memory_order_relaxed);
+        const int d_r = values[a_idx] - v;
+        const int next_r = prev_r + d_r;
+        if(is_debug && next_r > 2'000'000'000) Logger::error("Regret overflowing!\n" + info_str(prev_r, d_r, ctx));
+        if(next_r > REGRET_FLOOR) {
+          r_atom.fetch_add(d_r, std::memory_order_relaxed);
+        }
+        if(is_debug) log_regret(value_actions[a_idx], d_r, next_r);
       }
-      if(is_debug) log_regret(value_actions[a_idx], d_r, next_r);
     }
     return v;
   }
@@ -798,6 +802,10 @@ void TreeBlueprintSolver::track_regret(nlohmann::json& metrics, std::ostringstre
   }
 }
 
+void TreeBlueprintSolver::freeze(const std::vector<float>& freq, const Hand& hand, const Board& board, const ActionHistory& history) {
+  Logger::error("Freezing is not implemented for TreeBlueprintSolver.");
+}
+
 bool TreeBlueprintSolver::operator==(const TreeBlueprintSolver& other) const {
   return TreeSolver::operator==(other) &&
     BlueprintSolver::operator==(other) &&
@@ -816,9 +824,23 @@ TreeRealTimeSolver::TreeRealTimeSolver(const SolverConfig& config, const RealTim
   }
 }
 
-float TreeRealTimeSolver::frequency(const Action action, const PokerState& state, const Board& board, const Hand& hand) const {
-  const TreeDecision decision{get_strategy(), get_config().init_state};
-  return decision.frequency(action, state, board, hand);
+void TreeRealTimeSolver::freeze(const std::vector<float>& freq, const Hand& hand, const Board& board, const ActionHistory& history) {
+  PokerState state = get_config().init_state;
+  const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), board, hand);
+  TreeStorageNode<int>* node = init_regret_storage();
+  for(const Action h_a : history.get_history()) {
+    state = state.apply(h_a);
+    if(node->is_allocated(h_a)) {
+      node = node->apply(h_a, state);
+    }
+    else {
+      Logger::error("Cannot freeze: action in history is unallocated. Action history=" + history.to_string()
+          + ", Unallocated state history=" + state.get_action_history().to_string());
+    }
+  }
+  std::vector<int> regrets;
+  for(float f : freq) regrets.push_back(f * 100'000'000);
+  node->freeze(regrets, cluster);
 }
 
 bool TreeRealTimeSolver::operator==(const TreeRealTimeSolver& other) const {
@@ -828,6 +850,10 @@ bool TreeRealTimeSolver::operator==(const TreeRealTimeSolver& other) const {
 void TreeRealTimeSolver::on_start() {
   TreeSolver::on_start();
   RealTimeSolver::on_start();
+}
+
+bool TreeRealTimeSolver::is_frozen(const int cluster, const TreeStorageNode<int>* storage) const {
+  return storage->is_frozen(cluster);
 }
 
 std::shared_ptr<const TreeStorageConfig> TreeRealTimeSolver::make_tree_config() const {

@@ -13,20 +13,28 @@ struct Solution  {
   std::vector<float> freq;
 };
 
+struct FrozenNode {
+  std::vector<float> freq;
+  Hand hand;
+  Board board;
+  ActionHistory live_actions;
+};
+
 class Pluribus {
 public:
   Pluribus(const ActionProfile& live_profile, const std::shared_ptr<const LosslessBlueprint>& preflop_bp,
     const std::shared_ptr<const SampledBlueprint>& sampled_bp);
   ~Pluribus();
-  void new_game(const std::vector<int>& stacks, int hero_pos);
+  void new_game(const std::vector<int>& stacks, const Hand& hero_hand, int hero_pos);
   void update_state(Action action, int pos);
+  void hero_action(Action action, const std::vector<float>& freq);
   void update_board(const std::vector<uint8_t>& updated_board);
-  Solution solution(const Hand& hand) const;
+  Solution solution(const Hand& hand);
   void save_range(const std::string& fn);
 
 private:
   void _enqueue_job();
-  void _apply_action(Action a);
+  void _apply_action(Action a, const std::vector<float>& freq);
   void _update_root();
   bool _can_solve(const PokerState& root) const;
   // bool _should_solve(const PokerState& root) const;
@@ -45,7 +53,9 @@ private:
   ActionProfile _live_profile;
   std::vector<PokerRange> _ranges;
   std::vector<uint8_t> _board;
+  std::vector<FrozenNode> _frozen;
   std::filesystem::path _log_file;
+  Hand _hero_hand;
   int _hero_pos = -1;
   int _game_idx = 0;
 

@@ -112,6 +112,7 @@ public:
   void set_regret_metrics_config(const MetricsConfig& metrics_config) { _regret_metrics_config = metrics_config; }
   void interrupt() { _interrupt.store(true, std::memory_order_relaxed); }
   bool is_interrupted() const { return _interrupt.load(std::memory_order_relaxed); }
+  virtual void freeze(const std::vector<float>& freq, const Hand& hand, const Board& board, const ActionHistory& history) = 0;
 
   bool operator==(const MCCFRSolver& other) const { return Solver::operator==(other) && _t == other._t; }
 
@@ -125,6 +126,7 @@ protected:
   
   virtual int terminal_utility(const MCCFRContext<StorageT>& context) const;
   virtual bool is_terminal(const SlimPokerState& state, const int i) const { return state.is_terminal() || state.get_players()[i].has_folded(); }
+  virtual bool is_frozen(int cluster, const TreeStorageNode<int>* storage) const = 0;
   virtual void on_start() {}
   virtual void on_step(long t, int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {}
   virtual void on_snapshot() {}
@@ -301,6 +303,7 @@ public:
   explicit TreeBlueprintSolver(const SolverConfig& config = SolverConfig{}, const BlueprintSolverConfig& bp_config = BlueprintSolverConfig{});
 
   const TreeStorageNode<float>* get_phi() const { return _phi_root.get(); }
+  void freeze(const std::vector<float>& freq, const Hand& hand, const Board& board, const ActionHistory& history) override;
 
   bool operator==(const TreeBlueprintSolver& other) const;
   
@@ -313,6 +316,7 @@ public:
 protected:
   void on_start() override;
   void on_snapshot() override;
+  bool is_frozen(int cluster, const TreeStorageNode<int>* storage) const override { return false; }
 
   std::atomic<float>* get_base_avg_ptr(TreeStorageNode<float>* storage, int cluster) override;
   TreeStorageNode<float>* init_avg_storage() override;
@@ -335,7 +339,7 @@ public:
   explicit TreeRealTimeSolver(const SolverConfig& config = SolverConfig{}, const RealTimeSolverConfig& rt_config = RealTimeSolverConfig{},
     const std::shared_ptr<const SampledBlueprint>& bp = nullptr);
 
-  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const override;
+  void freeze(const std::vector<float>& freq, const Hand& hand, const Board& board, const ActionHistory& history) override;
 
   bool operator==(const TreeRealTimeSolver& other) const;
 
@@ -346,6 +350,7 @@ public:
 
 protected:
   void on_start() override;
+  bool is_frozen(int cluster, const TreeStorageNode<int>* storage) const override;
 
   void save_snapshot(const std::string& fn) const override { cereal_save(*this, fn); }
 

@@ -179,6 +179,18 @@ public:
     return is_allocated(_compute_action_index(a, _branching_actions));
   }
 
+  void freeze(const std::vector<int>& regrets, const int cluster) {
+    // TODO: freeze the specific action taken, not all actions
+    _frozen.store(node_value_index(_value_actions.size(), cluster, 0));
+  }
+
+  bool is_frozen(const int cluster, const int action_idx = 0) const {
+    const int frozen_idx = _frozen.load();
+    if(frozen_idx == -1) return false;
+    const int idx = node_value_index(_value_actions.size(), cluster, action_idx);
+    return idx >= frozen_idx && idx < frozen_idx + _value_actions.size();
+  }
+
   const std::vector<Action>& get_branching_actions() const { return _branching_actions; }
   const std::vector<Action>& get_value_actions() const { return _value_actions; }
   int get_n_clusters() const { return _n_clusters; }
@@ -229,7 +241,7 @@ public:
 
   template <class Archive>
   void save(Archive& ar) const {
-    ar(_branching_actions, _value_actions, _n_clusters, _is_root);
+    ar(_branching_actions, _value_actions, _frozen, _n_clusters, _is_root);
     if(_is_root) ar(_config);
     for(int c = 0; c < _n_clusters; ++c) {
       for(int a = 0; a < _value_actions.size(); ++a) {
@@ -247,7 +259,7 @@ public:
   template <class Archive>
   void load(Archive& ar) {
     free_memory();
-    ar(_branching_actions, _value_actions, _n_clusters, _is_root);
+    // ar(_branching_actions, _value_actions, _frozen, _n_clusters, _is_root); // TODO: compatibility
     if(_is_root) ar(_config);
 
     _values = std::make_unique<std::atomic<T>[]>(get_n_values());
@@ -305,6 +317,7 @@ private:
 
   std::vector<Action> _branching_actions;
   std::vector<Action> _value_actions;
+  std::atomic<int> _frozen = -1;
   int _n_clusters;
   std::shared_ptr<const TreeStorageConfig> _config;
 

@@ -13,6 +13,7 @@ def cast(num_str, dt):
 
 def new_game(host, args=None):
   stacks = []
+  if len(hand := (input("Hand: ") if not args else args[0]).strip()) != 4: return print("Invalid hand.")
   if (hero := cast(input("Hero position: ") if args is None else args.pop(0), int)) is None: return None
   if hero < 0: print("Invalid position.")
   while stack := (input(f"Player {len(stacks)} chips: ") if args is None else args.pop(0) if args else None):

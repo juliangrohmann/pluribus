@@ -43,7 +43,7 @@ Pluribus::~Pluribus() {
   if(_solver_thread.joinable()) _solver_thread.join();
 }
 
-void Pluribus::new_game(const std::vector<int>& stacks, const int hero_pos) {
+void Pluribus::new_game(const std::vector<int>& stacks, const Hand& hero_hand, const int hero_pos) {
   Logger::log("================================ New Game ================================");
   std::ostringstream oss;
   Logger::log("Stacks: " + join_as_strs(stacks, ", "));
@@ -51,19 +51,25 @@ void Pluribus::new_game(const std::vector<int>& stacks, const int hero_pos) {
   if(hero_pos < 0 || hero_pos >= poker_config.n_players) {
     Logger::error("0 <= Hero position < " + std::to_string(poker_config.n_players) + " required. Hero position=" + std::to_string(hero_pos));
   }
-  Logger::log("Hero position: " + std::to_string(hero_pos) + " (" + pos_to_str(hero_pos, poker_config.n_players, poker_config.straddle) + ")");
+  _hero_hand = hero_hand;
+  Logger::log("Hero hand: " + _hero_hand.to_string());
+  _hero_pos = hero_pos;
+  Logger::log("Hero position: " + std::to_string(_hero_pos) + " (" + pos_to_str(_hero_pos, poker_config.n_players, poker_config.straddle) + ")");
   if(stacks.size() != poker_config.n_players) {
     Logger::error("Player number mismatch. Expected " + std::to_string(poker_config.n_players) + " players.");
   }
 
-  if(_solver) _solver->interrupt();
-  _solver = nullptr;
-  _hero_pos = hero_pos;
+  {
+    std::lock_guard lk(_solver_mtx);
+    if(_solver) _solver->interrupt();
+    _solver = nullptr;
+  }
   _real_state = PokerState{poker_config.n_players, stacks, poker_config.ante, poker_config.straddle};
   _root_state = _real_state;
   _mapped_bp_actions = ActionHistory{};
   _mapped_live_actions = ActionHistory{};
   _live_profile = _init_profile;
+  _frozen = std::vector<FrozenNode>{};
 
   Logger::log("Real state/Root state:\n" + _root_state.to_string());
   const int init_pos = _root_state.get_players().size() == 2 ? 1 : 2;
@@ -78,7 +84,7 @@ void Pluribus::new_game(const std::vector<int>& stacks, const int hero_pos) {
   }
   Logger::log(oss.str());
 
-  _board.clear();
+  _board = std::vector<uint8_t>{};
   Logger::log("# Board cards: " + std::to_string(_board.size()));
 }
 
@@ -92,7 +98,16 @@ void Pluribus::update_state(const Action action, const int pos) {
   if(_real_state.get_active() != pos) {
     Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state) + " to act.");
   }
-  _apply_action(action);
+  _apply_action(action, {});
+}
+
+void Pluribus::hero_action(const Action action, const std::vector<float>& freq) {
+  Logger::log("============================== Hero Action ===============================");
+  Logger::log(pos_to_str(_hero_pos, _real_state.get_players().size(), _real_state.is_straddle()) + " (Hero): " + action.to_string());
+  if(_real_state.get_active() != _hero_pos) {
+    Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state) + " (hero) to act.");
+  }
+  _apply_action(action, freq);
 }
 
 void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
@@ -110,34 +125,40 @@ void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
   }
 }
 
-Solution Pluribus::solution(const Hand& hand) const {
+Solution Pluribus::solution(const Hand& hand) {
   Solution solution;
-  solution.actions = _solver->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
   const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
-  const RealTimeDecision decision{*_preflop_bp, _solver};
-  for(const Action a : solution.actions) {
-    solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
+  {
+    std::lock_guard lk(_solver_mtx);
+    solution.actions = _solver->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
+    const RealTimeDecision decision{*_preflop_bp, _solver};
+    for(const Action a : solution.actions) {
+      solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
+    }
   }
   return solution;
 }
 
 void Pluribus::save_range(const std::string& fn) {
   PngRangeViewer viewer{fn};
-  const RealTimeDecision decision{*_preflop_bp, _solver};
   std::cout << "Applying live actions...\n";
   std::cout << "Mapped live actions: " << _mapped_live_actions.to_string() << "\n";
   const TreeStorageNode<int>* node = _solver->get_strategy()->apply(_mapped_live_actions.get_history());
-  auto live_ranges = _ranges;
-  PokerState curr_state = _root_state;
-  for(Action a : _mapped_live_actions.get_history()) {
-    std::cout << "Updating range: " << a.to_string() << "\n";
-    update_ranges(_ranges, a, curr_state, Board{_board}, decision);
-    curr_state.apply_in_place(a);
+  {
+    std::lock_guard lk(_solver_mtx);
+    const RealTimeDecision decision{*_preflop_bp, _solver};
+    auto live_ranges = _ranges;
+    PokerState curr_state = _root_state;
+    for(Action a : _mapped_live_actions.get_history()) {
+      std::cout << "Updating range: " << a.to_string() << "\n";
+      update_ranges(_ranges, a, curr_state, Board{_board}, decision);
+      curr_state.apply_in_place(a);
+    }
+    std::cout << "Building renderable ranges...\n";
+    const auto action_ranges = build_renderable_ranges(decision, node->get_value_actions(), _real_state, Board{_board}, live_ranges[_real_state.get_active()]);
+    std::cout << "Rendering ranges...\n";
+    render_ranges(&viewer, live_ranges[_real_state.get_active()], action_ranges);
   }
-  std::cout << "Building renderable ranges...\n";
-  const auto action_ranges = build_renderable_ranges(decision, node->get_value_actions(), _real_state, Board{_board}, live_ranges[_real_state.get_active()]);
-  std::cout << "Rendering ranges...\n";
-  render_ranges(&viewer, live_ranges[_real_state.get_active()], action_ranges);
 }
 
 int terminal_round(const PokerState& root) { 
@@ -196,13 +217,32 @@ bool is_off_tree(const Action a, const std::vector<Action>& actions, const Poker
   return false;
 }
 
-void Pluribus::_apply_action(const Action a) {
-  Logger::log("Applying action: " + a.to_string());
-  const std::vector<Action>& actions = (_solver ? _solver : _preflop_bp)->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
-  Logger::log("Valid actions: " + actions_to_str(actions));
+void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
   const PokerState prev_real_state = _real_state;
-  _real_state = _real_state.apply(a);
-  Logger::log("New state:\n" + _real_state.to_string());
+  std::vector<Action> actions;
+  {
+    std::lock_guard lk(_solver_mtx);
+    Logger::log("Applying action: " + a.to_string());
+    if(_solver) actions = _solver->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
+    else actions = _preflop_bp->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
+    Logger::log("Valid actions: " + actions_to_str(actions));
+
+    _real_state = _real_state.apply(a);
+    Logger::log("New state:\n" + _real_state.to_string());
+
+    if(_solver && prev_real_state.get_active() == _hero_pos) {
+      if(freq.size() != actions.size()) {
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(2) << "Freeze frequency amount mismatch:\nFreeze freq=[";
+        for(int i = 0; i < freq.size(); ++i) oss << freq[i] << (i == freq.size() - 1 ? "]\n" : ", ");
+        oss << "Actions=" + actions_to_str(actions);
+        Logger::dump(oss);
+      }
+      FrozenNode frozen_node{freq, _hero_hand, Board{_board}, _mapped_live_actions};
+      _solver->freeze(frozen_node.freq, frozen_node.hand, frozen_node.board, frozen_node.live_actions);
+      _frozen.push_back(frozen_node);
+    }
+  }
 
   bool should_solve = false;
   if(_can_solve(_root_state) && is_off_tree(a, actions, prev_real_state)) {
@@ -226,11 +266,10 @@ void Pluribus::_apply_action(const Action a) {
     // }
     // Logger::log("New mapped live actions: " + _mapped_live_actions.to_string());
   }
-  else {
-    const Action translated = translate_pseudo_harmonic(a, actions, prev_real_state);
-    _mapped_live_actions.push_back(translated);
-    Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
-  }
+
+  const Action translated = translate_pseudo_harmonic(a, actions, prev_real_state);
+  _mapped_live_actions.push_back(translated);
+  Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
 
   if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
     Logger::log("Round advanced. Updating root...");
@@ -242,24 +281,29 @@ void Pluribus::_apply_action(const Action a) {
 }
 
 void Pluribus::_update_root() {
-  PokerState curr_state = _root_state;
-  const RealTimeDecision decision{*_preflop_bp, _solver};
   std::ostringstream oss;
-  const TreeStorageNode<uint8_t>* node = _sampled_bp->get_strategy()->apply(_mapped_bp_actions.get_history());
-  for(Action a : _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history()) {
-    const Action translated = translate_pseudo_harmonic(a, node->get_branching_actions(), curr_state);
-    _mapped_bp_actions.push_back(translated);
-    Logger::log("Blueprint action translation: " + a.to_string() + " -> " + translated.to_string());
-    oss << pos_to_str(curr_state) << " action applied to ranges: " + translated.to_string() << ", combos: "
-        << std::fixed << std::setprecision(2) << _ranges[curr_state.get_active()].n_combos();
-    const int expected_cards = n_board_cards(curr_state.get_round());
-    if(_board.size() < expected_cards) Logger::error("Not enough board cards. Expected: " + std::to_string(expected_cards) + ", Board=" + cards_to_str(_board));
-    update_ranges(_ranges, a, curr_state, Board{_board}, decision);
-    oss << " -> " << _ranges[curr_state.get_active()].n_combos();
-    Logger::dump(oss);
-    curr_state = curr_state.apply(a);
-    node = node->apply(translated);
+  PokerState curr_state = _root_state;
+  {
+    std::lock_guard lk(_solver_mtx);
+    const RealTimeDecision decision{*_preflop_bp, _solver};
+    const TreeStorageNode<uint8_t>* node = _sampled_bp->get_strategy()->apply(_mapped_bp_actions.get_history());
+    for(Action a : _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history()) {
+      const Action translated = translate_pseudo_harmonic(a, node->get_branching_actions(), curr_state);
+      _mapped_bp_actions.push_back(translated);
+      Logger::log("Blueprint action translation: " + a.to_string() + " -> " + translated.to_string());
+      oss << pos_to_str(curr_state) << " action applied to ranges: " + translated.to_string() << ", combos: "
+          << std::fixed << std::setprecision(2) << _ranges[curr_state.get_active()].n_combos();
+      const int expected_cards = n_board_cards(curr_state.get_round());
+      if(_board.size() < expected_cards) Logger::error("Not enough board cards. Expected: " + std::to_string(expected_cards) + ", Board=" + cards_to_str(_board));
+      update_ranges(_ranges, a, curr_state, Board{_board}, decision);
+      oss << " -> " << _ranges[curr_state.get_active()].n_combos();
+      Logger::dump(oss);
+      curr_state = curr_state.apply(a);
+      node = node->apply(translated);
+    }
+    _frozen = std::vector<FrozenNode>{};
   }
+
   for(int i = 0; i < _ranges.size(); ++i) {
     oss << pos_to_str(i, _ranges.size(), curr_state.is_straddle()) << " card removal, combos: " << _ranges[i].n_combos();
     _ranges[i].remove_cards(_board);
@@ -301,6 +345,7 @@ void Pluribus::_solver_worker() {
     const auto local = std::make_shared<TreeRealTimeSolver>(job->cfg, job->rt_cfg, _sampled_bp);
     {
       std::lock_guard lk(_solver_mtx);
+      for(FrozenNode frozen : _frozen) local->freeze(frozen.freq, frozen.hand, frozen.board, frozen.live_actions);
       _solver = local;
     }
     local->solve(100'000'000'000L);

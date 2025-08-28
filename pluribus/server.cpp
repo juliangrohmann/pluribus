@@ -9,7 +9,11 @@ PluribusServer::PluribusServer(const std::string& preflop_fn, const std::string&
     : _preflop_bp{std::make_shared<LosslessBlueprint>()}, _sampled_bp{std::make_shared<SampledBlueprint>()} {
   cereal_load(*_preflop_bp, preflop_fn);
   cereal_load(*_sampled_bp, sampled_fn);
-  _engine = std::make_unique<Pluribus>(_preflop_bp, _sampled_bp);
+  const int n_players = _preflop_bp->get_config().poker.n_players;
+  ActionProfile live_profile;
+  if(n_players > 2) live_profile = RingLiveProfile{n_players}; // TODO: unify blueprint/live profile into one class and read live profile from _sampled_bp
+  else live_profile = HeadsUpLiveProfile{};
+  _engine = std::make_unique<Pluribus>(live_profile, _preflop_bp, _sampled_bp);
   configure_server();
 }
 
@@ -41,10 +45,13 @@ void PluribusServer::dispatch_commands() {
 
     switch (cmd.type) {
       case CommandType::NewGame:
-        _engine->new_game(cmd.stacks);
+        _engine->new_game(cmd.stacks, cmd.hand, cmd.pos);
         break;
       case CommandType::UpdateState:
         _engine->update_state(cmd.action, cmd.pos);
+        break;
+      case CommandType::HeroAction:
+        _engine->hero_action(cmd.action, cmd.freq);
         break;
       case CommandType::UpdateBoard:
         _engine->update_board(cmd.board);
@@ -63,8 +70,9 @@ void PluribusServer::configure_server() {
     // ReSharper disable once CppDeprecatedEntity
     auto dat = json::parse(req.body.begin(), req.body.end());
     const auto stacks = dat.at("stacks").template get<std::vector<int>>();
-    const auto hero_pos = dat.at("hero").template get<int>();
-    Logger::log("POST: /new_game stacks=[" + join_as_strs(stacks, ", ") + "], hero=" + std::to_string(hero_pos));
+    const auto hero_hand = Hand{dat.at("hero_hand").template get<std::string>()};
+    const auto hero_pos = dat.at("hero_pos").template get<int>();
+    Logger::log("POST: /new_game stacks=[" + join_as_strs(stacks, ", ") + "], hero_hand=" + hero_hand.to_string() + ", hero_pos=" + std::to_string(hero_pos));
     {
       std::lock_guard lock(_cmd_mtx);
       _cmd_queue.push_back(Command::make_new_game(stacks, hero_pos));
@@ -82,6 +90,20 @@ void PluribusServer::configure_server() {
     {
       std::lock_guard lock(_cmd_mtx);
       _cmd_queue.push_back(Command::make_update_state(action, pos));
+    }
+    _cmd_cv.notify_one();
+    res.set_content(R"({"status":"ok"})", "application/json");
+  });
+
+  _server.Post("/hero_action", [&](auto& req, auto& res){
+    // ReSharper disable once CppDeprecatedEntity
+    auto dat = json::parse(req.body.begin(), req.body.end());
+    const auto action = Action{dat.at("action").template get<float>()};
+    const auto freq = dat.at("freq").template get<std::vector<float>>();
+    Logger::log("POST: /update_state action=" + action.to_string() + ", freq=[" + join_as_strs(freq, ", ") + "]");
+    {
+      std::lock_guard lock(_cmd_mtx);
+      _cmd_queue.push_back(Command::make_hero_action(action, freq));
     }
     _cmd_cv.notify_one();
     res.set_content(R"({"status":"ok"})", "application/json");
