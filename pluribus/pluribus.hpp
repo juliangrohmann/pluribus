@@ -49,7 +49,7 @@ private:
   PokerState _real_state;
   ActionHistory _mapped_bp_actions;
   ActionHistory _mapped_live_actions;
-  const std::array<ActionProfile, 4>& _init_profiles;
+  std::array<ActionProfile, 4> _init_profiles;
   ActionProfile _live_profile;
   std::vector<PokerRange> _ranges;
   std::vector<uint8_t> _board;
