@@ -21,9 +21,9 @@ private:
   const std::shared_ptr<const Solver> _solver;
 };
 
-Pluribus::Pluribus(const ActionProfile& live_profile, const std::shared_ptr<const LosslessBlueprint>& preflop_bp,
+Pluribus::Pluribus(const std::array<ActionProfile, 4>& live_profiles, const std::shared_ptr<const LosslessBlueprint>& preflop_bp,
   const std::shared_ptr<const SampledBlueprint>& sampled_bp)
-    : _preflop_bp{preflop_bp}, _sampled_bp{sampled_bp}, _init_profile{live_profile} {
+    : _preflop_bp{preflop_bp}, _sampled_bp{sampled_bp}, _init_profiles{live_profiles} {
   Logger::log("Pluribus action profile:\n" + _sampled_bp->get_config().action_profile.to_string());
   Logger::log((HoleCardIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hole card indexer."});
   Logger::log((HandIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hand indexer."});
@@ -68,7 +68,7 @@ void Pluribus::new_game(const std::vector<int>& stacks, const Hand& hero_hand, c
   _root_state = _real_state;
   _mapped_bp_actions = ActionHistory{};
   _mapped_live_actions = ActionHistory{};
-  _live_profile = _init_profile;
+  _live_profile = _init_profiles[_real_state.get_round()];
   _frozen = std::vector<FrozenNode>{};
 
   Logger::log("Real state/Root state:\n" + _root_state.to_string());
@@ -312,10 +312,12 @@ void Pluribus::_update_root() {
   }
   _root_state = _real_state;
   _mapped_live_actions = ActionHistory{};
+  _live_profile = _init_profiles[_root_state.get_round()];
   Logger::log("New root:\n" + _root_state.to_string());
   if(_root_state.get_action_history().size() != _mapped_bp_actions.size()) {
     Logger::error("Mapped action length mismatch!\nRoot: " + _root_state.get_action_history().to_string() + "\nMapped: " + _mapped_bp_actions.to_string());
   }
+  Logger::log("New live profile:\n" + _live_profile.to_string());
   Logger::log("Enqueing solve.");
   _enqueue_job();
 }

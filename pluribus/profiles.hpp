@@ -31,7 +31,7 @@ public:
 
 class RingLiveProfile : public ActionProfile {
 public:
-  explicit RingLiveProfile(int n_players);
+  explicit RingLiveProfile(int n_players, int round);
 };
 
 }

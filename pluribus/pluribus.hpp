@@ -22,7 +22,7 @@ struct FrozenNode {
 
 class Pluribus {
 public:
-  Pluribus(const ActionProfile& live_profile, const std::shared_ptr<const LosslessBlueprint>& preflop_bp,
+  Pluribus(const std::array<ActionProfile, 4>& live_profiles, const std::shared_ptr<const LosslessBlueprint>& preflop_bp,
     const std::shared_ptr<const SampledBlueprint>& sampled_bp);
   ~Pluribus();
   void new_game(const std::vector<int>& stacks, const Hand& hero_hand, int hero_pos);
@@ -49,7 +49,7 @@ private:
   PokerState _real_state;
   ActionHistory _mapped_bp_actions;
   ActionHistory _mapped_live_actions;
-  ActionProfile _init_profile;
+  const std::array<ActionProfile, 4>& _init_profiles;
   ActionProfile _live_profile;
   std::vector<PokerRange> _ranges;
   std::vector<uint8_t> _board;

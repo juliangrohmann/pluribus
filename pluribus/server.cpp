@@ -10,10 +10,14 @@ PluribusServer::PluribusServer(const std::string& preflop_fn, const std::string&
   cereal_load(*_preflop_bp, preflop_fn);
   cereal_load(*_sampled_bp, sampled_fn);
   const int n_players = _preflop_bp->get_config().poker.n_players;
-  ActionProfile live_profile;
-  if(n_players > 2) live_profile = RingLiveProfile{n_players}; // TODO: unify blueprint/live profile into one class and read live profile from _sampled_bp
-  else live_profile = HeadsUpLiveProfile{};
-  _engine = std::make_unique<Pluribus>(live_profile, _preflop_bp, _sampled_bp);
+  std::array<ActionProfile, 4> live_profiles;
+  for(int r = 0; r < 4; ++r) {
+    // TODO: unify blueprint/live profiles into one class and read live profiles from _sampled_bp
+    if(n_players > 2) live_profiles[r] = RingLiveProfile{n_players, r};
+    else live_profiles[r] = HeadsUpLiveProfile{};
+  }
+
+  _engine = std::make_unique<Pluribus>(live_profiles, _preflop_bp, _sampled_bp);
   configure_server();
 }
 
