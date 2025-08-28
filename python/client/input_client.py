@@ -12,13 +12,14 @@ def cast(num_str, dt):
     return print("Input is not a number.")
 
 def new_game(host, args=None):
+  print(args)
   stacks = []
-  if len(hero_hand := (input("Hand: ") if not args else args[0]).strip()) != 4: return print("Invalid hand.")
+  if len(hero_hand := (input("Hand: ") if not args else args.pop(0)).strip()) != 4: return print("Invalid hand.")
   if (hero_pos := cast(input("Hero position: ") if args is None else args.pop(0), int)) is None: return None
-  if hero_pos < 0: print("Invalid position.")
+  if hero_pos < 0: return print("Invalid position.")
   while stack := (input(f"Player {len(stacks)} chips: ") if args is None else args.pop(0) if args else None):
     if (v := cast(stack, int)) is not None: stacks.append(v)
-  if hero_pos >= len(stack): print("Invalid position.")
+  if hero_pos >= len(stacks): print("Invalid position.")
   return requests.post(to_url(host, "new_game"), json={"stacks": stacks, "hero_hand": hero_hand, "hero_pos": hero_pos})
 
 def update_state(host, args=None):
@@ -33,7 +34,7 @@ def hero_action(host, args=None):
   if (action := cast(input("Betsize: ") if not args else args.pop(0), float)) is None: return None
   if action < 0: return print("Invalid betsize.")
   while f_str := (input(f"Action {len(freq)} frquency: ") if args is None else args.pop(0) if args else None):
-    if (v := cast(f_str, float)) is not None: stacks.append(v)
+    if (v := cast(f_str, float)) is not None: freq.append(v)
   return requests.post(to_url(host, "hero_action"), json={"action": action, "freq": freq})
 
 def update_board(host, args=None):
@@ -69,6 +70,7 @@ def dispatch_endpoint(host, args, endpoints):
 endpoints = [
   ("new_game", new_game),
   ("update_state", update_state),
+  ("hero_action", hero_action),
   ("update_board", update_board),
   ("solution", solution),
   ("save_range", save_range),

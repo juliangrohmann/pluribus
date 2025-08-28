@@ -31,7 +31,7 @@ struct Command {
     return Command{CommandType::UpdateState, {}, {}, {}, {}, action_, pos_};
   }
   static Command make_hero_action(const Action action_, const std::vector<float>& freq_) {
-    return Command{CommandType::UpdateBoard, {}, {}, freq_, {}, action_, -1};
+    return Command{CommandType::HeroAction, {}, {}, freq_, {}, action_, -1};
   }
   static Command make_update_board(const std::vector<uint8_t>& board_) {
     return Command{CommandType::UpdateBoard, {}, board_};
