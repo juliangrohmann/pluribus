@@ -104,7 +104,7 @@ void PluribusServer::configure_server() {
     auto dat = json::parse(req.body.begin(), req.body.end());
     const auto action = Action{dat.at("action").template get<float>()};
     const auto freq = dat.at("freq").template get<std::vector<float>>();
-    Logger::log("POST: /update_state action=" + action.to_string() + ", freq=[" + join_as_strs(freq, ", ") + "]");
+    Logger::log("POST: /hero_action action=" + action.to_string() + ", freq=[" + join_as_strs(freq, ", ") + "]");
     {
       std::lock_guard lock(_cmd_mtx);
       _cmd_queue.push_back(Command::make_hero_action(action, freq));

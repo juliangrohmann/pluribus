@@ -16,7 +16,7 @@ std::string FrozenNode::to_string() const {
   std::ostringstream oss;
   oss << std::fixed << std::setprecision(4) << "FrozenNode: freq=[";
   for(int i = 0; i < freq.size(); ++i) oss << freq[i] << (i == freq.size() - 1 ? "]" : ", ");
-  oss << ", hand=" << hand.to_string() << ", board=" << board.to_string() << ", live_actions=" << live_actions.to_string();
+  oss << ", hand=" << hand.to_string() << ", board=" << cards_to_str(board) << ", live_actions=" << live_actions.to_string();
   return oss.str();
 }
 
@@ -247,12 +247,12 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
     Logger::log("New state:\n" + _real_state.to_string());
 
     if(_solver && prev_real_state.get_active() == _hero_pos) {
-      const FrozenNode frozen_node{freq, _hero_hand, Board{_board}, _mapped_live_actions};
+      const FrozenNode frozen_node{freq, _hero_hand, _board, _mapped_live_actions};
       Logger::log("Freezing hero actions. " + frozen_node.to_string());
       if(freq.size() != actions.size()) {
         Logger::error("Freeze frequency amount mismatch:\nActions=" + actions_to_str(actions));
       }
-      _solver->freeze(frozen_node.freq, frozen_node.hand, frozen_node.board, frozen_node.live_actions);
+      _solver->freeze(frozen_node.freq, frozen_node.hand, Board{frozen_node.board}, frozen_node.live_actions);
       _frozen.push_back(frozen_node);
     }
   }
@@ -360,7 +360,7 @@ void Pluribus::_solver_worker() {
     const auto local = std::make_shared<TreeRealTimeSolver>(job->cfg, job->rt_cfg, _sampled_bp);
     {
       std::lock_guard lk(_solver_mtx);
-      for(FrozenNode frozen : _frozen) local->freeze(frozen.freq, frozen.hand, frozen.board, frozen.live_actions);
+      for(FrozenNode frozen : _frozen) local->freeze(frozen.freq, frozen.hand, Board{frozen.board}, frozen.live_actions);
       _solver = local;
     }
     local->solve(100'000'000'000L);

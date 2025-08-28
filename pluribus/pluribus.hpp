@@ -18,7 +18,7 @@ struct Solution  {
 struct FrozenNode {
   std::vector<float> freq;
   Hand hand;
-  Board board;
+  std::vector<uint8_t> board;
   ActionHistory live_actions;
 
   std::string to_string() const;
