@@ -839,7 +839,7 @@ void TreeRealTimeSolver::freeze(const std::vector<float>& freq, const Hand& hand
     }
   }
   std::vector<int> regrets;
-  for(float f : freq) regrets.push_back(f * 100'000'000);
+  for(const float f : freq) regrets.push_back(f * 100'000'000);
   node->freeze(regrets, cluster);
 }
 

@@ -181,7 +181,14 @@ public:
 
   void freeze(const std::vector<int>& regrets, const int cluster) {
     // TODO: freeze the specific action taken, not all actions
-    _frozen.store(node_value_index(_value_actions.size(), cluster, 0));
+    if(regrets.size() != _value_actions.size()) {
+      Logger::error("Freeze regret amount mismatch: regrets=[" + join_as_strs(regrets, ", ") + "], value_actions=" + actions_to_str(_value_actions));
+    }
+    const int idx = node_value_index(_value_actions.size(), cluster, 0);
+    _frozen.store(idx);
+    for(int a_idx = 0; a_idx < _value_actions.size(); ++a_idx) {
+      _values[idx + a_idx].store(regrets[a_idx]);
+    }
   }
 
   bool is_frozen(const int cluster, const int action_idx = 0) const {
