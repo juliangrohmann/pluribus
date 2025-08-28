@@ -86,7 +86,7 @@ if __name__ == "__main__":
     if inp_args and inp_args[0] == "config":
       with open(inp_args[1]) as f:
         for line in f:
-          if not line.lstrip()[0] == '%': dispatch_endpoint(cmd_args.host, line.split(' '), endpoints)
+          if not line.lstrip()[0] == '%': dispatch_endpoint(cmd_args.host, line.strip().split(' '), endpoints)
     else:
       dispatch_endpoint(cmd_args.host, inp_args, endpoints)
 

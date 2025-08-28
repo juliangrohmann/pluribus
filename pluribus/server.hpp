@@ -24,8 +24,8 @@ struct Command {
   int pos = -1;
   std::string fn;
 
-  static Command make_new_game(const std::vector<int>& stacks_, const int hero_pos) {
-    return Command{CommandType::NewGame, stacks_, {}, {}, {}, Action::UNDEFINED, hero_pos};
+  static Command make_new_game(const std::vector<int>& stacks_, const Hand& hero_hand, const int hero_pos) {
+    return Command{CommandType::NewGame, stacks_, {}, {}, hero_hand, Action::UNDEFINED, hero_pos};
   }
   static Command make_update_state(const Action action_, const int pos_) {
     return Command{CommandType::UpdateState, {}, {}, {}, {}, action_, pos_};

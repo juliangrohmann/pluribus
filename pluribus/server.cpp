@@ -79,7 +79,7 @@ void PluribusServer::configure_server() {
     Logger::log("POST: /new_game stacks=[" + join_as_strs(stacks, ", ") + "], hero_hand=" + hero_hand.to_string() + ", hero_pos=" + std::to_string(hero_pos));
     {
       std::lock_guard lock(_cmd_mtx);
-      _cmd_queue.push_back(Command::make_new_game(stacks, hero_pos));
+      _cmd_queue.push_back(Command::make_new_game(stacks, hero_hand, hero_pos));
     }
     _cmd_cv.notify_one();
     res.set_content(R"({"status":"ok"})", "application/json");
