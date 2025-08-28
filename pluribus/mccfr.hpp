@@ -59,13 +59,13 @@ template <template<typename> class StorageT>
 struct MCCFRContext {
   MCCFRContext(SlimPokerState& state_, const long t_, const int i_, const int consec_folds_, const Board& board_,
       const std::vector<Hand>& hands_, std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_,
-      const StorageT<uint8_t>* bp_node_)
+      const StorageT<uint8_t>* bp_node_, SlimPokerState& bp_state_)
     : state{state_}, t{t_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
-      regret_storage{regret_storage_}, bp_node{bp_node_} {}
+      regret_storage{regret_storage_}, bp_node{bp_node_}, bp_state{bp_state_} {}
   MCCFRContext(SlimPokerState& next_state, StorageT<int>* next_regret_storage, const StorageT<uint8_t>* next_bp_node, const int next_consec_folds,
       const MCCFRContext& context)
     : state{next_state}, t{context.t}, i{context.i}, consec_folds{next_consec_folds}, board{context.board}, hands{context.hands},
-      indexers{context.indexers}, eval{context.eval}, regret_storage{next_regret_storage}, bp_node{next_bp_node} {}
+      indexers{context.indexers}, eval{context.eval}, regret_storage{next_regret_storage}, bp_node{next_bp_node}, bp_state{context.bp_state} {}
 
   SlimPokerState& state;
   const long t;
@@ -77,6 +77,7 @@ struct MCCFRContext {
   const omp::HandEvaluator& eval;
   StorageT<int>* regret_storage;
   const StorageT<uint8_t>* bp_node;
+  SlimPokerState& bp_state;
 };
 
 template <template<typename> class StorageT>
@@ -145,7 +146,7 @@ protected:
   virtual const StorageT<uint8_t>* init_bp_node() = 0;
   virtual StorageT<int>* next_regret_storage(StorageT<int>* storage, int action_idx, const SlimPokerState& next_state, int i) = 0;
   virtual StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const SlimPokerState& next_state, int i) = 0;
-  virtual const StorageT<uint8_t>* next_bp_node(Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) = 0;
+  virtual const StorageT<uint8_t>* next_bp_node(Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node, SlimPokerState& bp_state) = 0;
   virtual const std::vector<Action>& regret_branching_actions(StorageT<int>* storage) const = 0;
   virtual const std::vector<Action>& regret_value_actions(StorageT<int>* storage) const = 0;
   virtual const std::vector<Action>& avg_branching_actions(StorageT<float>* storage) const = 0;
@@ -249,7 +250,7 @@ protected:
   MetricsConfig get_avg_metrics_config() const { return _avg_metrics_config; }
 
   const StorageT<uint8_t>* init_bp_node() override { return nullptr; }
-  const StorageT<uint8_t>* next_bp_node(Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) override { return bp_node; }
+  const StorageT<uint8_t>* next_bp_node(Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node, SlimPokerState& bp_state) override { return bp_node; }
 
 private:
   MetricsConfig _avg_metrics_config;
@@ -286,7 +287,7 @@ protected:
   StorageT<float>* init_avg_storage() override { return nullptr; }
   const StorageT<uint8_t>* init_bp_node() override { return _root_node; }
   StorageT<float>* next_avg_storage(StorageT<float>* storage, int action_idx, const SlimPokerState& next_state, int i) override { return nullptr; }
-  const StorageT<uint8_t>* next_bp_node(Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) override;
+  const StorageT<uint8_t>* next_bp_node(Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node, SlimPokerState& bp_state) override;
 
 private:
   Action next_rollout_action(CachedIndexer& indexer, const SlimPokerState& state, const Hand& hand, const Board& board,

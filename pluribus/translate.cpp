@@ -15,6 +15,7 @@ std::vector<std::pair<Action, double>> translatable_actions(const SlimPokerState
 }
 
 TranslationResult pseudo_harmonic_result(const Action a, const std::vector<Action>& actions, const SlimPokerState& state) {
+  if(a == Action::FOLD) return {Action::FOLD, Action::FOLD, 1.0};
   const double x = a != Action::ALL_IN ? a.get_bet_type() : fractional_bet_size(state, total_bet_size(state, Action::ALL_IN));
   if(x < 0.0) return {a, a, 1.0};
   const auto translatable = translatable_actions(state, actions);

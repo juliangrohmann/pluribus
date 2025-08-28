@@ -11,9 +11,10 @@ namespace pluribus {
 template <template<typename> class StorageT>
 int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state, int i, const Board& board,
     const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) {
-  SlimPokerState slim_state{state};
-  return trainer->traverse_mccfr(MCCFRContext<StorageT>{slim_state, 1, i, 0, board, hands, indexers, eval, trainer->init_regret_storage(),
-      trainer->init_bp_node()});
+  SlimPokerState init_state{state};
+  SlimPokerState bp_state{state};
+  return trainer->traverse_mccfr(MCCFRContext<StorageT>{init_state, 1, i, 0, board, hands, indexers, eval, trainer->init_regret_storage(),
+      trainer->init_bp_node(), bp_state});
 }
 
 }

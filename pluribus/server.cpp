@@ -130,12 +130,13 @@ void PluribusServer::configure_server() {
     // ReSharper disable once CppDeprecatedEntity
     auto dat = json::parse(req.body.begin(), req.body.end());
     const auto hand = Hand{dat.at("hand").template get<std::string>()};
-    auto [actions, freq] = _engine->solution(hand);
+    auto [actions, freq, aligned] = _engine->solution(hand);
     std::vector<std::string> str_actions;
     std::ranges::transform(actions.begin(), actions.end(), std::back_inserter(str_actions), [](const Action a) { return a.to_string(); });
     json j;
     j["actions"] = str_actions;
     j["freq"]    = freq;
+    j["aligned"] = aligned;
     j["status"]  = "ok";
     res.set_content(j.dump(), "application/json");
   });

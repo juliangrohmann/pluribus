@@ -9,6 +9,7 @@ std::string Solution::to_string() const {
   std::ostringstream oss;
   oss << std::fixed << std::setprecision(4) << "Solution: actions=" << actions_to_str(actions) << ", freq=[";
   for(int i = 0; i < actions.size(); ++i) oss << freq[i] << (i == freq.size() - 1 ? "]" : ", ");
+  oss << ", aligned=" << (aligned ? "true" : "false") << "\n";
   return oss.str();
 }
 
@@ -107,13 +108,27 @@ std::string chips_to_str(const PokerState& state, const int i) {
   return pos_to_str(i, state.get_players().size(), state.is_straddle()) + " chips = " + std::to_string(state.get_players()[i].get_chips());
 }
 
+void handle_misaligned_state_update(PokerState& real_state, const PokerState& mapped_state, const Action action) {
+  // TODO: replace closest actions in profile with exact actions instead and resolve when misaligned
+  Logger::log("WARNING: Mapped state is NOT aligned. Not mapping until aligned.");
+  Logger::log("Real state:\n" + real_state.to_string());
+  Logger::log("Mapped live state:\n" + mapped_state.to_string());
+  real_state.apply_in_place(action);
+}
+
 void Pluribus::update_state(const Action action, const int pos) {
   Logger::log("============================== Update State ==============================");
   Logger::log(pos_to_str(pos, _real_state.get_players().size(), _real_state.is_straddle()) + ": " + action.to_string());
   if(_real_state.get_active() != pos) {
     Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state) + " to act.");
   }
-  _apply_action(action, {});
+  const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
+  if(mapped_state.get_round() != _real_state.get_round() || mapped_state.get_active() != _real_state.get_active()) {
+    handle_misaligned_state_update(_real_state, mapped_state, action);
+  }
+  else {
+    _apply_action(action, {});
+  }
 }
 
 void Pluribus::hero_action(const Action action, const std::vector<float>& freq) {
@@ -122,7 +137,13 @@ void Pluribus::hero_action(const Action action, const std::vector<float>& freq) 
   if(_real_state.get_active() != _hero_pos) {
     Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state) + " (hero) to act.");
   }
-  _apply_action(action, freq);
+  const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
+  if(mapped_state.get_round() != _real_state.get_round() || mapped_state.get_active() != _real_state.get_active()) {
+    handle_misaligned_state_update(_real_state, mapped_state, action);
+  }
+  else {
+    _apply_action(action, freq);
+  }
 }
 
 void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
@@ -148,10 +169,9 @@ std::vector<Action> Pluribus::_get_solution_actions() const {
     actions = _solver->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
   }
   else {
-    Logger::log("Applying blueprint actions to preflop blueprint. Mapped blueprint actions: " + _mapped_bp_actions.to_string());
-    const TreeStorageNode<float>* node = _preflop_bp->get_strategy()->apply(_mapped_bp_actions.get_history());
+    if(!_mapped_bp_actions.get_history().empty()) Logger::error("No solver available, but mapped blueprint actions exist.");
     Logger::log("Applying live actions to preflop blueprint. Mapped live actions: " + _mapped_live_actions.to_string());
-    actions = node->apply(_mapped_live_actions.get_history())->get_value_actions();
+    actions = _preflop_bp->get_strategy()->apply(_mapped_live_actions.get_history())->get_value_actions();
   }
   Logger::log("Value actions=" + actions_to_str(actions));
   return actions;
@@ -161,13 +181,26 @@ Solution Pluribus::solution(const Hand& hand) {
   Logger::log("================================ Solution ================================");
   Solution solution;
   const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
-  {
-    std::lock_guard lk(_solver_mtx);
-    solution.actions = _get_solution_actions();
-    const RealTimeDecision decision{*_preflop_bp, _solver};
-    for(const Action a : solution.actions) {
-      solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
+  if(mapped_state.get_round() == _real_state.get_round() && mapped_state.get_active() == _real_state.get_active()) {
+    Logger::log("Mapped state is aligned. Returning real solution.");
+    solution.aligned = true;
+    {
+      std::lock_guard lk(_solver_mtx);
+      solution.actions = _get_solution_actions();
+      const RealTimeDecision decision{*_preflop_bp, _solver};
+      for(const Action a : solution.actions) {
+        solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
+      }
     }
+  }
+  else {
+    // TODO: replace closest actions in profile with exact actions instead and resolve when misaligned
+    Logger::log("WARNING: Mapped state is NOT aligned. Returning check/call until aligned.");
+    Logger::log("Real state:\n" + _real_state.to_string());
+    Logger::log("Mapped live state:\n" + mapped_state.to_string());
+    solution.actions = {Action::CHECK_CALL};
+    solution.freq = {1.0};
+    solution.aligned = false;
   }
   Logger::log(solution.to_string());
   return solution;
@@ -199,7 +232,11 @@ int terminal_round(const PokerState& root) {
   return root.get_round() >= 2 || (root.get_round() == 1 && root.active_players() == 2) ? 4 : root.get_round() + 1;
 }
 
-void Pluribus::_enqueue_job() {
+int terminal_bet_level(const PokerState& root) {
+  return root.get_round() == 1 && root.active_players() > 2 ? root.get_bet_level() + 2 : 999;
+}
+
+void Pluribus::_enqueue_job(const bool force_terminal) {
   Logger::log("Initializing solver: MappedRealTimeSolver");
   SolverConfig config{_sampled_bp->get_config().poker, _live_profile};
   config.rake = _sampled_bp->get_config().rake;
@@ -209,8 +246,8 @@ void Pluribus::_enqueue_job() {
   RealTimeSolverConfig rt_config;
   rt_config.bias_profile = BiasActionProfile{};
   rt_config.init_actions = _mapped_bp_actions.get_history();
-  rt_config.terminal_round = terminal_round(_root_state);
-  rt_config.terminal_bet_level = 999;
+  rt_config.terminal_round = force_terminal ? 4 : terminal_round(_root_state);
+  rt_config.terminal_bet_level = force_terminal ? 999 : terminal_bet_level(_root_state);
   SolveJob job{config, rt_config};
   {
     std::lock_guard lk(_solver_mtx);
@@ -253,10 +290,11 @@ bool is_off_tree(const Action a, const std::vector<Action>& actions, const Poker
 
 void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
   const PokerState prev_real_state = _real_state;
+  std::vector<Action> actions;
   {
     std::lock_guard lk(_solver_mtx);
     Logger::log("Applying action: " + a.to_string());
-    const std::vector<Action> actions = _get_solution_actions();
+    actions = _get_solution_actions();
 
     _real_state = _real_state.apply(a);
     Logger::log("New state:\n" + _real_state.to_string());
@@ -304,30 +342,66 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
     _update_root();
   }
   else if(should_solve) {
-    _enqueue_job();
+    _enqueue_job(false);
   }
 }
 
 void Pluribus::_update_root() {
+  Logger::log("Updating root...");
+  Logger::log("Root state:\n" + _root_state.to_string());
+  Logger::log("Real state:\n" + _real_state.to_string());
+  Logger::log("Mapped blueprint actions=" + _mapped_bp_actions.to_string());
+  Logger::log("Mapped live actions=" + _mapped_live_actions.to_string());
   std::ostringstream oss;
   PokerState curr_state = _root_state;
+  PokerState bp_state = _root_state;
+  PokerState live_state = _root_state;
+  bool force_terminal = false;
   {
     std::lock_guard lk(_solver_mtx);
     const RealTimeDecision decision{*_preflop_bp, _solver};
-    const TreeStorageNode<uint8_t>* node = _sampled_bp->get_strategy()->apply(_mapped_bp_actions.get_history());
-    for(Action a : _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history()) {
-      const Action translated = translate_pseudo_harmonic(a, node->get_branching_actions(), curr_state);
-      _mapped_bp_actions.push_back(translated);
-      Logger::log("Blueprint action translation: " + a.to_string() + " -> " + translated.to_string());
-      oss << pos_to_str(curr_state) << " action applied to ranges: " + translated.to_string() << ", combos: "
+    const TreeStorageNode<uint8_t>* bp_node = _sampled_bp->get_strategy()->apply(_mapped_bp_actions.get_history());
+    std::vector<Action> real_history = _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history();
+    for(int h_idx = 0; h_idx < _mapped_live_actions.size(); ++h_idx) {
+      Logger::log("\nProcessing next live action: " + _mapped_live_actions.get(h_idx).to_string());
+      Action real_action = real_history.size() > h_idx ? real_history[h_idx] : Action::UNDEFINED;
+
+      if(!force_terminal) {
+        if(real_action != Action::UNDEFINED) {
+          const Action bp_translated = translate_pseudo_harmonic(real_action, bp_node->get_branching_actions(), curr_state);
+          Logger::log("Blueprint action translation: " + real_action.to_string() + " -> " + bp_translated.to_string());
+          _mapped_bp_actions.push_back(bp_translated);
+          bp_state = bp_state.apply(bp_translated);
+          Logger::log("Blueprint state:\n" + bp_state.to_string());
+          if(bp_state.get_active() == curr_state.get_active() && bp_state.get_round() == curr_state.get_round()) {
+            bp_node = bp_node->apply(bp_translated);
+          }
+          else {
+            Logger::log("Blueprint state mismatch. Forcing terminal solve.");
+            force_terminal = true;
+          }
+        }
+        else {
+          Logger::log("Live state mismatch. Forcing terminal solve.");
+          force_terminal = true;
+        }
+      }
+
+      const Action live_translated = _mapped_live_actions.get(h_idx);
+      oss << pos_to_str(live_state) << " action applied to ranges: " + live_translated.to_string() << ", combos: "
           << std::fixed << std::setprecision(2) << _ranges[curr_state.get_active()].n_combos();
       const int expected_cards = n_board_cards(curr_state.get_round());
-      if(_board.size() < expected_cards) Logger::error("Not enough board cards. Expected: " + std::to_string(expected_cards) + ", Board=" + cards_to_str(_board));
-      update_ranges(_ranges, a, curr_state, Board{_board}, decision);
+      if(_board.size() < expected_cards) Logger::error("Not enough board cards. Expected="+std::to_string(expected_cards) + ", Board="+cards_to_str(_board));
+      update_ranges(_ranges, live_translated, live_state, Board{_board}, decision);
       oss << " -> " << _ranges[curr_state.get_active()].n_combos();
       Logger::dump(oss);
-      curr_state = curr_state.apply(a);
-      node = node->apply(translated);
+      live_state = live_state.apply(live_translated);
+      Logger::log("Live state:\n" + live_state.to_string());
+
+      if(real_action != Action::UNDEFINED) {
+        curr_state = curr_state.apply(real_action);
+        Logger::log("Current state:\n" + curr_state.to_string());
+      }
     }
     _frozen = std::vector<FrozenNode>{};
   }
@@ -347,7 +421,7 @@ void Pluribus::_update_root() {
   }
   Logger::log("New live profile:\n" + _live_profile.to_string());
   Logger::log("Enqueing solve.");
-  _enqueue_job();
+  _enqueue_job(force_terminal);
 }
 
 bool Pluribus::_can_solve(const PokerState& root) const {

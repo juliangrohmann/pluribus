@@ -11,6 +11,7 @@ namespace pluribus {
 struct Solution  {
   std::vector<Action> actions;
   std::vector<float> freq;
+  bool aligned = true;
 
   std::string to_string() const;
 };
@@ -38,7 +39,7 @@ public:
 
 private:
   std::vector<Action> _get_solution_actions() const;
-  void _enqueue_job();
+  void _enqueue_job(bool force_terminal);
   void _apply_action(Action a, const std::vector<float>& freq);
   void _update_root();
   bool _can_solve(const PokerState& root) const;

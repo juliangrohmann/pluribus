@@ -112,7 +112,8 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         }
         on_step(t, i, sample.hands, indexers);
         SlimPokerState state{get_config().init_state};
-        MCCFRContext<StorageT> ctx{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), init_bp_node()};
+        SlimPokerState bp_state{get_config().init_state};
+        MCCFRContext<StorageT> ctx{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), init_bp_node(), bp_state};
         if(should_prune(t)) {
           if(is_debug) Logger::log("============== Traverse MCCFR-P ==============");
           traverse_mccfr_p(ctx);
@@ -293,7 +294,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
         SlimPokerState next_state = ctx.state.apply_copy(a);
         const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
         const int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-            next_bp_node(a, ctx.state, ctx.bp_node), next_consec_folds(ctx.consec_folds, a), ctx});
+            next_bp_node(a, ctx.state, ctx.bp_node, ctx.bp_state), next_consec_folds(ctx.consec_folds, a), ctx});
         const int v_r = std::max(regret, 0);
         values[a_idx] = v_a;
         v_exact += static_cast<double>(v_r) * static_cast<double>(v_a);
@@ -330,7 +331,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
-  auto next_node = next_bp_node(a, ctx.state, ctx.bp_node);
+  auto next_node = next_bp_node(a, ctx.state, ctx.bp_node, ctx.bp_state);
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
   return traverse_mccfr_p(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
@@ -364,7 +365,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
       const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
       SlimPokerState next_state = ctx.state.apply_copy(a);
       const int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-        next_bp_node(a, ctx.state, ctx.bp_node), next_consec_folds(ctx.consec_folds, a), ctx});
+        next_bp_node(a, ctx.state, ctx.bp_node, ctx.bp_state), next_consec_folds(ctx.consec_folds, a), ctx});
       const int v_r = std::max(base_ptr[a_idx].load(std::memory_order_relaxed), 0);
       values[a_idx] = v_a;
       v_exact += static_cast<double>(v_r) * static_cast<double>(v_a);
@@ -395,7 +396,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
   const int a_idx = external_sampling(value_actions, ctx);
   const Action a = value_actions[a_idx];
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
-  auto next_node = next_bp_node(a, ctx.state, ctx.bp_node);
+  auto next_node = next_bp_node(a, ctx.state, ctx.bp_node, ctx.bp_state);
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
   return traverse_mccfr(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
@@ -631,9 +632,16 @@ RealTimeSolver<StorageT>::RealTimeSolver(const std::shared_ptr<const SampledBlue
     : _bp{bp}, _root_node{bp->get_strategy()->apply(rt_config.init_actions)}, _rt_config{rt_config} {}
 
 template<template <typename> class StorageT>
-const StorageT<uint8_t>* RealTimeSolver<StorageT>::next_bp_node(const Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node) {
+const StorageT<uint8_t>* RealTimeSolver<StorageT>::next_bp_node(const Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node,
+    SlimPokerState& bp_state) {
   if(_rt_config.is_terminal() || state.apply_copy(a).is_terminal()) return nullptr;
-  return !is_bias(a) ? bp_node->apply(translate_pseudo_harmonic(a, bp_node->get_branching_actions(), state)) : bp_node; // TODO: cache by node pointer
+  if(!is_bias(a) && bp_state.get_round() == state.get_round() && bp_state.get_active() == state.get_active()) {
+    // ignore action if bp_state ran ahead (bp_state can never fall behind, only run ahead due to action translation)
+    const Action translated = translate_pseudo_harmonic(a, bp_node->get_branching_actions(), state); // TODO: cache by node pointer
+    bp_state.apply_in_place(translated);
+    return bp_node->apply(a);
+  }
+  return bp_node;
 }
 
 template <template<typename> class StorageT>
@@ -669,14 +677,15 @@ int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& ctx
   SlimPokerState curr_state = ctx.state;
   const TreeStorageNode<uint8_t>* node = ctx.bp_node;
   while(!curr_state.is_terminal() && !curr_state.get_players()[ctx.i].has_folded()) {
-    Action ra = next_rollout_action(ctx.indexers[curr_state.get_active()], curr_state, ctx.hands[curr_state.get_active()],
-      ctx.board, node);
-    // std::cout << "Rollout action: " << ra.to_string() << "\n";
-    curr_state.apply_in_place(ra);
-    if(!curr_state.is_terminal()) node = node->apply(ra);
-    // std::cout << "Applied:\n" << curr_state.to_string();
-    // std::cout << "Is terminal: " << curr_state.is_terminal() << "\n";
-    // std::cout << ctx.i << " folded: " << curr_state.get_players()[ctx.i].has_folded() << "\n";
+    if(curr_state.get_round() == ctx.bp_state.get_round() && curr_state.get_active() == ctx.bp_state.get_active()) {
+      const Action rollout_action = next_rollout_action(ctx.indexers[curr_state.get_active()], curr_state, ctx.hands[curr_state.get_active()], ctx.board, node);
+      curr_state.apply_in_place(rollout_action);
+      if(!curr_state.is_terminal()) node = node->apply(rollout_action);
+    }
+    else {
+      // roll state forward until real state and blueprint state are aligned again
+      curr_state.apply_in_place(Action::CHECK_CALL);
+    }
   }
   return utility(curr_state, ctx.i, ctx.board, ctx.hands, this->get_config().init_chips[ctx.i], this->get_config().rake, ctx.eval);
 }
