@@ -840,8 +840,11 @@ void TreeRealTimeSolver::freeze(const std::vector<float>& freq, const Hand& hand
   TreeStorageNode<int>* node = init_regret_storage();
   Logger::log("Applying history...");
   for(const Action h_a : history.get_history()) {
+    Logger::log("Applying " + h_a.to_string());
     state = state.apply(h_a);
+    Logger::log("Applied to state");
     node = node->apply(h_a, state);
+    Logger::log("Applied to node");
   }
   Logger::log("Applied...");
   std::vector<int> regrets;

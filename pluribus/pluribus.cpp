@@ -17,8 +17,8 @@ std::string FrozenNode::to_string() const {
   std::ostringstream oss;
   oss << std::fixed << std::setprecision(4) << "FrozenNode: freq=[";
   for(int i = 0; i < freq.size(); ++i) oss << freq[i] << (i == freq.size() - 1 ? "]" : ", ");
-  oss << "actions=" << actions_to_str(actions);
-  oss << ", hand=" << hand.to_string() << ", board=" << cards_to_str(board) << ", live_actions=" << live_actions.to_string();
+  oss << ", actions=[" << actions_to_str(actions) << "], hand=" << hand.to_string() << ", board=" << cards_to_str(board)
+      << ", live_actions=" << live_actions.to_string();
   return oss.str();
 }
 
@@ -352,7 +352,7 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
       oss << "    \n" << node.to_string() << "\n -> ";
       PokerState remapped_state = _root_state.apply(node.live_actions);
       auto remapped_actions = valid_actions(remapped_state, _live_profile);
-      auto remapped_freq = std::vector<float>(node.actions.size());
+      auto remapped_freq = std::vector<float>(remapped_actions.size());
       for(int i = 0; i < remapped_actions.size(); ++i) {
         auto it = std::find(node.actions.begin(), node.actions.end(), remapped_actions[i]);
         if(it != node.actions.end()) {
