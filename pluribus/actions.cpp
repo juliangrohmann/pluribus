@@ -81,6 +81,10 @@ void ActionProfile::sort(const int round, const int bet_level, const int pos, co
   std::ranges::sort(_profile[round][bet_level][pos][static_cast<int>(in_position)], std::ranges::less{}, &sort_key);
 }
 
+bool can_isolate(const SlimPokerState& state) {
+  return state.get_round() == 0 && state.get_bet_level() == 1 && state.vpip_players() > 0;
+}
+
 void ActionProfile::set_actions(const std::vector<Action>& actions, const int round, const int bet_level, const int pos, const bool in_position) {
   grow_to_fit(round, bet_level, pos, in_position);
   _profile[round][bet_level][pos][in_position] = actions;
@@ -92,7 +96,16 @@ void ActionProfile::set_iso_actions(const std::vector<Action>& actions, const in
   _iso_actions[pos][static_cast<int>(in_position)] = actions;
 }
 
-void ActionProfile::add_action(const Action action, const int round, const int bet_level, const int pos, const bool in_position) {
+void ActionProfile::add_action(const Action action, const SlimPokerState& state) {
+  if(can_isolate(state)) {
+    add_iso_action(action, state.get_active(), state.is_in_position(state.get_active()));
+  }
+  else {
+    add_action_raw(action, state.get_round(), state.get_bet_level(), state.get_active(), state.is_in_position(state.get_active()));
+  }
+}
+
+void ActionProfile::add_action_raw(const Action action, const int round, const int bet_level, const int pos, const bool in_position) {
   grow_to_fit(round, bet_level, pos, in_position);
   _profile[round][bet_level][pos][in_position].push_back(action);
   sort(round, bet_level, pos, in_position);
@@ -103,7 +116,7 @@ void ActionProfile::add_iso_action(const Action action, const int pos, bool in_p
   _iso_actions[pos][static_cast<int>(in_position)].push_back(action);
 }
 
-const std::vector<Action>& ActionProfile::get_actions_from_raw(const int round, const int bet_level, const int pos, const bool in_position) const {
+const std::vector<Action>& ActionProfile::get_actions_raw(const int round, const int bet_level, const int pos, const bool in_position) const {
   const int level_idx = std::min(bet_level, static_cast<int>(_profile[round].size()) - 1);
   const int pos_idx = std::min(pos, static_cast<int>(_profile[round][level_idx].size()) - 1);
   const auto& ip_vec = _profile[round][level_idx][pos_idx];
@@ -117,10 +130,10 @@ const std::vector<Action>& ActionProfile::get_iso_actions(const int pos, const b
 }
 
 const std::vector<Action>& ActionProfile::get_actions(const SlimPokerState& state) const {
-  if(state.get_round() == 0 && state.get_bet_level() == 1 && state.vpip_players() > 0) {
+  if(can_isolate(state)) {
     return get_iso_actions(state.get_active(), state.is_in_position(state.get_active()));
   }
-  return get_actions_from_raw(state.get_round(), state.get_bet_level(), state.get_active(), state.is_in_position(state.get_active()));
+  return get_actions_raw(state.get_round(), state.get_bet_level(), state.get_active(), state.is_in_position(state.get_active()));
 }
 
 std::unordered_set<Action> ActionProfile::all_actions() const {
@@ -218,7 +231,7 @@ CombinedActionProfile::CombinedActionProfile(const int hero_pos, const ActionPro
     for(int bet_level = round == 0 ? 1 : 0; bet_level <= max_level; ++bet_level) {
       for(int pos = 0; pos < n_players(); ++pos) {
         for(int ip = 0; ip <= 1; ++ip) {
-          const auto& actions = (pos == hero_pos && round <= max_round ? hero_profile : villain_profile).get_actions_from_raw(round, bet_level, pos, ip);
+          const auto& actions = (pos == hero_pos && round <= max_round ? hero_profile : villain_profile).get_actions_raw(round, bet_level, pos, ip);
           set_actions(actions, round, bet_level, pos, ip);
         }
       }

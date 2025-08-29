@@ -163,7 +163,7 @@ void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
   _board = updated_board;
   if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
     Logger::log("Street advanced. Updating root...");
-    _update_root();
+    _update_root(true);
   }
 }
 
@@ -286,8 +286,8 @@ bool is_off_tree(const Action a, const std::vector<Action>& actions, const Poker
   if(min_diff > 0.25 && total_diff > 150) {
     Logger::log("Action is off tree: Action=" + a.to_string() + ", Tree actions=" + actions_to_str(actions));
     std::ostringstream oss;
-    oss << std::fixed << std::setprecision(2) << "Max frac difference=" << min_diff << "\nAction size=" << std::setprecision(0) << action_size
-        << "\nClosest size=" << closest_size << "\nMax total difference=" << total_diff;
+    oss << std::fixed << std::setprecision(2) << "Max frac difference=" << min_diff << ", Action size=" << std::setprecision(0) << action_size
+        << ", Closest size=" << closest_size << ", Max total difference=" << total_diff;
     Logger::dump(oss);
     return true;
   }
@@ -300,8 +300,6 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
   {
     std::lock_guard lk(_solver_mtx);
     Logger::log("Applying action: " + a.to_string());
-    _real_state = _real_state.apply(a);
-    Logger::log("New state:\n" + _real_state.to_string());
     actions = _get_solution_actions();
     if(prev_real_state.get_active() == _hero_pos) {
       const FrozenNode frozen_node{actions, freq, _hero_hand, _board, _mapped_live_actions};
@@ -321,8 +319,7 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
   if(_can_solve(_root_state) && is_off_tree(a, actions, prev_real_state)) {
     should_solve = true;
     Logger::log("Action is off-tree. Adding to live actions...");
-    _live_profile.add_action(a, prev_real_state.get_round(), prev_real_state.get_bet_level(), prev_real_state.get_active(),
-        prev_real_state.is_in_position(prev_real_state.get_active()));
+    _live_profile.add_action(a, prev_real_state);
     Logger::log("New live profile:\n" + _live_profile.to_string());
     // TODO: remap actions to new live profile
     // TODO: if root is updated afterwards before the solve can start, seg faults during root update
@@ -340,20 +337,26 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
     // Logger::log("New mapped live actions: " + _mapped_live_actions.to_string());
   }
 
+  _real_state = _real_state.apply(a);
+  Logger::log("New state:\n" + _real_state.to_string());
   const Action translated = translate_pseudo_harmonic(a, actions, prev_real_state);
   _mapped_live_actions.push_back(translated);
   Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
 
   if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
     Logger::log("Round advanced. Updating root...");
-    _update_root();
+    _update_root(true);
   }
   else if(should_solve) {
     _enqueue_job(false);
   }
+  else if(!_can_solve(prev_real_state)) {
+    Logger::log("Root is not solvable yet. Updating root...");
+    _update_root(false);
+  }
 }
 
-void Pluribus::_update_root() {
+void Pluribus::_update_root(const bool solve) {
   Logger::log("Updating root...");
   Logger::log("Root state:\n" + _root_state.to_string());
   Logger::log("Real state:\n" + _real_state.to_string());
@@ -425,7 +428,7 @@ void Pluribus::_update_root() {
   }
   Logger::log("New live profile:\n" + _live_profile.to_string());
   Logger::log("Enqueing solve.");
-  _enqueue_job(force_terminal);
+  if(solve) _enqueue_job(force_terminal);
 }
 
 bool Pluribus::_can_solve(const PokerState& root) const {

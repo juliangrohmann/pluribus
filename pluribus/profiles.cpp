@@ -57,11 +57,11 @@ HeadsUpBlueprintProfile::HeadsUpBlueprintProfile(const int stack_size) : ActionP
 
   // preflop 3-bet
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{1.00f}, Action{1.25f}, Action{1.50f}, Action{1.75f}, Action{2.00f}}, 0, 2, 0);
-  if(stack_size < 10'000) add_action(Action{0.75f}, 0, 2, 0);
+  if(stack_size < 10'000) add_action_raw(Action{0.75f}, 0, 2, 0);
 
   // preflop 4-bet+
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.60f}, Action{0.70f}, Action{0.80f}, Action{0.90f}, Action{1.00f}, Action::ALL_IN}, 0, 3, 0);
-  if(stack_size < 10'000) add_action(Action{0.50f}, 0, 3, 0);
+  if(stack_size < 10'000) add_action_raw(Action{0.50f}, 0, 3, 0);
 
   // flop
   set_actions({Action::CHECK_CALL, Action{0.16f}, Action{0.33f}, Action{0.50f}, Action{0.75f}, Action{1.00f}, Action::ALL_IN}, 1, 0, 0);
@@ -70,12 +70,12 @@ HeadsUpBlueprintProfile::HeadsUpBlueprintProfile(const int stack_size) : ActionP
   // turn
   set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 2, 0, 0);
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 2, 1, 0);
-  if(stack_size < 10'000) add_action(Action{0.33f}, 2, 0, 0);
+  if(stack_size < 10'000) add_action_raw(Action{0.33f}, 2, 0, 0);
 
   // river
   set_actions({Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 3, 0, 0);
   set_actions({Action::FOLD, Action::CHECK_CALL, Action{0.50f}, Action{1.00f}, Action{1.50f}, Action::ALL_IN}, 3, 1, 0);
-  if(stack_size < 7'500) add_action(Action{0.33f}, 3, 0, 0);
+  if(stack_size < 7'500) add_action_raw(Action{0.33f}, 3, 0, 0);
 }
 
 RingBlueprintProfile::RingBlueprintProfile(const int n_players) : ActionProfile{n_players} {
@@ -118,7 +118,7 @@ void fill_from_profile(ActionProfile& to_profile, const ActionProfile& from_prof
       for(int r = 0; r <= max_round; ++r) {
         for(int bet_level = 0; bet_level <= 4; ++bet_level) {
           if(r == 0 && bet_level == 0) continue;
-          to_profile.set_actions(from_profile.get_actions_from_raw(r, bet_level, pos, is_in_pos), r, bet_level, pos, is_in_pos);
+          to_profile.set_actions(from_profile.get_actions_raw(r, bet_level, pos, is_in_pos), r, bet_level, pos, is_in_pos);
         }
       }
       to_profile.set_iso_actions(from_profile.get_iso_actions(pos, is_in_pos), pos, is_in_pos);

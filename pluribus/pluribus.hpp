@@ -42,7 +42,7 @@ private:
   std::vector<Action> _get_solution_actions() const;
   void _enqueue_job(bool force_terminal);
   void _apply_action(Action a, const std::vector<float>& freq);
-  void _update_root();
+  void _update_root(bool solve);
   bool _can_solve(const PokerState& root) const;
   // bool _should_solve(const PokerState& root) const;
 
