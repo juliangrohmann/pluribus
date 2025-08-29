@@ -186,7 +186,6 @@ class TreeSolver : virtual public MCCFRSolver<TreeStorageNode>, public Strategy<
 public:
   explicit TreeSolver(const SolverConfig& config) : MCCFRSolver{config} {}
 
-  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const override;
   const TreeStorageNode<int>* get_strategy() const override { return _regrets_root.get(); }
   const SolverConfig& get_config() const override { return Solver::get_config(); }
 
@@ -207,8 +206,6 @@ protected:
   const std::vector<Action>& regret_value_actions(TreeStorageNode<int>* storage) const override;
   const std::vector<Action>& avg_branching_actions(TreeStorageNode<float>* storage) const override;
   const std::vector<Action>& avg_value_actions(TreeStorageNode<float>* storage) const override;
-
-  void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
   virtual std::shared_ptr<const TreeStorageConfig> make_tree_config() const = 0;
 
@@ -303,6 +300,7 @@ class TreeBlueprintSolver : virtual public TreeSolver, virtual public BlueprintS
 public:
   explicit TreeBlueprintSolver(const SolverConfig& config = SolverConfig{}, const BlueprintSolverConfig& bp_config = BlueprintSolverConfig{});
 
+  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const override;
   const TreeStorageNode<float>* get_phi() const { return _phi_root.get(); }
   void freeze(const std::vector<float>& freq, const Hand& hand, const Board& board, const ActionHistory& history) override;
 
@@ -340,6 +338,7 @@ public:
   explicit TreeRealTimeSolver(const SolverConfig& config = SolverConfig{}, const RealTimeSolverConfig& rt_config = RealTimeSolverConfig{},
     const std::shared_ptr<const SampledBlueprint>& bp = nullptr);
 
+  float frequency(Action action, const PokerState& state, const Board& board, const Hand& hand) const override;
   void freeze(const std::vector<float>& freq, const Hand& hand, const Board& board, const ActionHistory& history) override;
 
   bool operator==(const TreeRealTimeSolver& other) const;
@@ -356,7 +355,7 @@ protected:
   void save_snapshot(const std::string& fn) const override { cereal_save(*this, fn); }
 
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override {}
-  // void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override {}
+  void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
 
   std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;
 };

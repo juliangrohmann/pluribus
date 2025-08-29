@@ -493,11 +493,6 @@ template class MCCFRSolver<TreeStorageNode>;
 // || TreeSolver
 // ==========================================================================================
 
-float TreeSolver::frequency(const Action action, const PokerState& state, const Board& board, const Hand& hand) const {
-  const TreeDecision decision{_regrets_root.get(), get_config().init_state}; // TODO: use get_cluster
-  return decision.frequency(action, state, board, hand);
-}
-
 void TreeSolver::on_start() {
   if(!_regrets_root) {
     Logger::log("Initializing regret storage tree ...");
@@ -531,12 +526,6 @@ const std::vector<Action>& TreeSolver::avg_branching_actions(TreeStorageNode<flo
 
 const std::vector<Action>& TreeSolver::avg_value_actions(TreeStorageNode<float>* storage) const {
   return storage->get_value_actions();
-}
-
-void TreeSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
-  const auto init_ranges = get_config().init_ranges;
-  track_strategy_by_decision(get_config().init_state, init_ranges, TreeDecision{_regrets_root.get(), get_config().init_state},
-      get_regret_metrics_config(), false, metrics);
 }
 
 // ==========================================================================================
@@ -721,6 +710,11 @@ std::shared_ptr<const TreeStorageConfig> TreeBlueprintSolver::make_tree_config()
 TreeBlueprintSolver::TreeBlueprintSolver(const SolverConfig& config, const BlueprintSolverConfig& bp_config) 
     : TreeSolver{config}, MCCFRSolver{config}, BlueprintSolver{config, bp_config} {}
 
+float TreeBlueprintSolver::frequency(const Action action, const PokerState& state, const Board& board, const Hand& hand) const {
+  const TreeDecision decision{get_strategy(), get_config().init_state, false};
+  return decision.frequency(action, state, board, hand);
+}
+
 void TreeBlueprintSolver::on_start() {
   TreeSolver::on_start();
   BlueprintSolver::on_start();
@@ -751,11 +745,11 @@ TreeStorageNode<float>* TreeBlueprintSolver::next_avg_storage(TreeStorageNode<fl
 }
 
 void TreeBlueprintSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
-  TreeSolver::track_strategy(metrics, out_str);
   const auto init_ranges = get_config().init_ranges;
+  const TreeDecision decision{get_strategy(), get_config().init_state, false};
+  track_strategy_by_decision(get_config().init_state, init_ranges, decision, get_regret_metrics_config(), false, metrics);
   if(_phi_root) {
-    track_strategy_by_decision(get_config().init_state, init_ranges, TreeDecision{_phi_root.get(), get_config().init_state},
-      get_avg_metrics_config(), true, metrics);
+    track_strategy_by_decision(get_config().init_state, init_ranges, decision, get_avg_metrics_config(), true, metrics);
   }
 }
 
@@ -833,6 +827,12 @@ TreeRealTimeSolver::TreeRealTimeSolver(const SolverConfig& config, const RealTim
   }
 }
 
+float TreeRealTimeSolver::frequency(const Action action, const PokerState& state, const Board& board, const Hand& hand) const {
+  // const TreeDecision decision{get_strategy(), get_config().init_state, true}; // TODO: use real time clusters
+  const TreeDecision decision{get_strategy(), get_config().init_state, false};
+  return decision.frequency(action, state, board, hand);
+}
+
 void TreeRealTimeSolver::freeze(const std::vector<float>& freq, const Hand& hand, const Board& board, const ActionHistory& history) {
   PokerState state = get_config().init_state;
   const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), board, hand);
@@ -863,6 +863,13 @@ void TreeRealTimeSolver::on_start() {
 
 bool TreeRealTimeSolver::is_frozen(const int cluster, const TreeStorageNode<int>* storage) const {
   return storage->is_frozen(cluster);
+}
+
+void TreeRealTimeSolver::track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const {
+  const auto init_ranges = get_config().init_ranges;
+  // const TreeDecision decision{get_strategy(), get_config().init_state, true}; TODO: use real time clusters
+  const TreeDecision decision{get_strategy(), get_config().init_state, false};
+  track_strategy_by_decision(get_config().init_state, init_ranges, decision, get_regret_metrics_config(), false, metrics);
 }
 
 std::shared_ptr<const TreeStorageConfig> TreeRealTimeSolver::make_tree_config() const {

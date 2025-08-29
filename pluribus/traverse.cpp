@@ -74,7 +74,7 @@ void traverse_tree(RangeViewer* viewer_p, const std::string& bp_fn) {
   TreeBlueprintSolver bp;
   cereal_load(bp, bp_fn);
   std::cout << "Success.\n";
-  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_strategy(), bp.get_config());
+  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state, false}, bp.get_strategy(), bp.get_config());
 }
 
 void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn) {
@@ -82,7 +82,7 @@ void traverse_blueprint(RangeViewer* viewer_p, const std::string& bp_fn) {
   LosslessBlueprint bp;
   cereal_load(bp, bp_fn);
   std::cout << "Success.\n";
-  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state}, bp.get_strategy(), bp.get_config());
+  traverse(viewer_p, TreeDecision{bp.get_strategy(), bp.get_config().init_state, false}, bp.get_strategy(), bp.get_config());
 }
 
 Action str_to_action(const std::string& str) {
@@ -113,10 +113,9 @@ void update_ranges(std::vector<PokerRange>& ranges, const Action a, const PokerS
   ranges[state.get_active()] *= build_action_range(ranges[state.get_active()], a, state, board, decision);
 }
 
-std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const Board& board, const Strategy<float>& strat) {
+std::vector<PokerRange> build_ranges(const std::vector<Action>& actions, const Board& board, const Strategy<float>& strat, const DecisionAlgorithm& decision) {
   PokerState curr_state = strat.get_config().init_state;
   std::vector<PokerRange> ranges = strat.get_config().init_ranges;
-  const TreeDecision decision{strat.get_strategy(), strat.get_config().init_state};
   for(int aidx = 0; aidx < actions.size(); ++aidx) {
     update_ranges(ranges, actions[aidx], curr_state, board, decision);
     if(aidx != actions.size() - 1) {

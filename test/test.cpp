@@ -511,7 +511,8 @@ TEST_CASE("Lossless monte carlo EV", "[ev][slow][dependency]") {
   PokerState state{bp.get_config().poker, 10'000};
   std::vector actions = {Action{0.75f}, Action::CHECK_CALL, Action::CHECK_CALL, Action{0.50f}, Action::CHECK_CALL, Action::CHECK_CALL, Action::CHECK_CALL};
   state = state.apply(ActionHistory{actions});
-  auto ranges = build_ranges(state.get_action_history().get_history(), Board{board}, bp);
+  const TreeDecision decision{bp.get_strategy(), bp.get_config().init_state, false};
+  auto ranges = build_ranges(state.get_action_history().get_history(), Board{board}, bp, decision);
   MonteCarloEV ev_solver{};
   double enum_ev = enumerate_ev(bp, state, 0, ranges, board);
   ResultEV mc_result = ev_solver.set_max_iterations(N)

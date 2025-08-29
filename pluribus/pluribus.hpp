@@ -17,6 +17,7 @@ struct Solution  {
 };
 
 struct FrozenNode {
+  std::vector<Action> actions;
   std::vector<float> freq;
   Hand hand;
   std::vector<uint8_t> board;

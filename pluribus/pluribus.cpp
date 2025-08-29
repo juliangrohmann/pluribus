@@ -23,18 +23,24 @@ std::string FrozenNode::to_string() const {
 
 class RealTimeDecision : public DecisionAlgorithm {
 public:
-  RealTimeDecision(const LosslessBlueprint& preflop_bp, const std::shared_ptr<const Solver>& solver)
-      : _preflop_decision{TreeDecision{preflop_bp.get_strategy(), preflop_bp.get_config().init_state}}, _solver{solver} {}
+  RealTimeDecision(const LosslessBlueprint& preflop_bp, const std::shared_ptr<const Solver>& solver, const std::vector<FrozenNode>& frozen)
+      : _preflop_decision{TreeDecision{preflop_bp.get_strategy(), preflop_bp.get_config().init_state, false}}, _solver{solver}, _frozen{frozen} {}
 
-  float frequency(const Action a, const PokerState& state, const Board& board, const Hand& hand, const int cluster = -1) const override {
+  float frequency(const Action a, const PokerState& state, const Board& board, const Hand& hand) const override {
     if(_solver) return _solver->frequency(a, state, board, hand);
-    if(state.get_round() == 0) return _preflop_decision.frequency(a, state, board, hand);
-    Logger::error("Cannot decide postflop frequency without solver.");
+    if(state.get_round() > 0) Logger::error("Cannot decide postflop frequency without solver.");
+    for(const auto& node : _frozen) {
+      if(hand == node.hand && state.get_action_history() == node.live_actions) {
+        return node.freq[index_of(a, node.actions)];
+      }
+    }
+    return _preflop_decision.frequency(a, state, board, hand);
   }
 
 private:
   const TreeDecision<float> _preflop_decision;
   const std::shared_ptr<const Solver> _solver;
+  std::vector<FrozenNode> _frozen;
 };
 
 Pluribus::Pluribus(const std::array<ActionProfile, 4>& live_profiles, const std::shared_ptr<const LosslessBlueprint>& preflop_bp,
@@ -187,7 +193,7 @@ Solution Pluribus::solution(const Hand& hand) {
     {
       std::lock_guard lk(_solver_mtx);
       solution.actions = _get_solution_actions();
-      const RealTimeDecision decision{*_preflop_bp, _solver};
+      const RealTimeDecision decision{*_preflop_bp, _solver, _frozen};
       for(const Action a : solution.actions) {
         solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
       }
@@ -212,7 +218,7 @@ void Pluribus::save_range(const std::string& fn) {
   const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
   {
     std::lock_guard lk(_solver_mtx);
-    const RealTimeDecision decision{*_preflop_bp, _solver};
+    const RealTimeDecision decision{*_preflop_bp, _solver, _frozen};
     auto live_ranges = _ranges;
     PokerState curr_state = _root_state;
     for(Action a : _mapped_live_actions.get_history()) {
@@ -298,7 +304,7 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
     Logger::log("New state:\n" + _real_state.to_string());
     actions = _get_solution_actions();
     if(prev_real_state.get_active() == _hero_pos) {
-      const FrozenNode frozen_node{freq, _hero_hand, _board, _mapped_live_actions};
+      const FrozenNode frozen_node{actions, freq, _hero_hand, _board, _mapped_live_actions};
       Logger::log("New frozen node: " + frozen_node.to_string());
       _frozen.push_back(frozen_node);
       if(freq.size() != actions.size()) {
@@ -360,7 +366,7 @@ void Pluribus::_update_root() {
   bool force_terminal = false;
   {
     std::lock_guard lk(_solver_mtx);
-    const RealTimeDecision decision{*_preflop_bp, _solver};
+    const RealTimeDecision decision{*_preflop_bp, _solver, _frozen};
     const TreeStorageNode<uint8_t>* bp_node = _sampled_bp->get_strategy()->apply(_mapped_bp_actions.get_history());
     std::vector<Action> real_history = _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history();
     for(int h_idx = 0; h_idx < _mapped_live_actions.size(); ++h_idx) {
@@ -447,7 +453,7 @@ void Pluribus::_solver_worker() {
     const auto local = std::make_shared<TreeRealTimeSolver>(job->cfg, job->rt_cfg, _sampled_bp);
     {
       std::lock_guard lk(_solver_mtx);
-      for(FrozenNode frozen : _frozen) local->freeze(frozen.freq, frozen.hand, Board{frozen.board}, frozen.live_actions);
+      for(const FrozenNode& frozen : _frozen) local->freeze(frozen.freq, frozen.hand, Board{frozen.board}, frozen.live_actions);
       _solver = local;
     }
     local->solve(100'000'000'000L);
