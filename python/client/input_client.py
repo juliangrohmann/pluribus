@@ -24,7 +24,6 @@ def new_game(host, args=None):
 
 def update_state(host, args=None):
   if (action := cast(input("Betsize: ") if not args else args.pop(0), float)) is None: return None
-  if action < 0: return print("Invalid betsize.")
   if (pos := cast(input("Position: ") if not args else args.pop(0), int)) is None: return None
   if pos < 0: return print("Invalid position")
   return requests.post(to_url(host, "update_state"), json={"action": action, "pos": pos})
@@ -32,7 +31,6 @@ def update_state(host, args=None):
 def hero_action(host, args=None):
   freq = []
   if (action := cast(input("Betsize: ") if not args else args.pop(0), float)) is None: return None
-  if action < 0: return print("Invalid betsize.")
   while f_str := (input(f"Action {len(freq)} frquency: ") if args is None else args.pop(0) if args else None):
     if (v := cast(f_str, float)) is not None: freq.append(v)
   return requests.post(to_url(host, "hero_action"), json={"action": action, "freq": freq})
