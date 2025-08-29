@@ -382,7 +382,9 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
   _mapped_live_actions.push_back(translated);
   Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
 
-  if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
+  // TODO: don't update root if current solve is terminal? how fast do future streets converge in terminal solves?
+  if((_real_state.get_round() > _root_state.get_round() || (_solver && _real_state.get_bet_level() >= _solver->get_real_time_config().terminal_bet_level))
+      && _can_solve(_real_state)) {
     Logger::log("Round advanced. Updating root...");
     _update_root(true);
   }
