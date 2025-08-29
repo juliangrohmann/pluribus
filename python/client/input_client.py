@@ -53,13 +53,22 @@ def view_range(host, args=None):
   fn = (input("Filename: ") if not args else args.pop(0)).strip()
   duration = cast(input("Duration (s): ") if not args else args.pop(0), float)
   t_0, viewing = time.time(), False
-  while time.time() - t_0 < duration:
-    save_range(host, [fn])
-    subprocess.run(["scp", f"root@{host}:/root/pluribus/build/{fn}", fn])
-    if not viewing: viewing, _ = True, subprocess.run(["xdg-open", fn])
+  try:
+    while time.time() - t_0 < duration:
+      save_range(host, [fn])
+      subprocess.run(["scp", f"root@{host}:/root/pluribus/build/{fn}", fn])
+      if not viewing: viewing, _ = True, subprocess.run(["xdg-open", fn])
+  except KeyboardInterrupt:
+    print(f"\nInterrupted range viewing: {time.time() - t_0:.2f} / {duration:.2f} s")
 
 def wait(_, args=None):
-  if args: time.sleep(cast(args[0], float))
+  if args:
+    t_0, duration = time.time(), cast(args[0], float)
+    try:
+      if duration: time.sleep(t_0)
+      else: print(f"Invalid duration: {args[0]}")
+    except KeyboardInterrupt:
+      print(f"\nInterrupted waiting: {time.time() - t_0:.2f} / {duration:.2f} seconds")
 
 def dispatch_endpoint(host, args, endpoints):
   if matches := [e[1] for e in endpoints if e[0] == args[0]]:
