@@ -259,8 +259,8 @@ void Pluribus::_enqueue_job(const bool force_terminal) {
   RealTimeSolverConfig rt_config;
   rt_config.bias_profile = BiasActionProfile{};
   rt_config.init_actions = _mapped_bp_actions.get_history();
-  rt_config.terminal_round = force_terminal ? 4 : terminal_round(_root_state);
-  rt_config.terminal_bet_level = force_terminal ? 999 : terminal_bet_level(_root_state);
+  rt_config.terminal_round = _root_state.get_round() + 1; // force_terminal ? 4 : terminal_round(_root_state);
+  rt_config.terminal_bet_level = _root_state.get_bet_level() + 2; // force_terminal ? 999 : terminal_bet_level(_root_state);
   SolveJob job{config, rt_config};
   const auto ack = job.ack.get_future();
   {
