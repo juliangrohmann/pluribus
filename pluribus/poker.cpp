@@ -268,10 +268,10 @@ std::string SlimPokerState::to_string() const {
   if(!_biases.empty()) {
     oss << "Biases: " << actions_to_str(_biases) << "\n";
   }
-  oss << "Bet level: " << static_cast<int>(_bet_level) << ", Max bet: " << _max_bet / 100.0 << " bb, Min raise: " << _min_raise / 100.0 << "bb \n";
+  oss << "Bet level: " << static_cast<int>(_bet_level) << ", Max bet: " << _max_bet / 100.0 << " bb, Min raise: " << _min_raise / 100.0 << " bb\n";
   if(_winner != -1) oss << "Winner: " << pos_to_str(_winner, _players.size(), _straddle) << "\n";
   for(int i = 0; i < _players.size(); ++i) {
-    oss << pos_to_str(i, _players.size(), _straddle) << " (" << _players[i].get_chips() / 100.0 << " bb): " << _players[i].get_betsize() / 100.0 << " bb\n";
+    oss << pos_to_str(i, _players.size(), _straddle) << " (" << _players[i].get_chips() / 100.0 << " bb): " << _players[i].get_betsize() / 100.0 << " bb";
     if(i == _active) {
       oss << " (active)";
     }
