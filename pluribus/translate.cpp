@@ -28,7 +28,7 @@ TranslationResult pseudo_harmonic_result(const Action a, const std::vector<Actio
       const auto [A_action, A] = translatable[i - 1];
       if(B_action == Action::ALL_IN) return {A_action, A_action, 1.0};
       const double p_A = (B - x) * (1 + A) / ((B - A) * (1 + x));
-      return {A_action, A_action, p_A};
+      return {A_action, B_action, p_A};
     }
   }
   const Action max_action = translatable[translatable.size() - 1].first;
