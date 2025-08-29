@@ -8,7 +8,7 @@ std::vector<std::pair<Action, double>> translatable_actions(const SlimPokerState
   std::vector<std::pair<Action, double>> translatable;
   for(Action a : actions) {
     if(a == Action::ALL_IN) translatable.emplace_back(a, fractional_bet_size(state, total_bet_size(state, Action::ALL_IN)));
-    else if(a.get_bet_type() >= 0.0) translatable.emplace_back(a, a.get_bet_type());
+    else if(a.get_bet_type() > 0.0) translatable.emplace_back(a, a.get_bet_type());
   }
   std::ranges::sort(translatable, std::ranges::less{}, [](const auto& e) { return e.second; });
   return translatable;
@@ -16,19 +16,19 @@ std::vector<std::pair<Action, double>> translatable_actions(const SlimPokerState
 
 TranslationResult pseudo_harmonic_result(const Action a, const std::vector<Action>& actions, const SlimPokerState& state) {
   if(a == Action::FOLD) return {Action::FOLD, Action::FOLD, 1.0};
+  if(a == Action::CHECK_CALL) return {Action::CHECK_CALL, Action::CHECK_CALL, 1.0};
   const double x = a != Action::ALL_IN ? a.get_bet_type() : fractional_bet_size(state, total_bet_size(state, Action::ALL_IN));
   if(x < 0.0) return {a, a, 1.0};
   const auto translatable = translatable_actions(state, actions);
   for(int i = 0; i < translatable.size(); ++i) {
-    const Action action = translatable[i].first;
-    const double bet_size = translatable[i].second;
-    if(bet_size == x) return {action, action, 1.0};
-    if(bet_size > x) {
-      if(i == 0) return {action, action, 1.0};;
-      const double A = translatable[i - 1].second;
-      const double B = translatable[i].second;
+    const auto [B_action, B] = translatable[i];
+    if(B == x || B_action == a) return {B_action, B_action, 1.0};
+    if(B > x) {
+      if(i == 0) return {B_action, B_action, 1.0};
+      const auto [A_action, A] = translatable[i - 1];
+      if(B_action == Action::ALL_IN) return {A_action, A_action, 1.0};
       const double p_A = (B - x) * (1 + A) / ((B - A) * (1 + x));
-      return {translatable[i - 1].first, translatable[i].first, p_A};
+      return {A_action, A_action, p_A};
     }
   }
   const Action max_action = translatable[translatable.size() - 1].first;

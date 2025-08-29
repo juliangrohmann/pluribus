@@ -428,7 +428,7 @@ void Pluribus::_update_root(const bool solve) {
     const TreeStorageNode<uint8_t>* bp_node = _sampled_bp->get_strategy()->apply(_mapped_bp_actions.get_history());
     std::vector<Action> real_history = _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history();
     for(int h_idx = 0; h_idx < _mapped_live_actions.size(); ++h_idx) {
-      Logger::log("\nProcessing next live action: " + _mapped_live_actions.get(h_idx).to_string());
+      Logger::log("Processing next live action: " + _mapped_live_actions.get(h_idx).to_string());
       Action real_action = real_history.size() > h_idx ? real_history[h_idx] : Action::UNDEFINED;
 
       if(!force_terminal) {
