@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
   else if(command == "blueprint-metadata") {
     // ./Pluribus blueprint-metadata metadata_fn out_fn [--no-preflop]
     if(argc < 4) {
-      std::cout << "Missing arguments to build blueprint from cache.\n";
+      std::cout << "Missing arguments to build blueprint from metadata.\n";
     }
     else {
       bool no_preflop = argc >= 5 && strcmp(argv[4], "--no-preflop") == 0;
@@ -128,7 +128,7 @@ int main(int argc, char* argv[]) {
       cereal_load(metadata, argv[2]);
       LosslessBlueprint lossless_bp;
       lossless_bp.build_from_meta_data(metadata, !no_preflop);
-      std::string lossless_fn = "lossless_" + std::string{argv[5]};
+      std::string lossless_fn = "lossless_" + std::string{argv[3]};
       cereal_save(lossless_bp, lossless_fn);
     }
   }
