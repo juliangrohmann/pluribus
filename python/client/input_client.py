@@ -65,7 +65,7 @@ def wait(_, args=None):
   if args:
     t_0, duration = time.time(), cast(args[0], float)
     try:
-      if duration: time.sleep(t_0)
+      if duration: time.sleep(duration)
       else: print(f"Invalid duration: {args[0]}")
     except KeyboardInterrupt:
       print(f"\nInterrupted waiting: {time.time() - t_0:.2f} / {duration:.2f} seconds")
