@@ -224,7 +224,7 @@ void Pluribus::save_range(const std::string& fn) {
     PokerState curr_state = _root_state;
     for(Action a : _mapped_live_actions.get_history()) {
       std::cout << "Updating range: " << a.to_string() << "\n";
-      update_ranges(_ranges, a, curr_state, Board{_board}, decision);
+      update_ranges(live_ranges, a, curr_state, Board{_board}, decision);
       curr_state.apply_in_place(a);
     }
     std::cout << "Building renderable ranges...\n";
