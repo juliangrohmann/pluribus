@@ -834,16 +834,21 @@ float TreeRealTimeSolver::frequency(const Action action, const PokerState& state
 }
 
 void TreeRealTimeSolver::freeze(const std::vector<float>& freq, const Hand& hand, const Board& board, const ActionHistory& history) {
+  Logger::log("Freezing...");
   PokerState state = get_config().init_state;
   const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(), board, hand);
   TreeStorageNode<int>* node = init_regret_storage();
+  Logger::log("Applying history...");
   for(const Action h_a : history.get_history()) {
     state = state.apply(h_a);
     node = node->apply(h_a, state);
   }
+  Logger::log("Applied...");
   std::vector<int> regrets;
   for(const float f : freq) regrets.push_back(f * 100'000'000);
+  Logger::log("Assigning regrets...");
   node->freeze(regrets, cluster);
+  Logger::log("Assigned.");
 }
 
 bool TreeRealTimeSolver::operator==(const TreeRealTimeSolver& other) const {

@@ -17,6 +17,7 @@ std::string FrozenNode::to_string() const {
   std::ostringstream oss;
   oss << std::fixed << std::setprecision(4) << "FrozenNode: freq=[";
   for(int i = 0; i < freq.size(); ++i) oss << freq[i] << (i == freq.size() - 1 ? "]" : ", ");
+  oss << "actions=" << actions_to_str(actions);
   oss << ", hand=" << hand.to_string() << ", board=" << cards_to_str(board) << ", live_actions=" << live_actions.to_string();
   return oss.str();
 }
@@ -345,6 +346,27 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
     //   curr_state = curr_state.apply(real_action);
     // }
     // Logger::log("New mapped live actions: " + _mapped_live_actions.to_string());
+    Logger::log("Remapping frozen nodes to new live profile...");
+    for(auto& node : _frozen) {
+      std::ostringstream oss;
+      oss << "    \n" << node.to_string() << "\n -> ";
+      PokerState remapped_state = _root_state.apply(node.live_actions);
+      auto remapped_actions = valid_actions(remapped_state, _live_profile);
+      auto remapped_freq = std::vector<float>(node.actions.size());
+      for(int i = 0; i < remapped_actions.size(); ++i) {
+        auto it = std::find(node.actions.begin(), node.actions.end(), remapped_actions[i]);
+        if(it != node.actions.end()) {
+          remapped_freq[i] = node.freq[std::distance(node.actions.begin(), it)];
+        }
+        else {
+          remapped_freq[i] = 0.0;
+        }
+      }
+      node.actions = remapped_actions;
+      node.freq = remapped_freq;
+      oss << node.to_string();
+      Logger::dump(oss);
+    }
   }
 
   _real_state = _real_state.apply(a);
