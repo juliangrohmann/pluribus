@@ -327,45 +327,52 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
 
   bool should_solve = false;
   if(is_off_tree(a, actions, prev_real_state)) {
-    should_solve = true;
-    Logger::log("Action is off-tree. Adding to live actions...");
-    _live_profile.add_action(a, prev_real_state);
-    Logger::log("New live profile:\n" + _live_profile.to_string());
-    actions = valid_actions(prev_real_state, _live_profile);
-    // TODO: remap actions to new live profile
-    // TODO: if root is updated afterwards before the solve can start, seg faults during root update
-    // TODO: if root is updated afterwards before the solve can converge, assigns bad ranges during root update
-    // Logger::log("Remapping live actions...");
-    // Logger::log("Bef mapped live actions: " + _mapped_live_actions.to_string());
-    // _mapped_live_actions = ActionHistory{};
-    // PokerState curr_state = _root_state;
-    // for(Action real_action : _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history()) {
-    //   const Action translated = translate_pseudo_harmonic(a, valid_actions(curr_state, _live_profile), prev_real_state);
-    //   _mapped_live_actions.push_back(translated);
-    //   Logger::log(real_action.to_string() + " -> " + translated.to_string());
-    //   curr_state = curr_state.apply(real_action);
-    // }
-    // Logger::log("New mapped live actions: " + _mapped_live_actions.to_string());
-    Logger::log("Remapping frozen nodes to new live profile...");
-    for(auto& node : _frozen) {
-      std::ostringstream oss;
-      oss << "    \n" << node.to_string() << "\n -> ";
-      PokerState remapped_state = _root_state.apply(node.live_actions);
-      auto remapped_actions = valid_actions(remapped_state, _live_profile);
-      auto remapped_freq = std::vector<float>(remapped_actions.size());
-      for(int i = 0; i < remapped_actions.size(); ++i) {
-        auto it = std::find(node.actions.begin(), node.actions.end(), remapped_actions[i]);
-        if(it != node.actions.end()) {
-          remapped_freq[i] = node.freq[std::distance(node.actions.begin(), it)];
-        }
-        else {
-          remapped_freq[i] = 0.0;
-        }
-      }
-      node.actions = remapped_actions;
-      node.freq = remapped_freq;
-      oss << node.to_string();
-      Logger::dump(oss);
+    if(prev_real_state.get_active() == _hero_pos) {
+      Logger::log("WARNING: Hero is off tree.");
+    }
+    else {
+      should_solve = true;
+      Logger::log("Action is off-tree. Adding to live actions...");
+      _live_profile.add_action(a, prev_real_state);
+      Logger::log("New live profile:\n" + _live_profile.to_string());
+      actions = valid_actions(prev_real_state, _live_profile);
+      // TODO: remap actions to new live profile
+      // TODO: if root is updated afterwards before the solve can start, seg faults during root update
+      // TODO: if root is updated afterwards before the solve can converge, assigns bad ranges during root update
+      // Logger::log("Remapping live actions...");
+      // Logger::log("Bef mapped live actions: " + _mapped_live_actions.to_string());
+      // _mapped_live_actions = ActionHistory{};
+      // PokerState curr_state = _root_state;
+      // for(Action real_action : _real_state.get_action_history().slice(_root_state.get_action_history().size()).get_history()) {
+      //   const Action translated = translate_pseudo_harmonic(a, valid_actions(curr_state, _live_profile), prev_real_state);
+      //   _mapped_live_actions.push_back(translated);
+      //   Logger::log(real_action.to_string() + " -> " + translated.to_string());
+      //   curr_state = curr_state.apply(real_action);
+      // }
+      // Logger::log("New mapped live actions: " + _mapped_live_actions.to_string());
+
+      // don't need to remap if hero is never off tree
+      // Logger::log("Remapping frozen nodes to new live profile...");
+      // for(auto& node : _frozen) {
+      //   std::ostringstream oss;
+      //   oss << "    \n" << node.to_string() << "\n -> ";
+      //   PokerState remapped_state = _root_state.apply(node.live_actions);
+      //   auto remapped_actions = valid_actions(remapped_state, _live_profile);
+      //   auto remapped_freq = std::vector<float>(remapped_actions.size());
+      //   for(int i = 0; i < remapped_actions.size(); ++i) {
+      //     auto it = std::find(node.actions.begin(), node.actions.end(), remapped_actions[i]);
+      //     if(it != node.actions.end()) {
+      //       remapped_freq[i] = node.freq[std::distance(node.actions.begin(), it)];
+      //     }
+      //     else {
+      //       remapped_freq[i] = 0.0;
+      //     }
+      //   }
+      //   node.actions = remapped_actions;
+      //   node.freq = remapped_freq;
+      //   oss << node.to_string();
+      //   Logger::dump(oss);
+      // }
     }
   }
 
