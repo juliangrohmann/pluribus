@@ -444,6 +444,7 @@ void Pluribus::_update_root(const bool solve) {
       const int expected_cards = n_board_cards(live_state.get_round());
       if(_board.size() < expected_cards) Logger::error("Not enough board cards. Expected="+std::to_string(expected_cards) + ", Board="+cards_to_str(_board));
       update_ranges(_ranges, live_translated, live_state, Board{_board}, decision);
+      if(_ranges[live_state.get_active()].n_combos() <= 0) Logger::error("No combos left in " + pos_to_str(live_state) + " range.");
       oss << " -> " << _ranges[live_state.get_active()].n_combos();
       Logger::dump(oss);
       live_state = live_state.apply(live_translated);
