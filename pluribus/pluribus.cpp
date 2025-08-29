@@ -373,6 +373,8 @@ void Pluribus::_update_root() {
           _mapped_bp_actions.push_back(bp_translated);
           bp_state = bp_state.apply(bp_translated);
           Logger::log("Blueprint state:\n" + bp_state.to_string());
+          curr_state = curr_state.apply(real_action);
+          Logger::log("Current state:\n" + curr_state.to_string());
           if(bp_state.get_active() == curr_state.get_active() && bp_state.get_round() == curr_state.get_round()) {
             bp_node = bp_node->apply(bp_translated);
           }
@@ -389,19 +391,14 @@ void Pluribus::_update_root() {
 
       const Action live_translated = _mapped_live_actions.get(h_idx);
       oss << pos_to_str(live_state) << " action applied to ranges: " + live_translated.to_string() << ", combos: "
-          << std::fixed << std::setprecision(2) << _ranges[curr_state.get_active()].n_combos();
-      const int expected_cards = n_board_cards(curr_state.get_round());
+          << std::fixed << std::setprecision(2) << _ranges[live_state.get_active()].n_combos();
+      const int expected_cards = n_board_cards(live_state.get_round());
       if(_board.size() < expected_cards) Logger::error("Not enough board cards. Expected="+std::to_string(expected_cards) + ", Board="+cards_to_str(_board));
       update_ranges(_ranges, live_translated, live_state, Board{_board}, decision);
-      oss << " -> " << _ranges[curr_state.get_active()].n_combos();
+      oss << " -> " << _ranges[live_state.get_active()].n_combos();
       Logger::dump(oss);
       live_state = live_state.apply(live_translated);
       Logger::log("Live state:\n" + live_state.to_string());
-
-      if(real_action != Action::UNDEFINED) {
-        curr_state = curr_state.apply(real_action);
-        Logger::log("Current state:\n" + curr_state.to_string());
-      }
     }
     _frozen = std::vector<FrozenNode>{};
   }
