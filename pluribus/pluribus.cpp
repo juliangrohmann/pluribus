@@ -291,6 +291,8 @@ bool is_off_tree(const Action a, const std::vector<Action>& actions, const Poker
 void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
   const PokerState prev_real_state = _real_state;
   std::vector<Action> actions;
+  const FrozenNode frozen_node{freq, _hero_hand, _board, _mapped_live_actions};
+  _frozen.push_back(frozen_node);
   {
     std::lock_guard lk(_solver_mtx);
     Logger::log("Applying action: " + a.to_string());
@@ -300,13 +302,11 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
     Logger::log("New state:\n" + _real_state.to_string());
 
     if(_solver && prev_real_state.get_active() == _hero_pos) {
-      const FrozenNode frozen_node{freq, _hero_hand, _board, _mapped_live_actions};
       Logger::log("Freezing hero actions. " + frozen_node.to_string());
       if(freq.size() != actions.size()) {
         Logger::error("Freeze frequency amount mismatch:\nActions=" + actions_to_str(actions));
       }
       _solver->freeze(frozen_node.freq, frozen_node.hand, Board{frozen_node.board}, frozen_node.live_actions);
-      _frozen.push_back(frozen_node);
     }
   }
 

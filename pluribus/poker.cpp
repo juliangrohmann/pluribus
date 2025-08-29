@@ -256,7 +256,7 @@ int SlimPokerState::vpip_players() const {
 }
 
 std::string SlimPokerState::to_string() const {
-  std::ostringstream oss; 
+  std::ostringstream oss;
   oss << "============== " << round_to_str(_round) << ": " << std::fixed << std::setprecision(2) << _pot.total() / 100.0 << " bb ==============\n";
   if(_pot.has_side_pots()) {
     const auto& pots = *_pot.get_side_pots();
