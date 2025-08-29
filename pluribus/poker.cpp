@@ -488,17 +488,27 @@ void SlimPokerState::update_side_pots() {
 PokerState PokerState::apply(const Action action) const {
   PokerState state = *this;
   state.apply_in_place(action);
-  if(!is_bias(action)) state._actions.push_back(action);
   return state;
 }
 
 PokerState PokerState::apply(const ActionHistory& action_history) const {
-  if(action_history.get_history().empty()) return *this;
-  PokerState state = apply(action_history.get(0));
-  for(int i = 1; i < action_history.size(); ++i) {
-    state = state.apply(action_history.get(i));
-  }
+  PokerState state = *this;
+  state.apply_in_place(action_history);
   return state;
+
+}
+
+void PokerState::apply_in_place(const Action action) {
+  SlimPokerState::apply_in_place(action);
+  if(!is_bias(action)) _actions.push_back(action);
+}
+
+void PokerState::apply_in_place(const ActionHistory& action_history) {
+  if(!action_history.get_history().empty()) {
+    for(int i = 0; i < action_history.size(); ++i) {
+      apply_in_place(action_history.get(i));
+    }
+  }
 }
 
 PokerState PokerState::apply_biases(const std::vector<Action>& biases) const {

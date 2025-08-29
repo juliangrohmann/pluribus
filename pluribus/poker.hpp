@@ -347,8 +347,13 @@ public:
   PokerState(const SlimPokerState& state, const ActionHistory& actions) : SlimPokerState{state}, _actions{actions} {}
 
   const ActionHistory& get_action_history() const { return _actions ;}
+  // TODO: clean up
   [[nodiscard]] PokerState apply(Action action) const;
   [[nodiscard]] PokerState apply(const ActionHistory& action_history) const;
+  [[nodiscard]] PokerState apply_copy(const Action action) const { return apply(action); } // hide base class methods to avoid slicing for now
+  [[nodiscard]] PokerState apply_copy(const ActionHistory& action_history) const { return apply(action_history); }
+  void apply_in_place(Action action);
+  void apply_in_place(const ActionHistory& action_history);
   [[nodiscard]] PokerState apply_biases(const std::vector<Action>& biases) const;
 
   template <class Archive>
