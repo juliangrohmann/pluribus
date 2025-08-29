@@ -839,13 +839,7 @@ void TreeRealTimeSolver::freeze(const std::vector<float>& freq, const Hand& hand
   TreeStorageNode<int>* node = init_regret_storage();
   for(const Action h_a : history.get_history()) {
     state = state.apply(h_a);
-    if(node->is_allocated(h_a)) {
-      node = node->apply(h_a, state);
-    }
-    else {
-      Logger::error("Cannot freeze: action in history is unallocated. Action history=" + history.to_string()
-          + ", Unallocated state history=" + state.get_action_history().to_string());
-    }
+    node = node->apply(h_a, state);
   }
   std::vector<int> regrets;
   for(const float f : freq) regrets.push_back(f * 100'000'000);
