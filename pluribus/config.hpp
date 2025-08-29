@@ -96,7 +96,8 @@ struct RealTimeSolverConfig : DiscountConfig {
 
   std::string to_string() const;
   void set_iterations(const RealTimeTimingConfig& timings, long it_per_sec);
-  bool is_terminal() const { return terminal_round >= 4 && terminal_bet_level >= 99; }
+  bool is_terminal_solve() const { return terminal_round >= 4 && terminal_bet_level >= 99; }
+  bool is_state_terminal(const SlimPokerState& state) const;
 
   bool operator==(const RealTimeSolverConfig& other) const = default;
 

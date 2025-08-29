@@ -101,4 +101,8 @@ void RealTimeSolverConfig::set_iterations(const RealTimeTimingConfig& timings, c
   log_interval = static_cast<long>(timings.log_interval_s * static_cast<double>(it_per_sec));
 }
 
+bool RealTimeSolverConfig::is_state_terminal(const SlimPokerState& state) const {
+  return state.get_round() >= terminal_round || (state.get_round() >= terminal_round - 1 && state.get_bet_level() >= terminal_bet_level);
+}
+
 }

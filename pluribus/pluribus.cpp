@@ -133,6 +133,9 @@ void Pluribus::update_state(const Action action, const int pos) {
   if(mapped_state.get_round() != _real_state.get_round() || mapped_state.get_active() != _real_state.get_active()) {
     handle_misaligned_state_update(_real_state, mapped_state, action);
   }
+  else if(const int n_cards = n_board_cards(mapped_state.get_round()); n_cards > _board.size()) {
+    Logger::error("Expected board update. Expected cards=" + std::to_string(n_cards) + ", Board=" + cards_to_str(_board));
+  }
   else {
     _apply_action(action, {});
   }
@@ -193,6 +196,10 @@ Solution Pluribus::solution(const Hand& hand) {
     solution.aligned = true;
     {
       std::lock_guard lk(_solver_mtx);
+      if(_solver && _solver->get_real_time_config().is_state_terminal(mapped_state)) {
+        Logger::error("Requested solution extends past the end of the non-terminal solve. "
+            + _solver->get_real_time_config().to_string() + ", Terminal state:\n" + mapped_state.to_string());
+      }
       solution.actions = _get_solution_actions();
       const RealTimeDecision decision{*_preflop_bp, _solver, _frozen};
       for(const Action a : solution.actions) {
@@ -219,6 +226,10 @@ void Pluribus::save_range(const std::string& fn) {
   const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
   {
     std::lock_guard lk(_solver_mtx);
+    if(_solver && _solver->get_real_time_config().is_state_terminal(mapped_state)) {
+      Logger::error("Requested range extends past the end of the non-terminal solve. "
+          + _solver->get_real_time_config().to_string() + ", Terminal state:\n" + mapped_state.to_string());
+    }
     const RealTimeDecision decision{*_preflop_bp, _solver, _frozen};
     auto live_ranges = _ranges;
     PokerState curr_state = _root_state;
@@ -383,9 +394,12 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
   Logger::log("Live action translation: " + a.to_string() + " -> " + translated.to_string());
 
   // TODO: don't update root if current solve is terminal? how fast do future streets converge in terminal solves?
-  if((_real_state.get_round() > _root_state.get_round() || (_solver && _real_state.get_bet_level() >= _solver->get_real_time_config().terminal_bet_level))
-      && _can_solve(_real_state)) {
+  if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
     Logger::log("Round advanced. Updating root...");
+    _update_root(true);
+  }
+  else if(_solver && _real_state.get_bet_level() >= _solver->get_real_time_config().terminal_bet_level && _can_solve(_real_state)) {
+    Logger::log("Bet level advanced. Updating root...");
     _update_root(true);
   }
   else if(should_solve) {

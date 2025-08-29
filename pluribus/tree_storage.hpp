@@ -14,7 +14,7 @@ namespace pluribus {
 
 inline std::vector<Action> real_time_actions(const SlimPokerState& state, const ActionProfile& profile, const RealTimeSolverConfig& rt_config,
     const bool branching) {
-  if(state.get_round() >= rt_config.terminal_round || state.get_bet_level() >= rt_config.terminal_bet_level) {
+  if(rt_config.is_state_terminal(state)) {
     return branching ? std::vector{{Action::BIAS_DUMMY}} : rt_config.bias_profile.get_actions(state);
   }
   return valid_actions(state, profile);
