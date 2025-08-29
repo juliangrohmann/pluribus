@@ -428,7 +428,9 @@ std::string MCCFRSolver<StorageT>::track_wandb_metrics(const long t) const {
   return metrics.dump();
 }
 
-bool should_track_strategy(const PokerState& prev_state, const PokerState& next_state, const SolverConfig& solver_config, const MetricsConfig& metrics_config) {
+template <template<typename> class StorageT>
+bool MCCFRSolver<StorageT>::should_track_strategy(const PokerState& prev_state, const PokerState& next_state, const SolverConfig& solver_config,
+    const MetricsConfig& metrics_config) const {
   return prev_state.active_players() > 1 &&
       prev_state.get_round() == solver_config.init_state.get_round() &&
       (next_state.get_round() > 0 || next_state.vpip_players() <= metrics_config.max_vpip) &&
@@ -455,8 +457,7 @@ std::string strategy_label(const PokerState& state, const PokerState& init_state
     }
     curr_state = curr_state.apply(rel_actions[a_idx]);
   }
-  oss << "[" << pos_to_str(curr_state) << " " << action.to_string() << "]"
-      << (phi ? " (phi)" : " (regrets)");
+  oss << "[" << pos_to_str(curr_state) << " " << action.to_string() << "]" << (phi ? " (phi)" : " (regrets)");
   return oss.str();
 }
 
@@ -865,6 +866,12 @@ void TreeRealTimeSolver::track_strategy(nlohmann::json& metrics, std::ostringstr
   // const TreeDecision decision{get_strategy(), get_config().init_state, true}; TODO: use real time clusters
   const TreeDecision decision{get_strategy(), get_config().init_state, false};
   track_strategy_by_decision(get_config().init_state, init_ranges, decision, get_regret_metrics_config(), false, metrics);
+}
+
+bool TreeRealTimeSolver::should_track_strategy(const PokerState& prev_state, const PokerState& next_state, const SolverConfig& solver_config, const MetricsConfig& metrics_config) const {
+  return MCCFRSolver::should_track_strategy(prev_state, next_state, solver_config, metrics_config) &&
+      prev_state.get_round() < get_real_time_config().terminal_round &&
+      prev_state.get_bet_level() < get_real_time_config().terminal_bet_level;
 }
 
 std::shared_ptr<const TreeStorageConfig> TreeRealTimeSolver::make_tree_config() const {

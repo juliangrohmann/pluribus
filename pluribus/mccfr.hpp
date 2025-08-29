@@ -157,6 +157,8 @@ protected:
   
   virtual void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const = 0;
   virtual void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const = 0;
+  virtual bool should_track_strategy(const PokerState& prev_state, const PokerState& next_state, const SolverConfig& solver_config,
+      const MetricsConfig& metrics_config) const;
 
   std::string track_wandb_metrics(long t) const;
   void track_strategy_by_decision(const PokerState& state, const std::vector<PokerRange>& ranges, const DecisionAlgorithm& decision,
@@ -356,6 +358,8 @@ protected:
 
   void track_regret(nlohmann::json& metrics, std::ostringstream& out_str, long t) const override {}
   void track_strategy(nlohmann::json& metrics, std::ostringstream& out_str) const override;
+  bool should_track_strategy(const PokerState& prev_state, const PokerState& next_state, const SolverConfig& solver_config,
+      const MetricsConfig& metrics_config) const override;
 
   std::shared_ptr<const TreeStorageConfig> make_tree_config() const override;
 };
