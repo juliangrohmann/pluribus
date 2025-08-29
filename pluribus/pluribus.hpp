@@ -1,7 +1,8 @@
 #pragma once
 
-#include <memory>
 #include <condition_variable>
+#include <future>
+#include <memory>
 #include <pluribus/blueprint.hpp>
 #include <pluribus/mccfr.hpp>
 #include <pluribus/poker.hpp>
@@ -69,6 +70,7 @@ private:
   struct SolveJob {
     SolverConfig cfg;
     RealTimeSolverConfig rt_cfg;
+    std::promise<void> ack;
   };
 
   std::thread _solver_thread;

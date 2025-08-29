@@ -239,11 +239,17 @@ int terminal_round(const PokerState& root) {
 }
 
 int terminal_bet_level(const PokerState& root) {
-  return root.get_round() == 1 && root.active_players() > 2 ? root.get_bet_level() + 2 : 999;
+  if(root.get_round() == 1 && root.active_players() > 2) {
+    return root.get_bet_level() + 2;
+  }
+  if(root.get_round() == 0 && root.active_players() > 4) {
+    return root.get_bet_level() + 2;
+  }
+  return 999;
 }
 
 void Pluribus::_enqueue_job(const bool force_terminal) {
-  Logger::log("Initializing solver: MappedRealTimeSolver");
+  Logger::log("Initializing solve job...");
   SolverConfig config{_sampled_bp->get_config().poker, _live_profile};
   config.rake = _sampled_bp->get_config().rake;
   config.init_state = _root_state;
@@ -255,12 +261,15 @@ void Pluribus::_enqueue_job(const bool force_terminal) {
   rt_config.terminal_round = force_terminal ? 4 : terminal_round(_root_state);
   rt_config.terminal_bet_level = force_terminal ? 999 : terminal_bet_level(_root_state);
   SolveJob job{config, rt_config};
+  const auto ack = job.ack.get_future();
   {
     std::lock_guard lk(_solver_mtx);
     if(_solver) _solver->interrupt();
     _pending_job = std::move(job);
   }
+  Logger::log("Enqueued job.");
   _solver_cv.notify_one();
+  ack.wait();
 }
 
 bool is_off_tree(const Action a, const std::vector<Action>& actions, const PokerState& state) {
@@ -316,11 +325,12 @@ void Pluribus::_apply_action(const Action a, const std::vector<float>& freq) {
   }
 
   bool should_solve = false;
-  if(_can_solve(_root_state) && is_off_tree(a, actions, prev_real_state)) {
+  if(is_off_tree(a, actions, prev_real_state)) {
     should_solve = true;
     Logger::log("Action is off-tree. Adding to live actions...");
     _live_profile.add_action(a, prev_real_state);
     Logger::log("New live profile:\n" + _live_profile.to_string());
+    actions = valid_actions(prev_real_state, _live_profile);
     // TODO: remap actions to new live profile
     // TODO: if root is updated afterwards before the solve can start, seg faults during root update
     // TODO: if root is updated afterwards before the solve can converge, assigns bad ranges during root update
@@ -447,15 +457,14 @@ void Pluribus::_start_worker() {
 void Pluribus::_solver_worker() {
   while(true) {
     std::optional<SolveJob> job;
+    std::shared_ptr<TreeRealTimeSolver> local;
     {
       std::unique_lock lk(_solver_mtx);
       _solver_cv.wait(lk, [&]{ return !_running_worker ? true : _pending_job.has_value(); });
       if(!_running_worker) break;
       job.swap(_pending_job);
-    }
-    const auto local = std::make_shared<TreeRealTimeSolver>(job->cfg, job->rt_cfg, _sampled_bp);
-    {
-      std::lock_guard lk(_solver_mtx);
+      job->ack.set_value();
+      local = std::make_shared<TreeRealTimeSolver>(job->cfg, job->rt_cfg, _sampled_bp);
       for(const FrozenNode& frozen : _frozen) local->freeze(frozen.freq, frozen.hand, Board{frozen.board}, frozen.live_actions);
       _solver = local;
     }
