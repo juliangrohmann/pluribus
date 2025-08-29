@@ -460,13 +460,21 @@ void Pluribus::_solver_worker() {
     std::shared_ptr<TreeRealTimeSolver> local;
     {
       std::unique_lock lk(_solver_mtx);
+      Logger::log("DEBUG: Worker start.");
       _solver_cv.wait(lk, [&]{ return !_running_worker ? true : _pending_job.has_value(); });
+      Logger::log("DEBUG: Done waiting.");
       if(!_running_worker) break;
+      Logger::log("DEBUG: No break.");
       job.swap(_pending_job);
+      Logger::log("DEBUG: Swapped job.");
       job->ack.set_value();
+      Logger::log("DEBUG: Set future value.");
       local = std::make_shared<TreeRealTimeSolver>(job->cfg, job->rt_cfg, _sampled_bp);
+      Logger::log("DEBUG: Created solver.");
       for(const FrozenNode& frozen : _frozen) local->freeze(frozen.freq, frozen.hand, Board{frozen.board}, frozen.live_actions);
+      Logger::log("DEBUG: Frozen.");
       _solver = local;
+      Logger::log("DEBUG: Assigned solver.");
     }
     local->solve(100'000'000'000L);
   }
