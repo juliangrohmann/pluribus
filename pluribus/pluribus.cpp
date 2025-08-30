@@ -51,7 +51,7 @@ Pluribus::Pluribus(const std::array<ActionProfile, 4>& live_profiles, const std:
   Logger::log((HoleCardIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hole card indexer."});
   Logger::log((HandIndexer::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" hand indexer."});
   Logger::log((BlueprintClusterMap::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" blueprint cluster map."});
-  // Logger::log((RealTimeClusterMap::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" real time cluster map."});
+  Logger::log((RealTimeClusterMap::get_instance() ? "Initialized" : "Failed to initialize") + std::string{" real time cluster map."});
   _start_worker();
 }
 

@@ -45,7 +45,7 @@ private:
   void _apply_action(Action a, const std::vector<float>& freq);
   void _update_root(bool solve);
   bool _can_solve(const PokerState& root) const;
-  void _set_invalid(const std::exception& e)z;
+  void _set_invalid(const std::exception& e);
   // bool _should_solve(const PokerState& root) const;
 
   void _solver_worker();

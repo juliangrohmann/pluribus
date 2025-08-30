@@ -59,14 +59,15 @@ template <template<typename> class StorageT>
 struct MCCFRContext {
   MCCFRContext(SlimPokerState& state_, const long t_, const int i_, const int consec_folds_, const Board& board_,
       const std::vector<Hand>& hands_, std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_,
-      const StorageT<uint8_t>* bp_node_, SlimPokerState& bp_state_)
+      const StorageT<uint8_t>* bp_node_, SlimPokerState& bp_state_, const int flop_idx_)
     : state{state_}, t{t_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
-      regret_storage{regret_storage_}, bp_node{bp_node_}, bp_state{bp_state_} {}
+      regret_storage{regret_storage_}, bp_node{bp_node_}, bp_state{bp_state_}, flop_idx{flop_idx_} {}
   MCCFRContext(SlimPokerState& next_state, StorageT<int>* next_regret_storage, const StorageT<uint8_t>* next_bp_node, const int next_consec_folds,
-      const MCCFRContext& context)
-    : state{next_state}, t{context.t}, i{context.i}, consec_folds{next_consec_folds}, board{context.board}, hands{context.hands},
-      indexers{context.indexers}, eval{context.eval}, regret_storage{next_regret_storage}, bp_node{next_bp_node}, bp_state{context.bp_state} {}
+      const MCCFRContext& ctx)
+    : state{next_state}, t{ctx.t}, i{ctx.i}, consec_folds{next_consec_folds}, board{ctx.board}, hands{ctx.hands}, indexers{ctx.indexers}, eval{ctx.eval},
+      regret_storage{next_regret_storage}, bp_node{next_bp_node}, bp_state{ctx.bp_state}, flop_idx{ctx.flop_idx} {}
 
+  // TODO: move parts only required by real time solver into subclass (bp_node, bp_state, flop_idx)
   SlimPokerState& state;
   const long t;
   const int i;
@@ -76,8 +77,9 @@ struct MCCFRContext {
   std::vector<CachedIndexer>& indexers;
   const omp::HandEvaluator& eval;
   StorageT<int>* regret_storage;
-  const StorageT<uint8_t>* bp_node;
-  SlimPokerState& bp_state;
+  const StorageT<uint8_t>* bp_node; // real time solver
+  SlimPokerState& bp_state; // real time solver
+  int flop_idx; // real time solver
 };
 
 template <template<typename> class StorageT>
@@ -138,7 +140,9 @@ protected:
   virtual bool should_log(long t) const = 0;
   virtual long next_step(long t, long T) const = 0;
 
-  virtual int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) = 0;
+  virtual void initialize_context(MCCFRContext<StorageT>& ctx) = 0;
+  virtual int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
+      int flop_idx) const = 0;
   virtual std::atomic<int>* get_base_regret_ptr(StorageT<int>* storage, int cluster) = 0;
   virtual std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, int cluster) = 0;
   virtual StorageT<int>* init_regret_storage() = 0;
@@ -170,6 +174,7 @@ private:
   int traverse_mccfr_p(const MCCFRContext<StorageT>& ctx);
   int traverse_mccfr(const MCCFRContext<StorageT>& ctx);
   int external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& ctx);
+  int get_cluster(const MCCFRContext<StorageT>& ctx) const;
 #ifdef UNIT_TEST
   template <template<typename> class T>
   friend int call_traverse_mccfr(MCCFRSolver<T>* trainer, const PokerState& state, int i, const Board& board, const std::vector<Hand>& hands, 
@@ -243,7 +248,9 @@ protected:
   bool should_log(const long t) const override { return (t + 1) % _bp_config.log_interval == 0; }
   long next_step(long t, long T) const override;
 
-  int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
+  void initialize_context(MCCFRContext<StorageT>& ctx) override {}
+  int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
+      int flop_idx) const override;
   double get_discount_factor(const long t) const override { return _bp_config.get_discount_factor(t); }
 
   MetricsConfig get_avg_metrics_config() const { return _avg_metrics_config; }
@@ -279,7 +286,9 @@ protected:
   bool should_log(const long t) const override { return (t + 1) % _rt_config.log_interval == 0; }
   long next_step(const long t, const long T) const override { return std::min(_rt_config.next_discount_step(t, T), t + 20'000'000); }
 
-  int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) override;
+  void initialize_context(MCCFRContext<StorageT>& ctx) override;
+  int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
+      int flop_idx) const override;
   double get_discount_factor(const long t) const override { return _rt_config.get_discount_factor(t); }
 
   std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, int cluster) override { return nullptr; }
@@ -289,8 +298,7 @@ protected:
   const StorageT<uint8_t>* next_bp_node(Action a, const SlimPokerState& state, const StorageT<uint8_t>* bp_node, SlimPokerState& bp_state) override;
 
 private:
-  Action next_rollout_action(CachedIndexer& indexer, const SlimPokerState& state, const Hand& hand, const Board& board,
-    const TreeStorageNode<uint8_t>* node) const;
+  Action next_rollout_action(const SlimPokerState& state, const TreeStorageNode<uint8_t>* node, const MCCFRContext<StorageT>& ctx) const;
 
   const std::shared_ptr<const SampledBlueprint> _bp = nullptr;
   const TreeStorageNode<uint8_t>* _root_node = nullptr;
