@@ -142,8 +142,7 @@ protected:
   virtual long next_step(long t, long T) const = 0;
 
   virtual void initialize_context(MCCFRContext<StorageT>& ctx) = 0;
-  virtual int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
-      int flop_idx) const = 0;
+  virtual int get_cluster(const SlimPokerState& state, const Board& board, const Hand& hand, CachedIndexer& indexer, int flop_idx) const = 0;
   virtual std::atomic<int>* get_base_regret_ptr(StorageT<int>* storage, int cluster) = 0;
   virtual std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, int cluster) = 0;
   virtual StorageT<int>* init_regret_storage() = 0;
@@ -250,8 +249,7 @@ protected:
   long next_step(long t, long T) const override;
 
   void initialize_context(MCCFRContext<StorageT>& ctx) override {}
-  int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
-      int flop_idx) const override;
+  int get_cluster(const SlimPokerState& state, const Board& board, const Hand& hand, CachedIndexer& indexer, int flop_idx) const override;
   double get_discount_factor(const long t) const override { return _bp_config.get_discount_factor(t); }
 
   MetricsConfig get_avg_metrics_config() const { return _avg_metrics_config; }
@@ -288,8 +286,7 @@ protected:
   long next_step(const long t, const long T) const override { return std::min(_rt_config.next_discount_step(t, T), t + 20'000'000); }
 
   void initialize_context(MCCFRContext<StorageT>& ctx) override;
-  int get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
-      int flop_idx) const override;
+  int get_cluster(const SlimPokerState& state, const Board& board, const Hand& hand, CachedIndexer& indexer, int flop_idx) const override;
   double get_discount_factor(const long t) const override { return _rt_config.get_discount_factor(t); }
 
   std::atomic<float>* get_base_avg_ptr(StorageT<float>* storage, int cluster) override { return nullptr; }

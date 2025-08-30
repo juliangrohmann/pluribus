@@ -32,7 +32,9 @@ public:
       node = node->apply(state.get_action_history().get(i));
     }
     int cluster = _real_time ?
-        RealTimeClusterMap::get_instance()->cluster(state.get_round(), board, hand) :
+        (state.get_round() == _init_state.get_round() ?
+            HoleCardIndexer::get_instance()->index(hand) :
+            RealTimeClusterMap::get_instance()->cluster(state.get_round(), board, hand)) :
         BlueprintClusterMap::get_instance()->cluster(state.get_round(), board, hand);
     auto freq = calculate_strategy(node->get(cluster), node->get_value_actions().size());
     if(std::ranges::find(node->get_value_actions(), a) == node->get_value_actions().end()) {
