@@ -664,20 +664,19 @@ int RealTimeSolver<StorageT>::terminal_utility(const MCCFRContext<StorageT>& ctx
     for(Action a : ctx.state.get_biases()) oss << a.to_string() << "  ";
     Logger::error(oss.str());
   }
-  SlimPokerState curr_state = ctx.state;
   const TreeStorageNode<uint8_t>* node = ctx.bp_node;
-  while(!curr_state.is_terminal() && !curr_state.get_players()[ctx.i].has_folded()) {
-    if(curr_state.get_round() == ctx.bp_state.get_round() && curr_state.get_active() == ctx.bp_state.get_active()) {
-      const Action rollout_action = next_rollout_action(curr_state, node, ctx);
-      curr_state.apply_in_place(rollout_action);
-      if(!curr_state.is_terminal()) node = node->apply(rollout_action);
+  while(!ctx.state.is_terminal() && !ctx.state.get_players()[ctx.i].has_folded()) {
+    if(ctx.state.get_round() == ctx.bp_state.get_round() && ctx.state.get_active() == ctx.bp_state.get_active()) {
+      const Action rollout_action = next_rollout_action(ctx.state, node, ctx);
+      ctx.state.apply_in_place(rollout_action);
+      if(!ctx.state.is_terminal()) node = node->apply(rollout_action);
     }
     else {
       // roll state forward until real state and blueprint state are aligned again
-      curr_state.apply_in_place(Action::CHECK_CALL);
+      ctx.state.apply_in_place(Action::CHECK_CALL);
     }
   }
-  return utility(curr_state, ctx.i, ctx.board, ctx.hands, this->get_config().init_chips[ctx.i], this->get_config().rake, ctx.eval);
+  return utility(ctx.state, ctx.i, ctx.board, ctx.hands, this->get_config().init_chips[ctx.i], this->get_config().rake, ctx.eval);
 }
 
 template<template <typename> class StorageT>
