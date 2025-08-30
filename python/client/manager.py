@@ -5,7 +5,8 @@ from typing import Callable, Awaitable, Dict, Any
 
 
 class RequestCommand:
-  def __init__(self, payload: Dict, callback: Callable[[Dict], None]):
+  def __init__(self, url: str, payload: Dict, callback: Callable[[Dict], None]):
+    self.url = url
     self.payload = payload
     self.callback = callback
 
@@ -25,8 +26,8 @@ class RequestManager:
     self._running = False
     if self.task: await self.task
 
-  def enqueue(self, payload: Dict, callback: Callable[[Dict], None]):
-    cmd = RequestCommand(payload, callback)
+  def enqueue(self, url: str, payload: Dict, callback: Callable[[Dict], None]):
+    cmd = RequestCommand(url, payload, callback)
     self.queue.put_nowait(cmd)
 
   async def _run_loop(self):
@@ -34,7 +35,7 @@ class RequestManager:
       while self._running:
         cmd: RequestCommand = await self.queue.get()
         try:
-          async with session.post(self.host, json=cmd.payload) as resp:
+          async with session.post(cmd.url, json=cmd.payload) as resp:
             cmd.callback(await resp.json())
         except Exception as e:
           print(f"[RequestManager] Error contacting {self.host}: {e}")
