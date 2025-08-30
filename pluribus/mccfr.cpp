@@ -702,7 +702,6 @@ void RealTimeSolver<StorageT>::initialize_context(MCCFRContext<StorageT>& ctx) {
 template<template <typename> class StorageT>
 int RealTimeSolver<StorageT>::get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
     const int flop_idx) const {
-  Logger::log("Getting cluster: Hand=" + hands[state.get_active()].to_string() + ", Board=" + board.to_string());
   if(state.get_round() == this->get_config().init_state.get_round()) return HoleCardIndexer::get_instance()->index(hands[state.get_active()]);
   const hand_index_t hand_idx = indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round());
   return RealTimeClusterMap::get_instance()->cluster(state.get_round(), flop_idx, hand_idx);
