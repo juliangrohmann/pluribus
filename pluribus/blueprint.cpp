@@ -325,7 +325,10 @@ void tree_to_sampled_buffers(const TreeStorageNode<float>* node, const ActionHis
     const std::atomic<float>* base_ptr = node->get(c, 0);
     auto freq = calculate_strategy(base_ptr, static_cast<int>(node->get_value_actions().size()));
     for(int a_idx = 0; a_idx < biases.size(); ++a_idx) {
-      sampled[node_value_index(static_cast<int>(biases.size()), c, a_idx)] = action_to_idx.at(sample_biased(node->get_value_actions(), freq, biases[a_idx], factor));
+      Action sampled_action = sample_biased(node->get_value_actions(), freq, biases[a_idx], factor);
+      auto it = action_to_idx.find(sampled_action);
+      if(it == action_to_idx.end()) Logger::error("Sampled action missing in compression map: " + sampled_action.to_string());
+      sampled[node_value_index(static_cast<int>(biases.size()), c, a_idx)] = it->second;
     }
   }
   buffer.entries.emplace_back(history, sampled);
