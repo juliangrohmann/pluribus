@@ -313,7 +313,11 @@ BlueprintClusterMap::BlueprintClusterMap() {
 }
 
 uint16_t RealTimeClusterMap::cluster(const int round, const hand_index_t flop_index, const hand_index_t hand_index) const {
-  return _cluster_map[flop_index][round].at(hand_index);
+  const auto it = _cluster_map[flop_index][round].find(hand_index);
+  if(it == _cluster_map[flop_index][round].end()) {
+    Logger::error("Failed to find hand index " + std::to_string(hand_index) + " in flop index " + std::to_string(flop_index) +", round=" + std::to_string(round));
+  }
+  return it->second;
 }
 
 uint16_t RealTimeClusterMap::cluster(const int round, const Board& board, const Hand& hand) const {

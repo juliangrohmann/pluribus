@@ -113,7 +113,7 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
         on_step(t, i, sample.hands, indexers);
         SlimPokerState state{get_config().init_state};
         SlimPokerState bp_state{get_config().init_state};
-        MCCFRContext<StorageT> ctx{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), init_bp_node(), bp_state, 0};
+        MCCFRContext<StorageT> ctx{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), init_bp_node(), bp_state};
         initialize_context(ctx);
         if(should_prune(t)) {
           if(is_debug) Logger::log("============== Traverse MCCFR-P ==============");
@@ -638,7 +638,8 @@ const StorageT<uint8_t>* RealTimeSolver<StorageT>::next_bp_node(const Action a, 
 template <template<typename> class StorageT>
 Action RealTimeSolver<StorageT>::next_rollout_action(const SlimPokerState& state, const TreeStorageNode<uint8_t>* node,
     const MCCFRContext<StorageT>& ctx) const {
-  const int cluster = get_cluster(state, ctx.board, ctx.hands, ctx.indexers, ctx.flop_idx);
+  const int cluster = BlueprintClusterMap::get_instance()->cluster(state.get_round(),
+      (*ctx.bp_indexers)[state.get_active()].index(ctx.board, ctx.hands[state.get_active()], state.get_round()));
   // std::cout << "Rollout cluster=" << cluster << "\n";
   const uint8_t bias_offset = _bp->bias_offset(state.get_biases()[state.get_active()]);
   // std::cout << "Bias offset=" << static_cast<int>(bias_offset) << "\n";
@@ -693,12 +694,15 @@ void RealTimeSolver<StorageT>::on_start() {
 
 template<template <typename> class StorageT>
 void RealTimeSolver<StorageT>::initialize_context(MCCFRContext<StorageT>& ctx) {
+  thread_local std::vector<CachedIndexer> bp_indexers(ctx.indexers.size());
   ctx.flop_idx = FlopIndexer::get_instance()->index(ctx.board);
+  ctx.bp_indexers = &bp_indexers;
 }
 
 template<template <typename> class StorageT>
 int RealTimeSolver<StorageT>::get_cluster(const SlimPokerState& state, const Board& board, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers,
     const int flop_idx) const {
+  Logger::log("Getting cluster: Hand=" + hands[state.get_active()].to_string() + ", Board=" + board.to_string());
   if(state.get_round() == this->get_config().init_state.get_round()) return HoleCardIndexer::get_instance()->index(hands[state.get_active()]);
   const hand_index_t hand_idx = indexers[state.get_active()].index(board, hands[state.get_active()], state.get_round());
   return RealTimeClusterMap::get_instance()->cluster(state.get_round(), flop_idx, hand_idx);

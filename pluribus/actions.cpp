@@ -142,7 +142,7 @@ std::unordered_set<Action> ActionProfile::all_actions() const {
     for(auto& level : round) {
       for(auto& pos : level) {
         for(auto& ip : pos) {
-          for(Action a : ip) {
+          for(const Action a : ip) {
             actions.insert(a);
           }
         }

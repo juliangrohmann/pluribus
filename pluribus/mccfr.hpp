@@ -59,13 +59,13 @@ template <template<typename> class StorageT>
 struct MCCFRContext {
   MCCFRContext(SlimPokerState& state_, const long t_, const int i_, const int consec_folds_, const Board& board_,
       const std::vector<Hand>& hands_, std::vector<CachedIndexer>& indexers_, const omp::HandEvaluator& eval_, StorageT<int>* regret_storage_,
-      const StorageT<uint8_t>* bp_node_, SlimPokerState& bp_state_, const int flop_idx_)
+      const StorageT<uint8_t>* bp_node_, SlimPokerState& bp_state_)
     : state{state_}, t{t_}, i{i_}, consec_folds{consec_folds_}, board{board_}, hands{hands_}, indexers{indexers_}, eval{eval_},
-      regret_storage{regret_storage_}, bp_node{bp_node_}, bp_state{bp_state_}, flop_idx{flop_idx_} {}
+      regret_storage{regret_storage_}, bp_node{bp_node_}, bp_state{bp_state_} {}
   MCCFRContext(SlimPokerState& next_state, StorageT<int>* next_regret_storage, const StorageT<uint8_t>* next_bp_node, const int next_consec_folds,
       const MCCFRContext& ctx)
     : state{next_state}, t{ctx.t}, i{ctx.i}, consec_folds{next_consec_folds}, board{ctx.board}, hands{ctx.hands}, indexers{ctx.indexers}, eval{ctx.eval},
-      regret_storage{next_regret_storage}, bp_node{next_bp_node}, bp_state{ctx.bp_state}, flop_idx{ctx.flop_idx} {}
+      regret_storage{next_regret_storage}, bp_node{next_bp_node}, bp_state{ctx.bp_state}, flop_idx{ctx.flop_idx}, bp_indexers{ctx.bp_indexers} {}
 
   // TODO: move parts only required by real time solver into subclass (bp_node, bp_state, flop_idx)
   SlimPokerState& state;
@@ -79,7 +79,8 @@ struct MCCFRContext {
   StorageT<int>* regret_storage;
   const StorageT<uint8_t>* bp_node; // real time solver
   SlimPokerState& bp_state; // real time solver
-  int flop_idx; // real time solver
+  int flop_idx = -1; // real time solver
+  std::vector<CachedIndexer>* bp_indexers = nullptr; // real time solver
 };
 
 template <template<typename> class StorageT>
