@@ -68,7 +68,7 @@ Pluribus::~Pluribus() {
 
 void Pluribus::new_game(const std::vector<int>& stacks, const Hand& hero_hand, const int hero_pos) {
   Logger::log("================================ New Game ================================");
-  valid = true;
+  _valid = true;
   std::ostringstream oss;
   Logger::log("Stacks: " + join_as_strs(stacks, ", "));
   const auto& poker_config = _sampled_bp->get_config().poker;
@@ -124,7 +124,15 @@ void handle_misaligned_state_update(PokerState& real_state, const PokerState& ma
   real_state.apply_in_place(action);
 }
 
+void log_invalid() {
+  Logger::log("Request ignored: Pluribus was already in an invalid state. Start a new game to continue.");
+}
+
 void Pluribus::update_state(const Action action, const int pos) {
+  if(!_valid) {
+    log_invalid();
+    return;
+  }
   try {
     Logger::log("============================== Update State ==============================");
     Logger::log(pos_to_str(pos, _real_state.get_players().size(), _real_state.is_straddle()) + ": " + action.to_string());
@@ -148,6 +156,10 @@ void Pluribus::update_state(const Action action, const int pos) {
 }
 
 void Pluribus::hero_action(const Action action, const std::vector<float>& freq) {
+  if(!_valid) {
+    log_invalid();
+    return;
+  }
   try {
     Logger::log("============================== Hero Action ===============================");
     Logger::log(pos_to_str(_hero_pos, _real_state.get_players().size(), _real_state.is_straddle()) + " (Hero): " + action.to_string());
@@ -168,6 +180,10 @@ void Pluribus::hero_action(const Action action, const std::vector<float>& freq) 
 }
 
 void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
+  if(!_valid) {
+    log_invalid();
+    return;
+  }
   try {
     Logger::log("============================== Update Board ==============================");
     Logger::log("Previous board: " + cards_to_str(_board));
@@ -188,6 +204,10 @@ void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
 }
 
 Solution Pluribus::solution(const Hand& hand) {
+  if(!_valid) {
+    log_invalid();
+    return Solution{};
+  }
   try {
     Logger::log("================================ Solution ================================");
     Solution solution;
@@ -227,6 +247,10 @@ Solution Pluribus::solution(const Hand& hand) {
 }
 
 void Pluribus::save_range(const std::string& fn) {
+  if(!_valid) {
+    log_invalid();
+    return;
+  }
   try {
     Logger::log("=============================== Save Range ===============================");
     PngRangeViewer viewer{fn};
@@ -519,9 +543,9 @@ bool Pluribus::_can_solve(const PokerState& root) const {
 }
 
 void Pluribus::_set_invalid(const std::exception& e) {
-  valid = false;
+  _valid = false;
   Logger::log("Exception: " + std::string{e.what()});
-  Logger::log("An exception occured while running. Start a new game to attempt to recover.");
+  Logger::log("An exception occured while running. Start a new game to continue.");
 }
 
 // bool Pluribus::_should_solve(const PokerState& root) const {

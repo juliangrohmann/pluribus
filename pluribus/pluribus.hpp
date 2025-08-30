@@ -67,7 +67,7 @@ private:
   Hand _hero_hand;
   int _hero_pos = -1;
   int _game_idx = 0;
-  bool valid = false;
+  bool _valid = false;
 
   struct SolveJob {
     SolverConfig cfg;
