@@ -71,7 +71,7 @@ struct MCCFRContext {
   SlimPokerState& state;
   const long t;
   const int i;
-  const int consec_folds;
+  int consec_folds;
   const Board& board;
   const std::vector<Hand>& hands;
   std::vector<CachedIndexer>& indexers;
@@ -171,8 +171,8 @@ protected:
   MetricsConfig get_regret_metrics_config() const { return _regret_metrics_config; }
 
 private:
-  int traverse_mccfr_p(const MCCFRContext<StorageT>& ctx);
-  int traverse_mccfr(const MCCFRContext<StorageT>& ctx);
+  int traverse_mccfr_p(MCCFRContext<StorageT>& ctx);
+  int traverse_mccfr(MCCFRContext<StorageT>& ctx);
   int external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& ctx);
   int get_cluster(const MCCFRContext<StorageT>& ctx) const;
 #ifdef UNIT_TEST

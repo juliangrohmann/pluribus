@@ -13,8 +13,8 @@ int call_traverse_mccfr(MCCFRSolver<StorageT>* trainer, const PokerState& state,
     const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers, const omp::HandEvaluator& eval) {
   SlimPokerState init_state{state};
   SlimPokerState bp_state{state};
-  return trainer->traverse_mccfr(MCCFRContext<StorageT>{init_state, 1, i, 0, board, hands, indexers, eval, trainer->init_regret_storage(),
-      trainer->init_bp_node(), bp_state});
+  MCCFRContext<StorageT> ctx{init_state, 1, i, 0, board, hands, indexers, eval, trainer->init_regret_storage(), trainer->init_bp_node(), bp_state};
+  return trainer->traverse_mccfr(ctx);
 }
 
 }

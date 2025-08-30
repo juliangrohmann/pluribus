@@ -255,7 +255,7 @@ int sample_idx_from_regrets(const std::atomic<T>* base_ptr, const int n_actions)
 }
 
 template <template<typename> class StorageT>
-int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
+int MCCFRSolver<StorageT>::traverse_mccfr_p(MCCFRContext<StorageT>& ctx) {
   if(is_terminal(ctx.state, ctx.i)) {
     const int u = terminal_utility(ctx);
     if(is_debug) log_utility(u, ctx);
@@ -287,8 +287,9 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
         ++filter_sum;
         SlimPokerState next_state = ctx.state.apply_copy(a);
         const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
-        const int v_a = traverse_mccfr_p(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-            next_bp_node(a, ctx.state, ctx.bp_node, ctx.bp_state), next_consec_folds(ctx.consec_folds, a), ctx});
+        MCCFRContext<StorageT> next_ctx{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
+            next_bp_node(a, ctx.state, ctx.bp_node, ctx.bp_state), next_consec_folds(ctx.consec_folds, a), ctx};
+        const int v_a = traverse_mccfr_p(next_ctx);
         const int v_r = std::max(regret, 0);
         values[a_idx] = v_a;
         v_exact += static_cast<double>(v_r) * static_cast<double>(v_a);
@@ -328,12 +329,14 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(const MCCFRContext<StorageT>& ctx) {
   auto next_node = next_bp_node(a, ctx.state, ctx.bp_node, ctx.bp_state);
   ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr_p(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
-      next_node, next_consec_folds(ctx.consec_folds, a), ctx});
+  ctx.regret_storage = next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i);
+  ctx.bp_node = next_node;
+  ctx.consec_folds = next_consec_folds(ctx.consec_folds, a);
+  return traverse_mccfr_p(ctx);
 }
 
 template <template<typename> class StorageT>
-int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
+int MCCFRSolver<StorageT>::traverse_mccfr(MCCFRContext<StorageT>& ctx) {
   if(is_terminal(ctx.state, ctx.i)) {
     const int u = terminal_utility(ctx);
     if(is_debug) log_utility(u, ctx);
@@ -358,8 +361,9 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
       if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (traverser): " + a.to_string());
       const int branching_idx = n_value_actions == branching_actions.size() ? a_idx : 0;
       SlimPokerState next_state = ctx.state.apply_copy(a);
-      const int v_a = traverse_mccfr(MCCFRContext<StorageT>{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
-        next_bp_node(a, ctx.state, ctx.bp_node, ctx.bp_state), next_consec_folds(ctx.consec_folds, a), ctx});
+      MCCFRContext<StorageT> next_ctx{next_state, next_regret_storage(ctx.regret_storage, branching_idx, next_state, ctx.i),
+        next_bp_node(a, ctx.state, ctx.bp_node, ctx.bp_state), next_consec_folds(ctx.consec_folds, a), ctx};
+      const int v_a = traverse_mccfr(next_ctx);
       const int v_r = std::max(base_ptr[a_idx].load(std::memory_order_relaxed), 0);
       values[a_idx] = v_a;
       v_exact += static_cast<double>(v_r) * static_cast<double>(v_a);
@@ -391,10 +395,12 @@ int MCCFRSolver<StorageT>::traverse_mccfr(const MCCFRContext<StorageT>& ctx) {
   const Action a = value_actions[a_idx];
   if(is_debug) Logger::log("[" + pos_to_str(ctx.state) + "] Applying (external): " + a.to_string());
   auto next_node = next_bp_node(a, ctx.state, ctx.bp_node, ctx.bp_state);
-  ctx.state.apply_in_place(a);
   const int branching_idx = value_actions.size() == branching_actions.size() ? a_idx : 0;
-  return traverse_mccfr(MCCFRContext<StorageT>{ctx.state, next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i),
-      next_node, next_consec_folds(ctx.consec_folds, a), ctx});
+  ctx.state.apply_in_place(a);
+  ctx.regret_storage = next_regret_storage(ctx.regret_storage, branching_idx, ctx.state, ctx.i);
+  ctx.bp_node = next_node;
+  ctx.consec_folds = next_consec_folds(ctx.consec_folds, a);
+  return traverse_mccfr(ctx);
 }
 
 template <template<typename> class StorageT>
