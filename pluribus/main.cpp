@@ -147,12 +147,25 @@ int main(int argc, char* argv[]) {
   else if(command == "sampled-blueprint-cached") {
     // ./Pluribus sampled-blueprint-cached lossless_bp_fn buf_dir out_fn
     if(argc < 5) {
-      std::cout << "Missing arguments to build blueprint.\n";
+      std::cout << "Missing arguments to build blueprint from cache.\n";
     }
     else {
       SampledBlueprint sampled_bp;
       sampled_bp.build_cached(argv[2], get_filepaths(argv[3]));
       cereal_save(sampled_bp, "sampled_" + std::string{argv[4]});
+    }
+  }
+  else if(command == "sampled-blueprint-metadata") {
+    // ./Pluribus sampled-blueprint-metadata metadata_fn out_fn
+    if(argc < 4) {
+      std::cout << "Missing arguments to build blueprint from metadata.\n";
+    }
+    else {
+	  SampledMetadata metadata;
+	  cereal_load(metadata, argv[2]);
+      SampledBlueprint sampled_bp;
+      sampled_bp.build_from_meta_data(metadata);
+      cereal_save(sampled_bp, "sampled_" + std::string{argv[3]});
     }
   }
   else {
