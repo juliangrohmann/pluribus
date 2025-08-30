@@ -289,7 +289,8 @@ std::vector<int> pokerkit_utiltiies(const std::string& line, const int n_players
 
 TEST_CASE("Utility test set", "[poker]") {
   const std::filesystem::path dir = std::filesystem::path{".."} / "resources";
-  const std::vector<std::string> fns = {"utility_no_sidepots, utility_sidepots"};
+  // const std::vector<std::string> fns = {"utility_no_sidepots, utility_sidepots"}; // TODO: generate no sidepots testset
+  const std::vector<std::string> fns = {"utility_sidepots"};
   for(const std::string& fn : fns) {
     std::ifstream pokerkit_file((dir / fn).string() + ".pokerkit");
     if(!pokerkit_file.is_open()) Logger::error("Failed to opoen pokerkit file.");

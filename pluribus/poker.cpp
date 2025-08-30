@@ -569,57 +569,52 @@ std::vector<Action> valid_actions(const SlimPokerState& state, const ActionProfi
   return valid;
 }
 
-std::pair<uint16_t, std::vector<uint16_t>> score_hands(const std::vector<Player>& players, const std::vector<Hand>& hands, const Board& board_cards,
+uint16_t score_hands(uint16_t scores[], const std::vector<Player>& players, const std::vector<Hand>& hands, const Board& board_cards,
     const omp::HandEvaluator& eval) {
   uint16_t best = 0;
-  std::vector<uint16_t> scores(hands.size(), 0);
   omp::Hand board = omp::Hand::empty();
   for(const uint8_t& idx : board_cards.cards()) {
     board += omp::Hand(idx);
   }
   for(int i = 0; i < hands.size(); ++i) {
-    if(players[i].has_folded()) continue;
-    const uint16_t score = eval.evaluate(board + hands[i].cards()[0] + hands[i].cards()[1]);
-    scores[i] = score;
-    best = std::max(score, best);
+    if(!players[i].has_folded()) {
+      const uint16_t score = eval.evaluate(board + hands[i].cards()[0] + hands[i].cards()[1]);
+      scores[i] = score;
+      best = std::max(score, best);
+    }
   }
-  return {best, scores};
+  return best;
 }
 
 int side_pot_payoff(const SlimPokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
     const omp::HandEvaluator& eval) {
   // TODO: collapse side pots to distribute odd chips correctly - pop all players that have folded from all pots, combine equal pots.
   // two odd chip pots -> one even chip pot, removes odd chip bias to the first winner
-  const auto scores = score_hands(state.get_players(), hands, board, eval).second;
+  uint16_t scores[MAX_PLAYERS]{};
+  const auto best = score_hands(scores, state.get_players(), hands, board, eval);
   const int total_payoff = rake.payoff(state.get_round(), state.get_pot().total());
   int payoff = 0;
   for(const auto& [amount, pot_players] : *state.get_pot().get_side_pots()) {
-    uint16_t best = 0;
-    std::vector<uint8_t> winners;
+    if(scores[i] < best) continue;
+    int n_winners = 0;
+    int first_winner = -1;
     bool found = false;
     for(const int p_idx : pot_players) {
       found |= p_idx == i;
-      if(!state.get_players()[p_idx].has_folded()) {
-        best = std::max(scores[p_idx], best);
-      }
-    }
-    if(!found || scores[i] < best) continue;
-    int n_winners = 0;
-    int first_winner = -1;
-    for(const int p_idx : pot_players) {
       if(!state.get_players()[p_idx].has_folded() && scores[p_idx] == best) {
         ++n_winners;
         if(first_winner == -1) first_winner = p_idx;
       }
     }
-    payoff += amount / n_winners + (first_winner == i ? amount % n_winners : 0);
+    if(found) payoff += amount / n_winners + (first_winner == i ? amount % n_winners : 0);
   }
   return static_cast<int>(std::round(static_cast<float>(payoff) / static_cast<float>(state.get_pot().total()) * static_cast<float>(total_payoff)));
 }
 
 int no_side_pot_payoff(const SlimPokerState& state, const int i, const Board& board, const std::vector<Hand>& hands, const RakeStructure& rake,
     const omp::HandEvaluator& eval) {
-  auto [best, scores] = score_hands(state.get_players(), hands, board, eval);
+  uint16_t scores[MAX_PLAYERS]{};
+  const auto best = score_hands(scores, state.get_players(), hands, board, eval);
   bool winner = false;
   int n_winners = 0;
   int first_winner = -1;
