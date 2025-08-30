@@ -221,7 +221,7 @@ public:
 
   template <class Archive>
   void save(Archive& ar) const {
-    ar(_branching_actions, _value_actions, _n_clusters, _is_root);
+    ar(_branching_actions, _value_actions, _frozen, _n_clusters, _is_root);
     if(_is_root) ar(_config);
     for(int c = 0; c < _n_clusters; ++c) {
       for(int a = 0; a < _value_actions.size(); ++a) {
@@ -297,6 +297,7 @@ private:
 
   std::vector<Action> _branching_actions;
   std::vector<Action> _value_actions;
+  std::atomic<int> _frozen = -1;
   int _n_clusters;
   std::shared_ptr<const TreeStorageConfig> _config;
 
