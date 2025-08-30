@@ -68,6 +68,7 @@ Pluribus::~Pluribus() {
 
 void Pluribus::new_game(const std::vector<int>& stacks, const Hand& hero_hand, const int hero_pos) {
   Logger::log("================================ New Game ================================");
+  valid = true;
   std::ostringstream oss;
   Logger::log("Stacks: " + join_as_strs(stacks, ", "));
   const auto& poker_config = _sampled_bp->get_config().poker;
@@ -124,50 +125,135 @@ void handle_misaligned_state_update(PokerState& real_state, const PokerState& ma
 }
 
 void Pluribus::update_state(const Action action, const int pos) {
-  Logger::log("============================== Update State ==============================");
-  Logger::log(pos_to_str(pos, _real_state.get_players().size(), _real_state.is_straddle()) + ": " + action.to_string());
-  if(_real_state.get_active() != pos) {
-    Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state) + " to act.");
+  try {
+    Logger::log("============================== Update State ==============================");
+    Logger::log(pos_to_str(pos, _real_state.get_players().size(), _real_state.is_straddle()) + ": " + action.to_string());
+    if(_real_state.get_active() != pos) {
+      Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state) + " to act.");
+    }
+    const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
+    if(mapped_state.get_round() != _real_state.get_round() || mapped_state.get_active() != _real_state.get_active()) {
+      handle_misaligned_state_update(_real_state, mapped_state, action);
+    }
+    else if(const int n_cards = n_board_cards(mapped_state.get_round()); n_cards > _board.size()) {
+      Logger::error("Expected board update. Expected cards=" + std::to_string(n_cards) + ", Board=" + cards_to_str(_board));
+    }
+    else {
+      _apply_action(action, {});
+    }
   }
-  const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
-  if(mapped_state.get_round() != _real_state.get_round() || mapped_state.get_active() != _real_state.get_active()) {
-    handle_misaligned_state_update(_real_state, mapped_state, action);
-  }
-  else if(const int n_cards = n_board_cards(mapped_state.get_round()); n_cards > _board.size()) {
-    Logger::error("Expected board update. Expected cards=" + std::to_string(n_cards) + ", Board=" + cards_to_str(_board));
-  }
-  else {
-    _apply_action(action, {});
+  catch(const std::exception& e) {
+    _set_invalid(e);
   }
 }
 
 void Pluribus::hero_action(const Action action, const std::vector<float>& freq) {
-  Logger::log("============================== Hero Action ===============================");
-  Logger::log(pos_to_str(_hero_pos, _real_state.get_players().size(), _real_state.is_straddle()) + " (Hero): " + action.to_string());
-  if(_real_state.get_active() != _hero_pos) {
-    Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state) + " (hero) to act.");
+  try {
+    Logger::log("============================== Hero Action ===============================");
+    Logger::log(pos_to_str(_hero_pos, _real_state.get_players().size(), _real_state.is_straddle()) + " (Hero): " + action.to_string());
+    if(_real_state.get_active() != _hero_pos) {
+      Logger::error("Wrong player is acting. Expected " + pos_to_str(_real_state) + " (hero) to act.");
+    }
+    const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
+    if(mapped_state.get_round() != _real_state.get_round() || mapped_state.get_active() != _real_state.get_active()) {
+      handle_misaligned_state_update(_real_state, mapped_state, action);
+    }
+    else {
+      _apply_action(action, freq);
+    }
   }
-  const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
-  if(mapped_state.get_round() != _real_state.get_round() || mapped_state.get_active() != _real_state.get_active()) {
-    handle_misaligned_state_update(_real_state, mapped_state, action);
-  }
-  else {
-    _apply_action(action, freq);
+  catch(const std::exception& e) {
+    _set_invalid(e);
   }
 }
 
 void Pluribus::update_board(const std::vector<uint8_t>& updated_board) {
-  Logger::log("============================== Update Board ==============================");
-  Logger::log("Previous board: " + cards_to_str(_board));
-  Logger::log("Updated board: " + cards_to_str(updated_board));
-  if(_board.size() >= updated_board.size()) Logger::error("No new cards on updated board.");
-  for(int i = 0; i < _board.size(); ++i) {
-    if(_board[i] != updated_board[i]) Logger::error("Inconsistent boards.");
+  try {
+    Logger::log("============================== Update Board ==============================");
+    Logger::log("Previous board: " + cards_to_str(_board));
+    Logger::log("Updated board: " + cards_to_str(updated_board));
+    if(_board.size() >= updated_board.size()) Logger::error("No new cards on updated board.");
+    for(int i = 0; i < _board.size(); ++i) {
+      if(_board[i] != updated_board[i]) Logger::error("Inconsistent boards.");
+    }
+    _board = updated_board;
+    if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
+      Logger::log("Street advanced. Updating root...");
+      _update_root(true);
+    }
   }
-  _board = updated_board;
-  if(_real_state.get_round() > _root_state.get_round() && _can_solve(_real_state)) {
-    Logger::log("Street advanced. Updating root...");
-    _update_root(true);
+  catch(const std::exception& e) {
+    _set_invalid(e);
+  }
+}
+
+Solution Pluribus::solution(const Hand& hand) {
+  try {
+    Logger::log("================================ Solution ================================");
+    Solution solution;
+    const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
+    if(mapped_state.get_round() == _real_state.get_round() && mapped_state.get_active() == _real_state.get_active()) {
+      Logger::log("Mapped state is aligned. Returning real solution.");
+      solution.aligned = true;
+      {
+        std::lock_guard lk(_solver_mtx);
+        if(_solver && _solver->get_real_time_config().is_state_terminal(mapped_state)) {
+          Logger::error("Requested solution extends past the end of the non-terminal solve. "
+              + _solver->get_real_time_config().to_string() + ", Terminal state:\n" + mapped_state.to_string());
+        }
+        solution.actions = _get_solution_actions();
+        const RealTimeDecision decision{*_preflop_bp, _solver, _frozen};
+        for(const Action a : solution.actions) {
+          solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
+        }
+      }
+    }
+    else {
+      // TODO: replace closest actions in profile with exact actions instead and resolve when misaligned
+      Logger::log("WARNING: Mapped state is NOT aligned. Returning check/call until aligned.");
+      Logger::log("Real state:\n" + _real_state.to_string());
+      Logger::log("Mapped live state:\n" + mapped_state.to_string());
+      solution.actions = {Action::CHECK_CALL};
+      solution.freq = {1.0};
+      solution.aligned = false;
+    }
+    Logger::log(solution.to_string());
+    return solution;
+  }
+  catch(const std::exception& e) {
+    _set_invalid(e);
+    return Solution{};
+  }
+}
+
+void Pluribus::save_range(const std::string& fn) {
+  try {
+    Logger::log("=============================== Save Range ===============================");
+    PngRangeViewer viewer{fn};
+    const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
+    {
+      std::lock_guard lk(_solver_mtx);
+      if(_solver && _solver->get_real_time_config().is_state_terminal(mapped_state)) {
+        Logger::error("Requested range extends past the end of the non-terminal solve. "
+            + _solver->get_real_time_config().to_string() + ", Terminal state:\n" + mapped_state.to_string());
+      }
+      const RealTimeDecision decision{*_preflop_bp, _solver, _frozen};
+      auto live_ranges = _ranges;
+      PokerState curr_state = _root_state;
+      for(Action a : _mapped_live_actions.get_history()) {
+        std::cout << "Updating range: " << a.to_string() << "\n";
+        update_ranges(live_ranges, a, curr_state, Board{_board}, decision);
+        curr_state.apply_in_place(a);
+      }
+      std::cout << "Building renderable ranges...\n";
+      const std::vector<Action> actions = _get_solution_actions();
+      const auto action_ranges = build_renderable_ranges(decision, actions, mapped_state, Board{_board}, live_ranges[mapped_state.get_active()]);
+      std::cout << "Rendering ranges...\n";
+      render_ranges(&viewer, live_ranges[mapped_state.get_active()], action_ranges);
+    }
+  }
+  catch(const std::exception& e) {
+    _set_invalid(e);
   }
 }
 
@@ -185,65 +271,6 @@ std::vector<Action> Pluribus::_get_solution_actions() const {
   }
   Logger::log("Value actions=" + actions_to_str(actions));
   return actions;
-}
-
-Solution Pluribus::solution(const Hand& hand) {
-  Logger::log("================================ Solution ================================");
-  Solution solution;
-  const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
-  if(mapped_state.get_round() == _real_state.get_round() && mapped_state.get_active() == _real_state.get_active()) {
-    Logger::log("Mapped state is aligned. Returning real solution.");
-    solution.aligned = true;
-    {
-      std::lock_guard lk(_solver_mtx);
-      if(_solver && _solver->get_real_time_config().is_state_terminal(mapped_state)) {
-        Logger::error("Requested solution extends past the end of the non-terminal solve. "
-            + _solver->get_real_time_config().to_string() + ", Terminal state:\n" + mapped_state.to_string());
-      }
-      solution.actions = _get_solution_actions();
-      const RealTimeDecision decision{*_preflop_bp, _solver, _frozen};
-      for(const Action a : solution.actions) {
-        solution.freq.push_back(decision.frequency(a, mapped_state, Board{_board}, hand));
-      }
-    }
-  }
-  else {
-    // TODO: replace closest actions in profile with exact actions instead and resolve when misaligned
-    Logger::log("WARNING: Mapped state is NOT aligned. Returning check/call until aligned.");
-    Logger::log("Real state:\n" + _real_state.to_string());
-    Logger::log("Mapped live state:\n" + mapped_state.to_string());
-    solution.actions = {Action::CHECK_CALL};
-    solution.freq = {1.0};
-    solution.aligned = false;
-  }
-  Logger::log(solution.to_string());
-  return solution;
-}
-
-void Pluribus::save_range(const std::string& fn) {
-  Logger::log("=============================== Save Range ===============================");
-  PngRangeViewer viewer{fn};
-  const PokerState mapped_state = _root_state.apply(_mapped_live_actions);
-  {
-    std::lock_guard lk(_solver_mtx);
-    if(_solver && _solver->get_real_time_config().is_state_terminal(mapped_state)) {
-      Logger::error("Requested range extends past the end of the non-terminal solve. "
-          + _solver->get_real_time_config().to_string() + ", Terminal state:\n" + mapped_state.to_string());
-    }
-    const RealTimeDecision decision{*_preflop_bp, _solver, _frozen};
-    auto live_ranges = _ranges;
-    PokerState curr_state = _root_state;
-    for(Action a : _mapped_live_actions.get_history()) {
-      std::cout << "Updating range: " << a.to_string() << "\n";
-      update_ranges(live_ranges, a, curr_state, Board{_board}, decision);
-      curr_state.apply_in_place(a);
-    }
-    std::cout << "Building renderable ranges...\n";
-    const std::vector<Action> actions = _get_solution_actions();
-    const auto action_ranges = build_renderable_ranges(decision, actions, mapped_state, Board{_board}, live_ranges[mapped_state.get_active()]);
-    std::cout << "Rendering ranges...\n";
-    render_ranges(&viewer, live_ranges[mapped_state.get_active()], action_ranges);
-  }
 }
 
 int terminal_round(const PokerState& root) { 
@@ -270,8 +297,8 @@ void Pluribus::_enqueue_job(const bool force_terminal) {
   RealTimeSolverConfig rt_config;
   rt_config.bias_profile = BiasActionProfile{};
   rt_config.init_actions = _mapped_bp_actions.get_history();
-  rt_config.terminal_round = _root_state.get_round() + 1; // force_terminal ? 4 : terminal_round(_root_state);
-  rt_config.terminal_bet_level = _root_state.get_bet_level() + 2; // force_terminal ? 999 : terminal_bet_level(_root_state);
+  rt_config.terminal_round = force_terminal ? 4 : terminal_round(_root_state);
+  rt_config.terminal_bet_level = force_terminal ? 999 : terminal_bet_level(_root_state);
   SolveJob job{config, rt_config};
   const auto ack = job.ack.get_future();
   {
@@ -489,6 +516,12 @@ void Pluribus::_update_root(const bool solve) {
 
 bool Pluribus::_can_solve(const PokerState& root) const {
   return (root.get_round() > 0 || root.active_players() <= 4) && _board.size() >= n_board_cards(root.get_round());
+}
+
+void Pluribus::_set_invalid(const std::exception& e) {
+  valid = false;
+  Logger::log("Exception: " + std::string{e.what()});
+  Logger::log("An exception occured while running. Start a new game to attempt to recover.");
 }
 
 // bool Pluribus::_should_solve(const PokerState& root) const {

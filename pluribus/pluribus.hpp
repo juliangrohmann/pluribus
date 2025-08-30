@@ -45,6 +45,7 @@ private:
   void _apply_action(Action a, const std::vector<float>& freq);
   void _update_root(bool solve);
   bool _can_solve(const PokerState& root) const;
+  void _set_invalid(const std::exception& e)z;
   // bool _should_solve(const PokerState& root) const;
 
   void _solver_worker();
@@ -66,6 +67,7 @@ private:
   Hand _hero_hand;
   int _hero_pos = -1;
   int _game_idx = 0;
+  bool valid = false;
 
   struct SolveJob {
     SolverConfig cfg;

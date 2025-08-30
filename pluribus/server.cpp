@@ -137,7 +137,7 @@ void PluribusServer::configure_server() {
     j["actions"] = str_actions;
     j["freq"]    = freq;
     j["aligned"] = aligned;
-    j["status"]  = "ok";
+    j["status"]  = actions.size() > 0 && freq.size() > 0 ? "ok" : "error";
     res.set_content(j.dump(), "application/json");
   });
 
