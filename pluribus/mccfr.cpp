@@ -104,16 +104,20 @@ void MCCFRSolver<StorageT>::_solve(long t_plus) {
       }
       for(int i = 0; i < get_config().poker.n_players; ++i) {
         if(is_debug) Logger::log("============== i = " + std::to_string(i) + " ==============");
-        std::vector<CachedIndexer> indexers(get_config().poker.n_players);
         RoundSample sample = sampler.sample();
         board = sample_board(get_config().init_board, sample.mask);
-        for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
-          indexers[h_idx].index(board, sample.hands[h_idx], 3); // cache indexes
+        std::vector<CachedIndexer> indexers(get_config().poker.n_players);
+        std::array<std::vector<uint16_t>, 4> clusters;
+        for(int r = get_config().init_state.get_round(); r < 4; ++r) {
+          for(int h_idx = 0; h_idx < sample.hands.size(); ++h_idx) {
+            indexers[h_idx].index(board, sample.hands[h_idx], 3);
+            clusters[r].push_back(get_cluster(r, board, sample.hands[h_idx], indexers[h_idx]));
+          }
         }
-        on_step(t, i, sample.hands, indexers);
+        on_step(t, i, sample.hands, clusters);
         SlimPokerState state{get_config().init_state};
         SlimPokerState bp_state{get_config().init_state};
-        MCCFRContext<StorageT> ctx{state, t, i, 0, board, sample.hands, indexers, eval, init_regret_storage(), init_bp_node(), bp_state};
+        MCCFRContext<StorageT> ctx{state, t, i, 0, board, sample.hands, clusters, eval, init_regret_storage(), init_bp_node(), bp_state};
         initialize_context(ctx);
         if(should_prune(t)) {
           if(is_debug) Logger::log("============== Traverse MCCFR-P ==============");
@@ -268,7 +272,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr_p(MCCFRContext<StorageT>& ctx) {
     const auto& value_actions = regret_value_actions(ctx.regret_storage);
     const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
     const int n_value_actions = value_actions.size();
-    const int cluster = get_cluster(ctx);
+    const int cluster = ctx.clusters[ctx.state.get_round()][ctx.state.get_active()];
     if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
 
@@ -349,7 +353,7 @@ int MCCFRSolver<StorageT>::traverse_mccfr(MCCFRContext<StorageT>& ctx) {
     const auto& value_actions = regret_value_actions(ctx.regret_storage);
     const auto& branching_actions = regret_branching_actions(ctx.regret_storage);
     const int n_value_actions = value_actions.size();
-    const int cluster = get_cluster(ctx);
+    const int cluster = ctx.clusters[ctx.state.get_round()][ctx.state.get_active()];
     if(is_debug) Logger::log("Cluster: " + std::to_string(cluster));
     std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
     int values[MAX_ACTIONS];
@@ -405,16 +409,11 @@ int MCCFRSolver<StorageT>::traverse_mccfr(MCCFRContext<StorageT>& ctx) {
 
 template <template<typename> class StorageT>
 int MCCFRSolver<StorageT>::external_sampling(const std::vector<Action>& actions, const MCCFRContext<StorageT>& ctx) {
-  const int cluster = get_cluster(ctx);
+  const int cluster = ctx.clusters[ctx.state.get_round()][ctx.state.get_active()];
   const std::atomic<int>* base_ptr = get_base_regret_ptr(ctx.regret_storage, cluster);
   const int a_idx = sample_idx_from_regrets(base_ptr, actions.size());
   // if(is_debug) log_external_sampling(actions[a_idx], actions, freq);
   return a_idx;
-}
-
-template<template <typename> class StorageT>
-int MCCFRSolver<StorageT>::get_cluster(const MCCFRContext<StorageT>& ctx) const {
-  return get_cluster(ctx.state, ctx.board, ctx.hands[ctx.state.get_active()], ctx.indexers[ctx.state.get_active()], ctx.flop_idx);
 }
 
 template <template<typename> class StorageT>
@@ -548,7 +547,7 @@ bool BlueprintSolver<StorageT>::is_update_terminal(const SlimPokerState& state, 
 }
 
 template <template<typename> class StorageT>
-void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& ctx) {
+void BlueprintSolver<StorageT>::update_strategy(UpdateContext<StorageT>& ctx) {
   if(is_update_terminal(ctx.state, ctx.i)) {
     return;
   }
@@ -557,7 +556,7 @@ void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& c
   }
   if(ctx.state.get_active() == ctx.i) {
     const auto& actions = this->avg_value_actions(ctx.avg_storage);
-    int cluster = this->get_cluster(ctx.state, ctx.board, ctx.hands[ctx.state.get_active()], ctx.indexers[ctx.state.get_active()], 0);
+    int cluster = ctx.clusters[ctx.state.get_round()][ctx.state.get_active()];
     const std::atomic<int>* base_ptr = this->get_base_regret_ptr(ctx.regret_storage, cluster);
     float freq[MAX_ACTIONS];
     calculate_strategy_in_place(base_ptr, actions.size(), freq);
@@ -573,16 +572,19 @@ void BlueprintSolver<StorageT>::update_strategy(const UpdateContext<StorageT>& c
     this->get_base_avg_ptr(ctx.avg_storage, cluster)[a_idx].fetch_add(1.0f, std::memory_order_relaxed);
     const Action a = actions[a_idx];
     ctx.state.apply_in_place(a);
-    update_strategy(UpdateContext<StorageT>{ctx.state, this->next_regret_storage(ctx.regret_storage, a_idx, ctx.state, ctx.i),
-                    this->next_avg_storage(ctx.avg_storage, a_idx, ctx.state, ctx.i), next_consec_folds(ctx.consec_folds, a), ctx});
+    ctx.regret_storage = this->next_regret_storage(ctx.regret_storage, a_idx, ctx.state, ctx.i);
+    ctx.avg_storage = this->next_avg_storage(ctx.avg_storage, a_idx, ctx.state, ctx.i);
+    ctx.consec_folds = next_consec_folds(ctx.consec_folds, a);
+    update_strategy(ctx);
   }
   else {
     const auto& actions = this->avg_branching_actions(ctx.avg_storage);
     for(int a_idx = 0; a_idx < actions.size(); ++a_idx) {
       const Action a = actions[a_idx];
       SlimPokerState next_state = ctx.state.apply_copy(a);
-      update_strategy(UpdateContext<StorageT>{next_state, this->next_regret_storage(ctx.regret_storage, a_idx, next_state, ctx.i),
-          this->next_avg_storage(ctx.avg_storage, a_idx, next_state, ctx.i), next_consec_folds(ctx.consec_folds, a), ctx});
+      UpdateContext<StorageT> next_ctx{next_state, this->next_regret_storage(ctx.regret_storage, a_idx, next_state, ctx.i),
+          this->next_avg_storage(ctx.avg_storage, a_idx, next_state, ctx.i), next_consec_folds(ctx.consec_folds, a), ctx};
+      update_strategy(next_ctx);
     }
   }
 }
@@ -594,12 +596,13 @@ void BlueprintSolver<StorageT>::on_start() {
 }
 
 template <template<typename> class StorageT>
-void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::vector<Hand>& hands, std::vector<CachedIndexer>& indexers) {
+void BlueprintSolver<StorageT>::on_step(const long t, const int i, const std::vector<Hand>& hands, const std::array<std::vector<uint16_t>, 4>& clusters) {
   if(t > 0 && t % get_blueprint_config().strategy_interval == 0 && t < get_blueprint_config().preflop_threshold) {
     if(is_debug) Logger::log("============== Updating strategy ==============");
     SlimPokerState state{this->get_config().init_state};
-    update_strategy(UpdateContext<StorageT>{state, i, 0, Board{this->get_config().init_board}, hands, indexers,
-        this->init_regret_storage(), this->init_avg_storage()});
+    UpdateContext<StorageT> ctx{state, i, 0, Board{this->get_config().init_board}, hands, clusters,
+        this->init_regret_storage(), this->init_avg_storage()};
+    update_strategy(ctx);
   }
 }
 
@@ -614,9 +617,8 @@ long BlueprintSolver<StorageT>::next_step(const long t, const long T) const {
 }
 
 template<template<typename> class StorageT>
-int BlueprintSolver<StorageT>::get_cluster(const SlimPokerState& state, const Board& board, const Hand& hand, CachedIndexer& indexer,
-    const int flop_idx) const {
-  return BlueprintClusterMap::get_instance()->cluster(state.get_round(), indexer.index(board, hand, state.get_round()));
+int BlueprintSolver<StorageT>::get_cluster(const int r, const Board& board, const Hand& hand, CachedIndexer& indexer) const {
+  return BlueprintClusterMap::get_instance()->cluster(r, indexer.index(board, hand, r));
 }
 
 // ==========================================================================================
@@ -698,17 +700,17 @@ void RealTimeSolver<StorageT>::on_start() {
 
 template<template <typename> class StorageT>
 void RealTimeSolver<StorageT>::initialize_context(MCCFRContext<StorageT>& ctx) {
-  thread_local std::vector<CachedIndexer> bp_indexers(ctx.indexers.size());
-  ctx.flop_idx = FlopIndexer::get_instance()->index(ctx.board);
+  thread_local std::vector<CachedIndexer> bp_indexers;
+  bp_indexers.clear();
+  bp_indexers.resize(ctx.hands.size());
   ctx.bp_indexers = &bp_indexers;
 }
 
 template<template <typename> class StorageT>
-int RealTimeSolver<StorageT>::get_cluster(const SlimPokerState& state, const Board& board, const Hand& hand, CachedIndexer& indexer,
-    const int flop_idx) const {
-  if(state.get_round() == this->get_config().init_state.get_round()) return HoleCardIndexer::get_instance()->index(hand);
-  const hand_index_t hand_idx = indexer.index(board, hand, state.get_round());
-  return RealTimeClusterMap::get_instance()->cluster(state.get_round(), flop_idx, hand_idx);
+int RealTimeSolver<StorageT>::get_cluster(const int r, const Board& board, const Hand& hand, CachedIndexer& indexer) const {
+  if(r == this->get_config().init_state.get_round()) return HoleCardIndexer::get_instance()->index(hand);
+  const hand_index_t hand_idx = indexer.index(board, hand, r);
+  return RealTimeClusterMap::get_instance()->cluster(r, FlopIndexer::get_instance()->index(board), hand_idx);
 }
 
 // ==========================================================================================
@@ -856,7 +858,7 @@ void TreeRealTimeSolver::freeze(const std::vector<float>& freq, const Hand& hand
     node = node->apply(h_a, state);
   }
   CachedIndexer indexer{};
-  const int cluster = get_cluster(state, board, hand, indexer, FlopIndexer::get_instance()->index(board));
+  const int cluster = get_cluster(state.get_round(), board, hand, indexer);
   std::vector<int> regrets;
   for(const float f : freq) regrets.push_back(f * 100'000'000);
   node->freeze(regrets, cluster);
