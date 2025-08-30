@@ -136,6 +136,13 @@ std::unordered_set<Action> ActionProfile::all_actions() const {
       }
     }
   }
+  for(auto& pos : _iso_actions) {
+    for(auto& ip : pos) {
+      for(Action a : ip) {
+        actions.insert(a);
+      }
+    }
+  }
   return actions;
 }
 
