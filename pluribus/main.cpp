@@ -144,6 +144,17 @@ int main(int argc, char* argv[]) {
 
     }
   }
+  else if(command == "sampled-blueprint-cached") {
+    // ./Pluribus sampled-blueprint-cached lossless_bp_fn buf_dir out_fn
+    if(argc < 5) {
+      std::cout << "Missing arguments to build blueprint.\n";
+    }
+    else {
+      SampledBlueprint sampled_bp;
+      sampled_bp.build_cached(argv[2], get_filepaths(argv[3]));
+      cereal_save(sampled_bp, "sampled_" + std::string{argv[4]});
+    }
+  }
   else {
     std::cout << "Unknown command." << std::endl;
   }

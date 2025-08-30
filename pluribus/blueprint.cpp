@@ -137,7 +137,7 @@ LosslessMetadata build_lossless_buffers(const std::string& preflop_fn, const std
   return meta;
 }
 
-LosslessMetadata collect_meta_data(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns) {
+LosslessMetadata collect_lossless_meta_data(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns) {
   Logger::log("Collecting lossless meta data...");
   Logger::log("Preflop buffer file: " + preflop_buf_fn);
   Logger::log("Final blueprint file: " + final_bp_fn);
@@ -167,8 +167,8 @@ void LosslessBlueprint::build(const std::string& preflop_fn, const std::vector<s
 void LosslessBlueprint::build_cached(const std::string& preflop_buf_fn, const std::string& final_bp_fn, const std::vector<std::string>& buffer_fns,
     const bool preflop) {
   Logger::log("Building lossless blueprint from cached buffers...");
-  const auto metadata = collect_meta_data(preflop_buf_fn, final_bp_fn, buffer_fns);
-  cereal_save(metadata, "metadata.bin");
+  const auto metadata = collect_lossless_meta_data(preflop_buf_fn, final_bp_fn, buffer_fns);
+  cereal_save(metadata, "lossless_metadata.bin");
   build_from_meta_data(metadata, preflop);
 }
 
@@ -349,7 +349,8 @@ void tree_to_sampled_buffers(const TreeStorageNode<float>* node, const ActionHis
 }
 
 SampledMetadata SampledBlueprint::build_sampled_buffers(const std::string& lossless_bp_fn, const std::string& buf_dir, const double max_gb,
-    const ActionProfile& bias_profile, const float factor) {
+    const float factor) {
+  const BiasActionProfile bias_profile;
   Logger::log("Building sampled buffers...");
   const std::filesystem::path buffer_dir = buf_dir;
   LosslessBlueprint bp;
@@ -395,10 +396,34 @@ std::shared_ptr<const TreeStorageConfig> make_sampled_tree_config(const SampledM
 
 void SampledBlueprint::build(const std::string& lossless_bp_fn, const std::string& buf_dir, const int max_gb, const float bias_factor) {
   Logger::log("Building sampled blueprint...");
-  const BiasActionProfile bias_profile;
-  const SampledMetadata meta = build_sampled_buffers(lossless_bp_fn, buf_dir, max_gb, bias_profile, bias_factor);
-  set_config(meta.config);
+  build_from_meta_data(build_sampled_buffers(lossless_bp_fn, buf_dir, max_gb, bias_factor));
+}
 
+SampledMetadata collect_sampled_meta_data(const std::string& lossless_bp_fn, const std::vector<std::string>& buffer_fns) {
+  Logger::log("Building sampled blueprint from cached buffers...");
+  LosslessBlueprint bp;
+  cereal_load(bp, lossless_bp_fn);
+  const BiasActionProfile bias_profile;
+  SampledMetadata meta;
+  meta.config = bp.get_config();
+  meta.tree_config = bp.get_strategy()->make_config_ptr();
+  meta.buffer_fns = buffer_fns;
+  meta.biases = bias_profile.get_actions(meta.config.init_state);
+  Logger::log("Biases=" + std::to_string(meta.biases.size()));
+  return meta;
+}
+
+void SampledBlueprint::build_cached(const std::string& lossless_bp_fn, const std::vector<std::string>& buffer_fns) {
+  Logger::log("Building sampled blueprint...");
+  const SampledMetadata metadata = collect_sampled_meta_data(lossless_bp_fn, buffer_fns);
+  cereal_save(metadata, "sampled_metadata.bin");
+  build_from_meta_data(metadata);
+}
+
+void SampledBlueprint::build_from_meta_data(const SampledMetadata& meta) {
+  Logger::log("Building sampled blueprint from meta data...");
+  const BiasActionProfile bias_profile;
+  set_config(meta.config);
   Logger::log("Initializing sampled blueprint...");
   assign_freq(new TreeStorageNode<uint8_t>(meta.config.init_state, make_sampled_tree_config(meta)));
   for(const auto& buf_fn : meta.buffer_fns) {
