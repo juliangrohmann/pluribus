@@ -1,10 +1,14 @@
 import time
+import sys
+import threading
 from typing import Tuple, List
 from dataclasses import dataclass
 from termcolor import colored
 from colorama import just_fix_windows_console
 from PIL.Image import Image
 from interface import PokerInterface, get_interfaces
+from gui import Overlay, OverlayManager
+from manager import RequestManager
 from state import PokerState
 from screenshot import screenshot_all
 from util import round_to_str, colorize_cards
@@ -13,7 +17,7 @@ from util import round_to_str, colorize_cards
 class PokerTable:
   state: PokerState
   interface: PokerInterface
-  gui: Overlay()
+  manager: RequestManager
   seat_map: List[int]
   round: int = 0
   def __repr__(self) -> str: return f"{self.interface}\n{self.state}"
@@ -33,7 +37,10 @@ def init_new_hand(img:Image, inter:PokerInterface, verbose:bool=False) -> Tuple[
       return PokerState(state_stacks, inter.ante(blinds=True), len(inter.blinds()) == 3, verbose=verbose), seat_map
   return None, None
 
-def update_tables(tables:List[PokerTable]) -> None:
+def find_host(tables:List[PokerTable], hosts:List[str]):
+  return available[0] if (available := [host for host in hosts if not any(t.manager.host == host for t in tables)]) else None
+
+def update_tables(tables:List[PokerTable], hosts:List[str], manager:OverlayManager) -> None:
   curr_inter = get_interfaces()
   curr_handles = set(t.handle for t in curr_inter)
   for i in range(len(tables)-1,-1,-1):
@@ -42,8 +49,12 @@ def update_tables(tables:List[PokerTable]) -> None:
   prev_handles = set(t.interface.handle for t in tables)
   for inter in curr_inter:
     if not inter.handle in prev_handles:
-      tables.append(PokerTable(None, inter, None))
-      print(colored(f"New Table: {inter}", "yellow"))
+      if (host := find_host(tables, hosts)) is not None:
+        tables.append(PokerTable(None, inter, RequestManager(host), None))
+        manager.create_overlay.emit(inter.handle, inter.config.layout)
+        print(colored(f"New Table: {inter}, Host: {host}", "yellow"))
+      else:
+        print("No host found.")
 
 def print_showdown(showing:List[bool], hands:List[str|None], pot:float, board:str):
   print(colored(f"Showdown (Pot: {pot:.2f} bb, Board: {board})", "yellow"))
@@ -159,14 +170,17 @@ def update_state(img:Image, table:PokerTable, debug:int=0):
           else:
             state.check()
 
-def run(log_level:int=0) -> None:
+def run(manager:OverlayManager, log_level:int=0) -> None:
   just_fix_windows_console()
-  cycles = []
+  hosts: List[str] = []
+  with open("hosts.txt") as f:
+    for line in f: hosts.append(line.strip())
+  cycles: List[float] = []
   tables: List[PokerTable] = []
   while True:
     if log_level >= 1: t_0 = time.time()
     screen = screenshot_all()
-    update_tables(tables)
+    update_tables(tables, hosts, manager)
     for table in tables:
       update_state(screen.crop(table.interface.rect()), table, debug=log_level)
     if log_level >= 1:
@@ -178,5 +192,12 @@ def run(log_level:int=0) -> None:
         cycles.clear()
 
 if __name__ == "__main__":
+  from PyQt6.QtWidgets import QApplication
+  app = QApplication(sys.argv)
+  manager = OverlayManager()
+
   print("Running...")
-  run(log_level=2)
+  t = threading.Thread(target=run, args=(manager, 2), daemon=True)
+  t.start()
+
+  app.exec()

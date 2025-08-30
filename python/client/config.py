@@ -8,6 +8,10 @@ def is_exact_rgb(rgb: Tuple[int, int, int], target: Tuple[int, int, int], tol: i
 def is_uniform(rgb: Tuple[int, int, int], tol: int): max_v = max(rgb); return sum(abs(v - max_v) > tol for v in rgb) == 0
 
 @dataclass(frozen=True)
+class GuiLayout:
+  action_bounds: Tuple[float,float,float,float]
+
+@dataclass(frozen=True)
 class SiteConfig:
   board_suits: Tuple[Tuple[float,float], ...]
   board_ranks: Tuple[Tuple[float,float, float,float], ...]
@@ -29,6 +33,7 @@ class SiteConfig:
 class PokerConfig:
   name: str
   site: SiteConfig
+  layout: GuiLayout
   n_players: int
   seats: Tuple[Tuple[float, float], ...]
   cards: Tuple[Tuple[float, float], ...]
@@ -41,7 +46,11 @@ class PokerConfig:
   stacks: Tuple[Tuple[float, float, float, float], ...]
   usernames: Tuple[Tuple[float, float, float, float], ...]
 
-pokerstars = SiteConfig(
+pokerstars_layout = GuiLayout(
+  action_bounds=(0.02, 0.80, 0.50, 0.99)
+)
+
+pokerstars_config = SiteConfig(
   board_suits=((0.3675, 0.3327), (0.4347, 0.3327), (0.5018, 0.3327), (0.5690, 0.3327), (0.6361, 0.3327)),
   board_ranks=((0.3382, 0.3327, 0.3711, 0.3823), (0.4054, 0.3327, 0.4383, 0.3823), (0.4725, 0.3327, 0.5054, 0.3823),
                (0.5397, 0.3327, 0.5725, 0.3823), (0.6068, 0.3327, 0.6397, 0.3823)),
@@ -61,7 +70,8 @@ pokerstars = SiteConfig(
 
 pokerstars_6p = PokerConfig(
   name="PokerStars 6-max",
-  site=pokerstars,
+  site=pokerstars_config,
+  layout=pokerstars_layout,
   n_players=6,
   seats=((0.5252, 0.7301), (0.0924, 0.5457), (0.1302, 0.2348), (0.4737, 0.1372), (0.8728, 0.2348), (0.9033, 0.5457)),
   cards=((0.4821, 0.6616), (0.1008, 0.4771), (0.1996, 0.1676), (0.5472, 0.0686), (0.8939, 0.1676), (0.8624, 0.4771)),
