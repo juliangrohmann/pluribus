@@ -280,7 +280,7 @@ protected:
 
   void on_start() override;
   bool should_prune(long t) const override { return false; /* TODO: test pruning */ }
-  bool should_discount(const long t) const override { return t % _rt_config.discount_interval == 0; }
+  bool should_discount(const long t) const override { return t % _rt_config.is_discount_step(t); }
   bool should_snapshot(long t, long T) const override { return false; }
   bool should_log(const long t) const override { return (t + 1) % _rt_config.log_interval == 0; }
   long next_step(const long t, const long T) const override { return std::min(_rt_config.next_discount_step(t, T), t + 20'000'000); }
