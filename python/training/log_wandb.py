@@ -40,6 +40,7 @@ def clean_startup(directory, used_dir="logged"):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
+  parser.add_argument("name", type=str)
   parser.add_argument('-d', '--directory', type=str, default='.')
   args = parser.parse_args()
   logged_dir = str(pathlib.Path(args.directory) / "logged")
@@ -48,7 +49,7 @@ if __name__ == "__main__":
   clean_startup(args.directory)
 
   wandb.login()
-  run = wandb.init(project="Pluribus", config={})
+  run = None
 
   print("Logging to wandb...")
   while True:
@@ -56,5 +57,7 @@ if __name__ == "__main__":
       file_path = os.path.join(args.directory, filename)
       if os.path.isfile(file_path):
         data = read_and_move(file_path, logged_dir)
-        if data: wandb.log(data)
+        if data:
+          if run is None: wandb.init(project="Pluribus", config={"name": args.name})
+          wandb.log(data)
     time.sleep(0.5)
