@@ -518,12 +518,8 @@ PokerState PokerState::apply_biases(const std::vector<Action>& biases) const {
 }
 
 int total_bet_size(const SlimPokerState& state, const float frac) {
-  const Player& active_player = state.get_players()[state.get_active()];
-  if(frac <= 0.0f) throw std::runtime_error("Invalid action bet size: " + std::to_string(frac));
-  const int missing = state.get_max_bet() - active_player.get_betsize();
-  const int real_pot = state.get_pot().total() + missing;
-  // return static_cast<int>(std::round(static_cast<float>(real_pot) * action.get_bet_type())) + missing + active_player.get_betsize();
-  return real_pot * frac + missing + active_player.get_betsize();
+  // if(frac <= 0.0f) throw std::runtime_error("Invalid action bet size: " + std::to_string(frac));
+  return (state.get_pot().total() + state.get_max_bet() - state.get_players()[state.get_active()].get_betsize()) * frac + state.get_max_bet();
 }
 
 int total_bet_size(const SlimPokerState& state, const Action action) {
