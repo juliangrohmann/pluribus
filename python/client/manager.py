@@ -3,7 +3,6 @@ import aiohttp
 from input_client import new_game, update_state, hero_action, update_board, solution
 from typing import Callable, Awaitable, Dict, Any
 
-
 class RequestCommand:
   def __init__(self, url: str, payload: Dict, callback: Callable[[Dict], None]):
     self.url = url

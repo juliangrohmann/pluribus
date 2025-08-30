@@ -13,6 +13,7 @@ from util import round_to_str, colorize_cards
 class PokerTable:
   state: PokerState
   interface: PokerInterface
+  gui: Overlay()
   seat_map: List[int]
   round: int = 0
   def __repr__(self) -> str: return f"{self.interface}\n{self.state}"

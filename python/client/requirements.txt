@@ -6,3 +6,6 @@ colorama
 requests
 opencv-python
 onnxruntime-gpu
+aiohttp
+pyqt6
+
